@@ -1,14 +1,15 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { SunMedium, Zap, FileText, Users } from 'lucide-react';
+import { AppLogoIcon } from '@/components/app-logo-icon'; // Changed from SunMedium
+import { Zap, FileText, Users } from 'lucide-react';
 
 export default function HomePage() {
   return (
     <div className="flex flex-col min-h-screen">
       <header className="px-4 lg:px-6 h-16 flex items-center border-b">
         <Link href="/" className="flex items-center justify-center" prefetch={false}>
-          <SunMedium className="h-6 w-6 text-primary" />
-          <span className="ml-2 text-xl font-semibold font-headline">Solaris CRM</span>
+          <AppLogoIcon className="h-6 w-6" /> {/* Changed from SunMedium */}
+          <span className="ml-2 text-xl font-semibold font-headline">Soryouth</span> {/* Changed from Solaris CRM */}
         </Link>
         <nav className="ml-auto flex gap-4 sm:gap-6">
           <Link
@@ -30,10 +31,10 @@ export default function HomePage() {
               <div className="flex flex-col justify-center space-y-4">
                 <div className="space-y-2">
                   <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none font-headline">
-                    Power Up Your Solar Business with Solaris CRM
+                    Power Up Your Renewable Energy Business with Soryouth {/* Changed from Solaris CRM */}
                   </h1>
                   <p className="max-w-[600px] text-muted-foreground md:text-xl">
-                    Streamline your operations, manage leads effectively, and generate documents with ease. Solaris CRM is designed for solar companies like yours.
+                    Streamline your operations, manage leads effectively, and generate documents with ease. Soryouth is designed for renewable energy companies like yours. {/* Changed from Solaris CRM */}
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
@@ -45,9 +46,9 @@ export default function HomePage() {
                 </div>
               </div>
               <img
-                src="https://placehold.co/600x400.png?text=Solar+Panel+Installation"
-                alt="Solar Panel Installation"
-                data-ai-hint="solar panels"
+                src="https://placehold.co/600x400.png?text=Renewable+Energy"
+                alt="Renewable Energy Installation"
+                data-ai-hint="renewable energy" // Updated hint
                 width="600"
                 height="400"
                 className="mx-auto aspect-video overflow-hidden rounded-xl object-cover sm:w-full lg:order-last"
@@ -63,10 +64,10 @@ export default function HomePage() {
                   Key Features
                 </div>
                 <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl font-headline">
-                  Everything Your Solar Business Needs
+                  Everything Your Renewable Energy Business Needs {/* Changed "Solar" to "Renewable Energy" */}
                 </h2>
                 <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-                  From lead management to AI-powered document customization, Solaris CRM provides the tools to help you succeed.
+                  From lead management to AI-powered document customization, Soryouth provides the tools to help you succeed. {/* Changed from Solaris CRM */}
                 </p>
               </div>
             </div>
@@ -98,7 +99,7 @@ export default function HomePage() {
       </main>
       <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t">
         <p className="text-xs text-muted-foreground">
-          &copy; {new Date().getFullYear()} Solaris CRM. All rights reserved.
+          &copy; {new Date().getFullYear()} Soryouth. All rights reserved. {/* Changed from Solaris CRM */}
         </p>
         <nav className="sm:ml-auto flex gap-4 sm:gap-6">
           <Link href="#" className="text-xs hover:underline underline-offset-4" prefetch={false}>

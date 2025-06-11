@@ -9,7 +9,7 @@ import {
   TerminalSquare,
 } from 'lucide-react';
 
-export const APP_NAME = "Solaris CRM";
+export const APP_NAME = "Soryouth";
 
 export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },

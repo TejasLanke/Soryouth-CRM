@@ -3,8 +3,8 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: 'Solaris CRM',
-  description: 'A fully equipped CRM for Solar companies.',
+  title: 'Soryouth',
+  description: 'Empowering your renewable energy business with Soryouth.',
 };
 
 export default function RootLayout({

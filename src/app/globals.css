@@ -4,78 +4,78 @@
 
 @layer base {
   :root {
-    --background: 195 100% 95%; /* Light Blue #E6F7FF */
-    --foreground: 200 25% 20%; /* Dark Blue-Gray */
+    --background: 205 60% 96%; /* Very Light Blue */
+    --foreground: 205 30% 15%; /* Very Dark Blue */
     --card: 0 0% 100%; /* White */
-    --card-foreground: 200 25% 20%;
+    --card-foreground: 205 30% 15%;
     --popover: 0 0% 100%;
-    --popover-foreground: 200 25% 20%;
-    --primary: 195 100% 50%; /* Deep Sky Blue #00BFFF */
+    --popover-foreground: 205 30% 15%;
+    --primary: 205 88% 53%; /* Soryouth Blue */
     --primary-foreground: 0 0% 100%; /* White */
-    --secondary: 195 60% 88%; /* Lighter shade of primary */
-    --secondary-foreground: 195 100% 30%; /* Darker blue */
-    --muted: 195 50% 90%; /* Very light blue-gray */
-    --muted-foreground: 195 30% 50%; /* Slightly darker muted text */
-    --accent: 33 100% 64%; /* Orange-Yellow #FFB347 */
-    --accent-foreground: 33 100% 15%; /* Dark brown/black */
+    --secondary: 145 55% 60%; /* Soryouth Green */
+    --secondary-foreground: 145 55% 20%; /* Darker Green for text on secondary */
+    --muted: 205 50% 92%; /* Lighter blue-gray */
+    --muted-foreground: 205 30% 45%; /* Medium blue-gray for muted text */
+    --accent: 28 95% 55%; /* Soryouth Orange */
+    --accent-foreground: 28 100% 15%; /* Dark brown for text on accent */
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 195 50% 80%; /* Slightly darker blue for borders */
-    --input: 195 50% 85%; /* Can be background for inputs or border if transparent */
-    --ring: 195 100% 50%; /* Primary color for focus rings */
-    --chart-1: 195 100% 50%;
-    --chart-2: 33 100% 64%;
-    --chart-3: 195 70% 70%;
-    --chart-4: 33 80% 70%;
-    --chart-5: 195 50% 60%;
+    --border: 205 40% 80%; /* Softer blue for borders */
+    --input: 205 40% 90%; /* Light blue for input backgrounds or borders */
+    --ring: 205 88% 53%; /* Primary blue for focus rings */
+    --chart-1: 205 88% 53%; /* Soryouth Blue */
+    --chart-2: 28 95% 55%; /* Soryouth Orange */
+    --chart-3: 145 55% 60%; /* Soryouth Green */
+    --chart-4: 205 70% 70%; /* Lighter Blue */
+    --chart-5: 28 70% 70%; /* Lighter Orange */
     --radius: 0.5rem;
 
     /* Sidebar specific colors */
-    --sidebar-background: 195 80% 92%;
-    --sidebar-foreground: 195 30% 25%;
-    --sidebar-primary: 195 100% 50%;
+    --sidebar-background: 205 40% 20%; /* Darker blue for sidebar */
+    --sidebar-foreground: 205 60% 90%; /* Light text for dark sidebar */
+    --sidebar-primary: 205 88% 53%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 195 100% 85%;
-    --sidebar-accent-foreground: 195 100% 25%;
-    --sidebar-border: 195 50% 75%;
-    --sidebar-ring: 195 100% 50%;
+    --sidebar-accent: 205 88% 63%; /* Lighter blue for hover/accent on sidebar */
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 205 40% 30%;
+    --sidebar-ring: 205 88% 53%;
   }
 
   .dark {
-    --background: 200 30% 10%; /* Very dark desaturated blue */
-    --foreground: 195 80% 90%; /* Light cyan/blue */
-    --card: 200 30% 15%;
-    --card-foreground: 195 80% 90%;
-    --popover: 200 30% 12%;
-    --popover-foreground: 195 80% 90%;
-    --primary: 195 100% 60%; /* Brighter Deep Sky Blue */
-    --primary-foreground: 200 50% 10%; /* Very dark blue */
-    --secondary: 195 50% 25%;
-    --secondary-foreground: 195 80% 85%;
-    --muted: 195 30% 20%;
-    --muted-foreground: 195 50% 65%;
-    --accent: 33 100% 70%; /* Brighter Orange-Yellow */
-    --accent-foreground: 33 100% 10%;
+    --background: 205 30% 10%; /* Very dark blue */
+    --foreground: 205 60% 92%; /* Very light blue for text */
+    --card: 205 30% 15%;
+    --card-foreground: 205 60% 92%;
+    --popover: 205 30% 12%;
+    --popover-foreground: 205 60% 92%;
+    --primary: 205 88% 63%; /* Brighter Soryouth Blue */
+    --primary-foreground: 205 30% 10%; /* Dark text on primary for contrast */
+    --secondary: 145 55% 50%; /* Slightly darker Soryouth Green */
+    --secondary-foreground: 145 55% 90%; /* Light green text */
+    --muted: 205 30% 22%;
+    --muted-foreground: 205 50% 65%;
+    --accent: 28 95% 60%; /* Brighter Soryouth Orange */
+    --accent-foreground: 28 100% 10%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 195 40% 30%;
-    --input: 195 40% 25%;
-    --ring: 195 100% 60%;
-    --chart-1: 195 100% 60%;
-    --chart-2: 33 100% 70%;
-    --chart-3: 195 70% 50%;
-    --chart-4: 33 80% 60%;
-    --chart-5: 195 50% 40%;
+    --border: 205 30% 30%;
+    --input: 205 30% 25%;
+    --ring: 205 88% 63%;
+    --chart-1: 205 88% 63%;
+    --chart-2: 28 95% 60%;
+    --chart-3: 145 55% 50%;
+    --chart-4: 205 70% 50%;
+    --chart-5: 28 70% 60%;
 
     /* Dark Sidebar specific colors */
-    --sidebar-background: 200 30% 8%; /* Even darker for sidebar */
-    --sidebar-foreground: 195 70% 85%;
-    --sidebar-primary: 195 100% 60%;
-    --sidebar-primary-foreground: 200 50% 10%;
-    --sidebar-accent: 195 80% 25%; /* Darker blue accent for hover */
-    --sidebar-accent-foreground: 195 70% 90%;
-    --sidebar-border: 195 30% 22%;
-    --sidebar-ring: 195 100% 60%;
+    --sidebar-background: 205 30% 8%; /* Even darker blue */
+    --sidebar-foreground: 205 70% 85%;
+    --sidebar-primary: 205 88% 63%;
+    --sidebar-primary-foreground: 205 30% 10%;
+    --sidebar-accent: 205 88% 53%; /* Adjusted Soryouth Blue accent for dark sidebar hover */
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 205 30% 20%;
+    --sidebar-ring: 205 88% 63%;
   }
 }
 
