@@ -36,8 +36,8 @@ interface DocumentCreationDialogProps {
 }
 
 // Define schemas for different document types
-const invoiceSchema = z.object({
-  customerName: z.string().min(1, 'Customer name is required'),
+const purchaseOrderSchema = z.object({
+  customerName: z.string().min(1, 'Customer name is required'), // Or 'Supplier Name' if more appropriate contextually
   amount: z.coerce.number().positive('Amount must be a positive number'),
   itemDescription: z.string().min(1, 'Item description is required'),
   relatedLeadId: z.string().optional(),
@@ -60,7 +60,7 @@ const genericSchema = z.object({
 });
 
 
-type InvoiceFormValues = z.infer<typeof invoiceSchema>;
+type PurchaseOrderFormValues = z.infer<typeof purchaseOrderSchema>;
 type ContractFormValues = z.infer<typeof contractSchema>;
 type GenericFormValues = z.infer<typeof genericSchema>;
 
@@ -72,7 +72,7 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
   // Determine the schema and default values based on documentType
   const currentSchema = (() => {
     switch (documentType) {
-      case 'Invoice': return invoiceSchema;
+      case 'Purchase Order': return purchaseOrderSchema;
       case 'Contract': return contractSchema;
       // Add cases for other document types
       default: return genericSchema; // Fallback for other types
@@ -81,7 +81,7 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
 
   const defaultValues = (() => {
     switch (documentType) {
-      case 'Invoice': return { customerName: '', amount: 0, itemDescription: '', relatedLeadId: '' };
+      case 'Purchase Order': return { customerName: '', amount: 0, itemDescription: '', relatedLeadId: '' };
       case 'Contract': return { clientName: '', effectiveDate: '', contractTerms: '', relatedLeadId: '' };
       default: return { title: '', details: '', relatedLeadId: ''};
     }
@@ -129,17 +129,17 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
 
   const renderFormFields = () => {
     switch (documentType) {
-      case 'Invoice':
+      case 'Purchase Order':
         return (
           <>
             <FormField
               control={form.control}
-              name="customerName"
+              name="customerName" // Keeping as customerName for consistency with existing structure, can be re-labeled
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Customer Name</FormLabel>
+                  <FormLabel>Customer/Project Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="John Doe" {...field} />
+                    <Input placeholder="John Doe Project" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -163,9 +163,9 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
               name="itemDescription"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Item Description</FormLabel>
+                  <FormLabel>Item/Service Description</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="E.g., Solar Panel Installation (5kW)" {...field} />
+                    <Textarea placeholder="E.g., Supply of 10 Solar Panels (Model X)" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -325,4 +325,3 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
     </Dialog>
   );
 }
-    

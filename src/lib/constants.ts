@@ -7,6 +7,11 @@ import {
   MessageSquareText,
   WandSparkles,
   TerminalSquare,
+  CheckSquare,
+  Award,
+  Edit,
+  Eye,
+  FileSignature,
 } from 'lucide-react';
 
 export const APP_NAME = "Soryouth";
@@ -32,14 +37,25 @@ export const MOCK_QUOTATIONS: Quotation[] = [
   { id: 'q2', leadId: '2', leadName: 'Jane Smith', quotationNumber: 'Q-2024-002', amount: 22000, status: 'Sent', createdAt: new Date(Date.now() - 86400000).toISOString(), validUntil: new Date(Date.now() + 2505600000).toISOString() },
 ];
 
+export const DOCUMENT_TYPES_CONFIG: Array<{ type: DocumentType; icon: React.ComponentType<{ className?: string }>; description: string }> = [
+  { type: 'Work Completion Report', icon: CheckSquare, description: 'Reports confirming project completion.' },
+  { type: 'Purchase Order', icon: FileText, description: 'Purchase orders for goods or services.' },
+  { type: 'Contract', icon: FileSignature, description: 'Legal agreements and contracts.' },
+  { type: 'Proposal Document', icon: Edit, description: 'Proposals and quotations for leads.' },
+  { type: 'Site Survey Report', icon: Eye, description: 'Reports from on-site assessments.' },
+  { type: 'Warranty Certificate', icon: Award, description: 'Certificates for product/service warranties.' },
+  // { type: 'Other', icon: Files, description: 'Other general documents.'} // Example for 'Other'
+];
+
+
 export const MOCK_DOCUMENTS: Document[] = [
   { id: 'd1', title: 'Work Completion for Project Sunbeam', type: 'Work Completion Report', relatedLeadId: '2', createdAt: new Date().toISOString() },
-  { id: 'd2', title: 'Invoice INV-2024-050', type: 'Invoice', relatedLeadId: '1', createdAt: new Date(Date.now() - 172800000).toISOString() },
+  { id: 'd2', title: 'Purchase Order PO-2024-050', type: 'Purchase Order', relatedLeadId: '1', createdAt: new Date(Date.now() - 172800000).toISOString() },
   { id: 'd3', title: 'Standard Service Contract Alpha', type: 'Contract', relatedLeadId: '1', createdAt: new Date(Date.now() - 86400000).toISOString() },
   { id: 'd4', title: 'Proposal for Green Energy Solutions', type: 'Proposal Document', relatedLeadId: '3', createdAt: new Date().toISOString() },
   { id: 'd5', title: 'Site Survey - 123 Main St', type: 'Site Survey Report', relatedLeadId: '1', createdAt: new Date(Date.now() - 2*86400000).toISOString() },
   { id: 'd6', title: 'System Warranty - Project Sunbeam', type: 'Warranty Certificate', relatedLeadId: '2', createdAt: new Date().toISOString() },
-  { id: 'd7', title: 'Invoice INV-2024-051', type: 'Invoice', relatedLeadId: '3', createdAt: new Date(Date.now() - 90000000).toISOString() },
+  { id: 'd7', title: 'Purchase Order PO-2024-051', type: 'Purchase Order', relatedLeadId: '3', createdAt: new Date(Date.now() - 90000000).toISOString() },
 ];
 
 export const MOCK_COMMUNICATIONS: Communication[] = [

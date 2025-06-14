@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { MOCK_DOCUMENTS } from '@/lib/constants';
+import { MOCK_DOCUMENTS, DOCUMENT_TYPES_CONFIG } from '@/lib/constants';
 import type { Document, DocumentType } from '@/types';
 import { 
   Files, 
@@ -14,25 +14,11 @@ import {
   Eye, 
   Edit3, 
   ArrowLeft, 
-  FileSignature, 
-  FileText as FileTextIcon, 
-  CheckSquare, 
-  Award,
-  Edit as EditIcon,
   type LucideIcon
 } from 'lucide-react';
-import { DocumentCreationDialog } from './document-creation-dialog'; // New import
+import { DocumentCreationDialog } from './document-creation-dialog';
 import { useToast } from '@/hooks/use-toast';
 
-const DOCUMENT_TYPES_CONFIG: Array<{ type: DocumentType; icon: LucideIcon; description: string }> = [
-  { type: 'Work Completion Report', icon: CheckSquare, description: 'Reports confirming project completion.' },
-  { type: 'Invoice', icon: FileTextIcon, description: 'Billing documents for services/products.' },
-  { type: 'Contract', icon: FileSignature, description: 'Legal agreements and contracts.' },
-  { type: 'Proposal Document', icon: EditIcon, description: 'Proposals and quotations for leads.' },
-  { type: 'Site Survey Report', icon: Eye, description: 'Reports from on-site assessments.' },
-  { type: 'Warranty Certificate', icon: Award, description: 'Certificates for product/service warranties.' },
-  // { type: 'Other', icon: Files, description: 'Other general documents.'} // Example for 'Other'
-];
 
 export default function DocumentsPage() {
   const [selectedType, setSelectedType] = useState<DocumentType | null>(null);
@@ -85,7 +71,6 @@ export default function DocumentsPage() {
                 {selectedTypeConfig?.icon ? <selectedTypeConfig.icon className="mx-auto h-12 w-12 mb-4 text-muted-foreground" /> : <Files className="mx-auto h-12 w-12 mb-4" /> }
                 <h3 className="text-xl font-semibold mb-2">No {selectedType}s Yet</h3>
                 <p className="mb-4">Start by creating your first {selectedType.toLowerCase()}.</p>
-                 {/* Create button moved to header for this view */}
               </div>
             </CardContent>
           </Card>
@@ -174,4 +159,3 @@ export default function DocumentsPage() {
     </>
   );
 }
-    

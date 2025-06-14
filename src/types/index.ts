@@ -23,7 +23,7 @@ export interface Quotation {
 
 export type DocumentType =
   | 'Work Completion Report'
-  | 'Invoice'
+  | 'Purchase Order'
   | 'Contract'
   | 'Proposal Document'
   | 'Site Survey Report'

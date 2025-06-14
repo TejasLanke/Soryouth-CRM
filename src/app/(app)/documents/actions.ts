@@ -83,4 +83,3 @@ export async function createDocumentInDrive(
     documentId: `mock_drive_id_${Date.now()}`, // Simulate a returned Drive ID
   };
 }
-    
