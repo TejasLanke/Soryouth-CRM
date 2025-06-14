@@ -14,13 +14,14 @@ import {
   Eye,
   FileSignature,
 } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 
 export const APP_NAME = "Soryouth";
 
 export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/leads', label: 'Leads', icon: UsersRound },
-  { href: '/proposals', label: 'Proposals', icon: FileText }, // Formerly Quotations
+  { href: '/proposals', label: 'Proposals', icon: FileText },
   { href: '/documents', label: 'Documents', icon: Files },
   { href: '/communications', label: 'Communications', icon: MessageSquareText },
   { href: '/document-customizer', label: 'AI Document Customizer', icon: WandSparkles },
@@ -39,23 +40,25 @@ export const DCR_STATUSES: DCRStatus[] = ['DCR', 'Non-DCR'];
 export const MODULE_WATTAGE_OPTIONS: ModuleWattage[] = ["540", "545", "550", "585", "590"];
 
 
-const calculateFinancials = (ratePerWatt: number, capacity: number, clientType: ClientType, manualSubsidyInput?: number): Pick<Proposal, 'baseAmount' | 'cgstAmount' | 'sgstAmount' | 'subtotalAmount' | 'finalAmount' | 'subsidyAmount'> => {
+const calculateFinancialsAndSubsidy = (ratePerWatt: number, capacity: number, clientType: ClientType): Pick<Proposal, 'baseAmount' | 'cgstAmount' | 'sgstAmount' | 'subtotalAmount' | 'finalAmount' | 'subsidyAmount'> => {
   const baseAmount = ratePerWatt * capacity * 1000;
   const cgstAmount = baseAmount * 0.069;
   const sgstAmount = baseAmount * 0.069;
-  const subtotalAmount = baseAmount + cgstAmount + sgstAmount; // This is total before subsidy
+  const subtotalAmount = baseAmount + cgstAmount + sgstAmount;
+  const finalAmountPreSubsidy = subtotalAmount;
 
   let subsidyAmount = 0;
   if (clientType === 'Housing Society') {
     subsidyAmount = 18000 * capacity;
-  } else if (clientType === 'Individual/Bungalow' && manualSubsidyInput !== undefined) {
-    subsidyAmount = manualSubsidyInput;
+  } else if (clientType === 'Individual/Bungalow') {
+    if (capacity === 1) subsidyAmount = 30000;
+    else if (capacity === 2) subsidyAmount = 60000;
+    else if (capacity >= 3) subsidyAmount = 78000;
+    else subsidyAmount = 0;
   }
-  // For Commercial/Industrial, subsidy is 0 by default.
+  // For Commercial/Industrial, subsidy remains 0
 
-  const finalAmount = subtotalAmount; // finalAmount field now stores the pre-subsidy total
-
-  return { baseAmount, cgstAmount, sgstAmount, subtotalAmount, finalAmount, subsidyAmount };
+  return { baseAmount, cgstAmount, sgstAmount, subtotalAmount, finalAmount: finalAmountPreSubsidy, subsidyAmount };
 };
 
 
@@ -75,8 +78,8 @@ export const MOCK_PROPOSALS: Proposal[] = [
     inverterRating: 50,
     inverterQty: 2,
     ratePerWatt: 40,
-    proposalDate: new Date(Date.now() - 86400000 * 7).toISOString(),
-    ...calculateFinancials(40, 50, 'Housing Society'),
+    proposalDate: format(new Date(Date.now() - 86400000 * 7), 'yyyy-MM-dd'),
+    ...calculateFinancialsAndSubsidy(40, 50, 'Housing Society'),
     createdAt: new Date(Date.now() - 86400000 * 7).toISOString(),
     updatedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
   },
@@ -88,15 +91,15 @@ export const MOCK_PROPOSALS: Proposal[] = [
     clientType: 'Individual/Bungalow',
     contactPerson: 'Mr. Anil Patel',
     location: 'Mumbai, MH',
-    capacity: 10,
+    capacity: 10, // capacity >= 3, so subsidy will be 78000
     moduleType: 'TOPCon',
     moduleWattage: '585',
     dcrStatus: 'Non-DCR',
     inverterRating: 10,
     inverterQty: 1,
     ratePerWatt: 45,
-    proposalDate: new Date(Date.now() - 86400000 * 12).toISOString(),
-    ...calculateFinancials(45, 10, 'Individual/Bungalow', 50000),
+    proposalDate: format(new Date(Date.now() - 86400000 * 12), 'yyyy-MM-dd'),
+    ...calculateFinancialsAndSubsidy(45, 10, 'Individual/Bungalow'), // Subsidy now calculated
     createdAt: new Date(Date.now() - 86400000 * 12).toISOString(),
     updatedAt: new Date(Date.now() - 86400000 * 1).toISOString(),
   },
@@ -111,20 +114,20 @@ export const MOCK_PROPOSALS: Proposal[] = [
     capacity: 200,
     moduleType: 'Mono PERC',
     moduleWattage: '550',
-    dcrStatus: 'DCR', // Will be overridden to Non-DCR by form logic if type is commercial/industrial
+    dcrStatus: 'Non-DCR', // Should be Non-DCR for commercial
     inverterRating: 200,
     inverterQty: 5,
     ratePerWatt: 38,
-    proposalDate: new Date(Date.now() - 86400000 * 3).toISOString(),
-    ...calculateFinancials(38, 200, 'Commercial'),
+    proposalDate: format(new Date(Date.now() - 86400000 * 3), 'yyyy-MM-dd'),
+    ...calculateFinancialsAndSubsidy(38, 200, 'Commercial'),
     createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
     updatedAt: new Date(Date.now() - 86400000 * 1).toISOString(),
   },
    {
     id: 'prop4',
     proposalNumber: 'P-2024-004',
-    clientId: 'client1', // Same client as prop1 for testing multiple proposals
-    name: 'Green Valley Society', // Name should be consistent for the same client
+    clientId: 'client1',
+    name: 'Green Valley Society',
     clientType: 'Housing Society',
     contactPerson: 'Mr. Sharma',
     location: 'Pune, MH',
@@ -135,9 +138,49 @@ export const MOCK_PROPOSALS: Proposal[] = [
     inverterRating: 75,
     inverterQty: 3,
     ratePerWatt: 39,
-    proposalDate: new Date(Date.now() - 86400000 * 1).toISOString(),
-    ...calculateFinancials(39, 75, 'Housing Society'),
+    proposalDate: format(new Date(Date.now() - 86400000 * 1), 'yyyy-MM-dd'),
+    ...calculateFinancialsAndSubsidy(39, 75, 'Housing Society'),
     createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  { // Example for 1kW Individual to test subsidy
+    id: 'prop5',
+    proposalNumber: 'P-2024-005',
+    clientId: 'client4',
+    name: 'Mrs. Sunita Rao (Bungalow)',
+    clientType: 'Individual/Bungalow',
+    contactPerson: 'Mrs. Sunita Rao',
+    location: 'Nashik, MH',
+    capacity: 1, // 1kW capacity
+    moduleType: 'Mono PERC',
+    moduleWattage: '540',
+    dcrStatus: 'DCR',
+    inverterRating: 1,
+    inverterQty: 1,
+    ratePerWatt: 50,
+    proposalDate: format(new Date(Date.now() - 86400000 * 2), 'yyyy-MM-dd'),
+    ...calculateFinancialsAndSubsidy(50, 1, 'Individual/Bungalow'), // Subsidy should be 30000
+    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  { // Example for 2kW Individual to test subsidy
+    id: 'prop6',
+    proposalNumber: 'P-2024-006',
+    clientId: 'client5',
+    name: 'Mr. Vijay Kumar (Bungalow)',
+    clientType: 'Individual/Bungalow',
+    contactPerson: 'Mr. Vijay Kumar',
+    location: 'Aurangabad, MH',
+    capacity: 2, // 2kW capacity
+    moduleType: 'TOPCon',
+    moduleWattage: '550',
+    dcrStatus: 'Non-DCR',
+    inverterRating: 2,
+    inverterQty: 1,
+    ratePerWatt: 48,
+    proposalDate: format(new Date(Date.now() - 86400000 * 5), 'yyyy-MM-dd'),
+    ...calculateFinancialsAndSubsidy(48, 2, 'Individual/Bungalow'), // Subsidy should be 60000
+    createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
     updatedAt: new Date().toISOString(),
   },
 ];
@@ -147,7 +190,7 @@ export const DOCUMENT_TYPES_CONFIG: Array<{ type: DocumentType; icon: React.Comp
   { type: 'Work Completion Report', icon: CheckSquare, description: 'Reports confirming project completion.' },
   { type: 'Purchase Order', icon: FileText, description: 'Purchase orders for goods or services.' },
   { type: 'Annexure I', icon: FileSignature, description: 'Annexure I documents for compliance.' },
-  { type: 'DCR Declaration', icon: Edit, description: 'Declarations related to domestic content requirement.' }, // Replaced Proposal Document
+  { type: 'DCR Declaration', icon: Edit, description: 'Declarations related to domestic content requirement.' },
   { type: 'Net Metering Agreement', icon: Eye, description: 'Agreements for net metering services.' },
   { type: 'Warranty Certificate', icon: Award, description: 'Certificates for product/service warranties.' },
 ];
@@ -169,3 +212,4 @@ export const MOCK_COMMUNICATIONS: Communication[] = [
     { id: 'c3', leadId: 'lead2', type: 'System Alert', content: 'Lead status changed to "Contacted".', direction: 'Outgoing', timestamp: new Date(Date.now() - 3600000).toISOString() },
     { id: 'c4', leadId: 'lead2', type: 'Meeting', subject: 'Site Visit', content: 'Scheduled site visit for next Tuesday.', direction: 'Outgoing', timestamp: new Date().toISOString(), recordedBy: 'Sales Rep B'},
 ];
+

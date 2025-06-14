@@ -43,6 +43,7 @@ import { Separator } from '@/components/ui/separator';
 // Export schema for reusability
 export const proposalSchema = z.object({
   proposalNumber: z.string().min(3, { message: 'Proposal number must be at least 3 characters.' }),
+  proposalDate: z.string({ required_error: "Proposal date is required." }).refine(val => !isNaN(Date.parse(val)), { message: "Invalid date format" }),
   name: z.string().min(2, { message: 'Client/Company name must be at least 2 characters.' }),
   clientType: z.enum(CLIENT_TYPES as [ClientType, ...ClientType[]], { required_error: "Client type is required."}),
   contactPerson: z.string().min(2, { message: 'Contact person must be at least 2 characters.' }),
@@ -54,8 +55,6 @@ export const proposalSchema = z.object({
   inverterRating: z.coerce.number().positive({ message: 'Inverter rating (kW) must be a positive number.' }),
   inverterQty: z.coerce.number().int().positive({ message: 'Inverter quantity must be a positive integer.' }),
   ratePerWatt: z.coerce.number().positive({ message: 'Rate per Watt (₹) must be a positive number.' }),
-  proposalDate: z.string({ required_error: "Proposal date is required." }).refine(val => !isNaN(Date.parse(val)), { message: "Invalid date format" }),
-  // Subsidy is handled separately as it's more of a calculation result or conditional input
   subsidyAmount: z.coerce.number().min(0, { message: 'Subsidy amount cannot be negative.' }).optional(),
 });
 
@@ -66,15 +65,16 @@ interface ProposalFormProps {
   onClose: () => void;
   onSubmit: (data: Proposal) => void;
   proposal?: Proposal | null;
-  initialData?: { 
+  initialData?: {
     clientId?: string;
-    name?: string; 
+    name?: string;
     clientType?: ClientType;
   };
 }
 
 const initialFormStateForUseForm: ProposalFormValues = {
-  proposalNumber: "", 
+  proposalNumber: "",
+  proposalDate: format(new Date(), 'yyyy-MM-dd'),
   name: "",
   clientType: CLIENT_TYPES[0],
   contactPerson: "",
@@ -86,7 +86,6 @@ const initialFormStateForUseForm: ProposalFormValues = {
   inverterRating: 0,
   inverterQty: 1,
   ratePerWatt: 0,
-  proposalDate: format(new Date(), 'yyyy-MM-dd'),
   subsidyAmount: 0,
 };
 
@@ -98,13 +97,13 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, initialData 
 
   useEffect(() => {
     if (isOpen) {
-      if (proposal) { 
+      if (proposal) {
         form.reset({
           ...proposal,
           proposalDate: proposal.proposalDate ? format(parseISO(proposal.proposalDate), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-          subsidyAmount: proposal.subsidyAmount,
+          subsidyAmount: proposal.subsidyAmount, // Will be recalculated anyway by effect below
         });
-      } else { 
+      } else {
         const clientSideProposalNumber = `P-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 100000)).padStart(5, '0')}`;
         let initialContactPerson = '';
         if (initialData?.clientType === 'Individual/Bungalow' && initialData.name) {
@@ -112,7 +111,7 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, initialData 
         }
 
         form.reset({
-          ...initialFormStateForUseForm, 
+          ...initialFormStateForUseForm,
           proposalNumber: clientSideProposalNumber,
           proposalDate: format(new Date(), 'yyyy-MM-dd'),
           name: initialData?.name || '',
@@ -130,15 +129,12 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, initialData 
   const watchedName = form.watch('name');
 
   useEffect(() => {
-    if (isOpen && !proposal) { 
+    if (isOpen && !proposal) {
         if (watchedClientType === 'Individual/Bungalow' && watchedName) {
             const currentContact = form.getValues('contactPerson');
             if (!currentContact || currentContact === '' || currentContact !== watchedName) {
                  form.setValue('contactPerson', watchedName, { shouldValidate: true, shouldDirty: true });
             }
-        } else if (watchedClientType !== 'Individual/Bungalow' && form.getValues('contactPerson') === watchedName) {
-            // Clear if type changes from individual and contact was same as name
-            // form.setValue('contactPerson', '', { shouldValidate: true, shouldDirty: true });
         }
     }
   }, [watchedName, watchedClientType, form, isOpen, proposal]);
@@ -160,22 +156,22 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, initialData 
       }
     }
   }, [watchedClientType, form]);
-  
+
   const calculatedValues = useMemo(() => {
-    const capacity = parseFloat(watchedCapacity as any) || 0;
-    const ratePerWatt = parseFloat(watchedRatePerWatt as any) || 0;
+    const capacity = parseFloat(String(watchedCapacity)) || 0;
+    const ratePerWatt = parseFloat(String(watchedRatePerWatt)) || 0;
 
     const baseAmount = ratePerWatt * capacity * 1000;
     const cgstAmount = baseAmount * 0.069;
     const sgstAmount = baseAmount * 0.069;
-    const finalAmount = baseAmount + cgstAmount + sgstAmount; // Final amount is pre-subsidy
+    const finalAmount = baseAmount + cgstAmount + sgstAmount; // This is pre-subsidy
 
     return { baseAmount, cgstAmount, sgstAmount, finalAmount };
   }, [watchedCapacity, watchedRatePerWatt]);
 
-  // Subsidy calculation effect
+
    useEffect(() => {
-    const capacity = parseFloat(watchedCapacity as any) || 0;
+    const capacity = parseFloat(String(watchedCapacity)) || 0;
     let newSubsidyAmount = 0;
 
     if (watchedClientType === 'Housing Society') {
@@ -183,21 +179,25 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, initialData 
     } else if (watchedClientType === 'Commercial' || watchedClientType === 'Industrial') {
       newSubsidyAmount = 0;
     } else if (watchedClientType === 'Individual/Bungalow') {
-      // For Individual/Bungalow, subsidy is manually entered.
-      // We can ensure subsidyAmount is not undefined if schema expects a number
-      // If we are editing, it will be prefilled. If new, it defaults to 0 from initialFormState.
-      newSubsidyAmount = parseFloat(form.getValues('subsidyAmount') as any);
-      if(isNaN(newSubsidyAmount)) newSubsidyAmount = 0;
+      if (capacity === 1) {
+        newSubsidyAmount = 30000;
+      } else if (capacity === 2) {
+        newSubsidyAmount = 60000;
+      } else if (capacity >= 3) {
+        newSubsidyAmount = 78000;
+      } else {
+        newSubsidyAmount = 0; // Default for capacity < 1 or other cases
+      }
     }
-    
-    if (form.getValues('subsidyAmount') !== newSubsidyAmount && watchedClientType !== 'Individual/Bungalow') {
+
+    const currentFormSubsidy = parseFloat(String(form.getValues('subsidyAmount')));
+    if (currentFormSubsidy !== newSubsidyAmount || isNaN(currentFormSubsidy)) {
         form.setValue('subsidyAmount', newSubsidyAmount, { shouldValidate: true, shouldDirty: true });
     }
 
   }, [watchedClientType, watchedCapacity, form]);
 
 
-  const isSubsidyEditable = watchedClientType === 'Individual/Bungalow';
   const isDcrDisabled = watchedClientType === 'Commercial' || watchedClientType === 'Industrial';
 
 
@@ -210,31 +210,34 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, initialData 
     const cgstAmount = baseAmount * 0.069;
     const sgstAmount = baseAmount * 0.069;
     const subtotalAmount = baseAmount + cgstAmount + sgstAmount;
-    const finalAmount = subtotalAmount; 
+    const finalAmountPreSubsidy = subtotalAmount;
 
-    let currentSubsidyAmount = parseFloat(values.subsidyAmount as any);
-    if (isNaN(currentSubsidyAmount)) { 
-        currentSubsidyAmount = 0;
-    }
-
+    let currentSubsidyAmount = 0;
     if (clientType === 'Housing Society') {
         currentSubsidyAmount = 18000 * capacity;
-    } else if (clientType === 'Commercial' || clientType === 'Industrial') {
-        currentSubsidyAmount = 0;
+    } else if (clientType === 'Individual/Bungalow') {
+        if (capacity === 1) currentSubsidyAmount = 30000;
+        else if (capacity === 2) currentSubsidyAmount = 60000;
+        else if (capacity >= 3) currentSubsidyAmount = 78000;
+        else currentSubsidyAmount = 0;
     }
-    // For 'Individual/Bungalow', currentSubsidyAmount is taken from the form field.
+    // For Commercial/Industrial, subsidy remains 0
 
     const submissionData: Proposal = {
-      id: proposal?.id || `prop${Date.now()}`, 
-      clientId: proposal?.clientId || initialData?.clientId || `client${Date.now()}`, 
-      ...values, 
+      id: proposal?.id || `prop${Date.now()}`,
+      clientId: proposal?.clientId || initialData?.clientId || `client${Date.now()}`,
+      ...values,
+      capacity, // ensure number
+      ratePerWatt, // ensure number
+      inverterRating: Number(values.inverterRating) || 0,
+      inverterQty: Number(values.inverterQty) || 1,
       baseAmount,
       cgstAmount,
       sgstAmount,
-      subtotalAmount, // This is the new field to store total before subsidy
-      finalAmount, // This is pre-subsidy total
-      subsidyAmount: currentSubsidyAmount, 
-      proposalDate: values.proposalDate, // Already string yyyy-MM-dd
+      subtotalAmount,
+      finalAmount: finalAmountPreSubsidy,
+      subsidyAmount: currentSubsidyAmount,
+      proposalDate: values.proposalDate,
       createdAt: proposal?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -516,11 +519,11 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, initialData 
                 </div>
                  <Separator/>
                 <div className="flex justify-between items-center text-primary">
-                    <FormLabel className="font-medium text-lg">Final Proposal Amount</FormLabel>
+                    <FormLabel className="font-medium text-lg">Final Proposal Amount (Pre-Subsidy)</FormLabel>
                     <span className="font-bold text-xl flex items-center"><IndianRupee className="h-5 w-5 mr-0.5"/>{calculatedValues.finalAmount.toFixed(2)}</span>
                 </div>
             </div>
-            
+
             <FormField
               control={form.control}
               name="subsidyAmount"
@@ -530,16 +533,18 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, initialData 
                   <FormControl>
                     <Input
                         type="number"
-                        placeholder="Enter subsidy if applicable"
+                        placeholder="Auto-calculated"
                         {...field}
-                        value={field.value ?? 0} 
+                        value={field.value ?? 0}
                         onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                        readOnly={!isSubsidyEditable}
-                        className={cn(!isSubsidyEditable ? 'bg-muted cursor-not-allowed' : '', field.value === 0 && !isSubsidyEditable ? 'text-muted-foreground' : '')}
+                        readOnly // Always read-only as it's calculated
+                        className={'bg-muted cursor-not-allowed text-muted-foreground'}
                     />
                   </FormControl>
-                  {!isSubsidyEditable && <p className="text-xs text-muted-foreground">Auto-calculated for Housing Society. Zero for Commercial/Industrial.</p>}
-                  {isSubsidyEditable && <p className="text-xs text-muted-foreground">Manual input for Individual/Bungalow client type.</p>}
+                  <p className="text-xs text-muted-foreground">
+                    Auto-calculated based on client type and capacity.
+                    (Ind/Bungalow: 1kW-30k, 2kW-60k, 3kW+-78k; Housing Soc: 18k/kW; Comm/Ind: 0)
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}
@@ -559,3 +564,4 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, initialData 
     </Dialog>
   );
 }
+

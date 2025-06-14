@@ -10,16 +10,16 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PageHeader } from '@/components/page-header';
-import { PlusCircle, Trash2, Rows, CalendarIcon, IndianRupee } from 'lucide-react';
+import { PlusCircle, Trash2, Rows, CalendarIcon } from 'lucide-react';
 import { CLIENT_TYPES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS, MOCK_PROPOSALS } from '@/lib/constants';
 import type { Proposal, ClientType, ModuleType, DCRStatus, ModuleWattage } from '@/types';
-import { proposalSchema } from '../proposal-form'; // Assuming proposalSchema is exported
+import { proposalSchema } from '../proposal-form';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
-import { FormField } from '@/components/ui/form'; // Added import
+import { FormField } from '@/components/ui/form';
 
 // Schema for the entire batch form
 const batchProposalsSchema = z.object({
@@ -29,6 +29,7 @@ const batchProposalsSchema = z.object({
 type BatchProposalsFormValues = z.infer<typeof batchProposalsSchema>;
 
 // Default values for a single new proposal row
+// Note: Financials (baseAmount, etc.) and subsidyAmount are calculated on submission
 const getDefaultProposalRow = (): Omit<Proposal, 'id' | 'clientId' | 'createdAt' | 'updatedAt' | 'baseAmount' | 'cgstAmount' | 'sgstAmount' | 'subtotalAmount' | 'finalAmount' | 'subsidyAmount'> => ({
   proposalNumber: `P-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 100000)).padStart(5, '0')}`,
   name: '',
@@ -42,7 +43,7 @@ const getDefaultProposalRow = (): Omit<Proposal, 'id' | 'clientId' | 'createdAt'
   inverterRating: 0,
   inverterQty: 1,
   ratePerWatt: 0,
-  proposalDate: format(new Date(), 'yyyy-MM-dd'), // Use format for consistency
+  proposalDate: format(new Date(), 'yyyy-MM-dd'),
 });
 
 
@@ -51,7 +52,7 @@ export default function BatchProposalsPage() {
   const form = useForm<BatchProposalsFormValues>({
     resolver: zodResolver(batchProposalsSchema),
     defaultValues: {
-      proposals: [getDefaultProposalRow() as any], // Cast as any to satisfy initial type before full object is formed
+      proposals: [getDefaultProposalRow() as any],
     },
   });
 
@@ -62,26 +63,26 @@ export default function BatchProposalsPage() {
 
   const watchFieldArray = form.watch('proposals');
 
-  // Effect to update dynamic defaults within rows
   useEffect(() => {
     watchFieldArray.forEach((proposal, index) => {
       const currentClientType = proposal.clientType;
       const currentName = proposal.name;
       const currentCapacity = Number(proposal.capacity) || 0;
 
-      // Default contactPerson
       if (currentClientType === 'Individual/Bungalow' && currentName && form.getValues(`proposals.${index}.contactPerson`) !== currentName) {
         form.setValue(`proposals.${index}.contactPerson`, currentName, { shouldValidate: false, shouldDirty: true });
       }
 
-      // Default inverterRating
       if (currentCapacity > 0 && Number(form.getValues(`proposals.${index}.inverterRating`)) !== currentCapacity) {
         form.setValue(`proposals.${index}.inverterRating`, currentCapacity, { shouldValidate: false, shouldDirty: true });
       }
-      
-      // Default DCR status
-      if ((currentClientType === 'Commercial' || currentClientType === 'Industrial') && form.getValues(`proposals.${index}.dcrStatus`) !== 'Non-DCR') {
-        form.setValue(`proposals.${index}.dcrStatus`, 'Non-DCR', { shouldValidate: false, shouldDirty: true });
+
+      const currentDcrStatus = form.getValues(`proposals.${index}.dcrStatus`);
+      if ((currentClientType === 'Commercial' || currentClientType === 'Industrial') && currentDcrStatus !== 'Non-DCR') {
+        form.setValue(`proposals.${index}.dcrStatus`, 'Non-DCR', { shouldValidate: true, shouldDirty: true });
+      } else if (currentClientType !== 'Commercial' && currentClientType !== 'Industrial' && currentDcrStatus === 'Non-DCR' && !form.formState.dirtyFields.proposals?.[index]?.dcrStatus) {
+         // If type changes away from Comm/Ind, and DCR was auto-set, allow it to be changed by resetting or setting to default if needed
+         // This logic might need refinement based on desired UX for changing *away* from Comm/Ind
       }
     });
   }, [watchFieldArray, form]);
@@ -89,7 +90,6 @@ export default function BatchProposalsPage() {
 
   const processSubmittedProposals = (data: BatchProposalsFormValues) => {
     data.proposals.forEach((proposalData, index) => {
-      // Recalculate financials and subsidy
       const capacity = Number(proposalData.capacity) || 0;
       const ratePerWatt = Number(proposalData.ratePerWatt) || 0;
       const clientType = proposalData.clientType;
@@ -98,41 +98,44 @@ export default function BatchProposalsPage() {
       const cgstAmount = baseAmount * 0.069;
       const sgstAmount = baseAmount * 0.069;
       const subtotalAmount = baseAmount + cgstAmount + sgstAmount;
-      const finalAmount = subtotalAmount; // Final amount is pre-subsidy
+      const finalAmountPreSubsidy = subtotalAmount;
 
       let subsidyAmount = 0;
       if (clientType === 'Housing Society') {
         subsidyAmount = 18000 * capacity;
       } else if (clientType === 'Individual/Bungalow') {
-        // In batch, subsidy for individual is not directly input. We'll assume 0 or a fixed logic if needed.
-        // For now, keeping it 0 for Individual in batch context unless a different rule is defined.
-        // subsidyAmount = Number(proposalData.subsidyAmount) || 0; // If subsidyAmount were a field in the batch row
-        // Since subsidyAmount is not a field in the batch row, it remains 0 for Individual/Bungalow unless explicitly calculated here
+        if (capacity === 1) subsidyAmount = 30000;
+        else if (capacity === 2) subsidyAmount = 60000;
+        else if (capacity >= 3) subsidyAmount = 78000;
+        else subsidyAmount = 0;
       }
+      // For Commercial/Industrial, subsidy remains 0
 
       const processedProposal: Proposal = {
         id: `batch-${Date.now()}-${index}`,
         clientId: `client-batch-${Date.now()}-${index}`,
         ...proposalData,
-        capacity, // ensure number
-        ratePerWatt, // ensure number
+        capacity,
+        ratePerWatt,
         inverterRating: Number(proposalData.inverterRating) || 0,
         inverterQty: Number(proposalData.inverterQty) || 1,
-        proposalDate: proposalData.proposalDate, // Already string
+        proposalDate: proposalData.proposalDate,
         baseAmount,
         cgstAmount,
         sgstAmount,
         subtotalAmount,
-        finalAmount,
+        finalAmount: finalAmountPreSubsidy,
         subsidyAmount,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      console.log('Processed Proposal:', processedProposal);
-      // MOCK_PROPOSALS.unshift(processedProposal); // Simulate adding to global store
+      console.log('Processed Batch Proposal:', processedProposal);
+      // In a real app, you would save this to your database.
+      // For now, we add to MOCK_PROPOSALS (if you want to see it reflected, but usually not done this way)
+      // MOCK_PROPOSALS.unshift(processedProposal);
       toast({
         title: `Proposal Generated: ${processedProposal.proposalNumber}`,
-        description: `For client: ${processedProposal.name}`,
+        description: `For client: ${processedProposal.name}. Capacity: ${processedProposal.capacity}kW, Subsidy: ${processedProposal.subsidyAmount}`,
       });
     });
     // form.reset({ proposals: [getDefaultProposalRow() as any] }); // Optionally reset form
@@ -151,6 +154,7 @@ export default function BatchProposalsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[150px]">Proposal No.</TableHead>
+                <TableHead className="w-[180px]">Proposal Date</TableHead>
                 <TableHead className="w-[200px]">Client Name</TableHead>
                 <TableHead className="w-[180px]">Client Type</TableHead>
                 <TableHead className="w-[200px]">Contact Person</TableHead>
@@ -162,7 +166,6 @@ export default function BatchProposalsPage() {
                 <TableHead className="w-[130px]">Inverter Rating (kW)</TableHead>
                 <TableHead className="w-[100px]">Inverter Qty</TableHead>
                 <TableHead className="w-[120px]">Rate/Watt (₹)</TableHead>
-                <TableHead className="w-[180px]">Proposal Date</TableHead>
                 <TableHead className="w-[80px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -179,6 +182,34 @@ export default function BatchProposalsPage() {
                         render={({ field }) => <Input {...field} placeholder="P-YYYY-NNNNN" />}
                       />
                        {form.formState.errors.proposals?.[index]?.proposalNumber && <p className="text-xs text-destructive mt-1">{form.formState.errors.proposals[index]?.proposalNumber?.message}</p>}
+                    </TableCell>
+                    <TableCell>
+                      <Controller
+                        control={form.control}
+                        name={`proposals.${index}.proposalDate`}
+                        render={({ field }) => (
+                          <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                  variant={"outline"}
+                                  className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {field.value ? format(parseISO(field.value), "PPP") : <span>Pick a date</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                              <Calendar
+                                mode="single"
+                                selected={field.value ? parseISO(field.value) : undefined}
+                                onSelect={(date) => field.onChange(date ? format(date, 'yyyy-MM-dd') : '')}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        )}
+                      />
+                      {form.formState.errors.proposals?.[index]?.proposalDate && <p className="text-xs text-destructive mt-1">{form.formState.errors.proposals[index]?.proposalDate?.message}</p>}
                     </TableCell>
                     <TableCell>
                       <FormField
@@ -295,34 +326,6 @@ export default function BatchProposalsPage() {
                         render={({ field }) => <Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} placeholder="Rate" />}
                       />
                       {form.formState.errors.proposals?.[index]?.ratePerWatt && <p className="text-xs text-destructive mt-1">{form.formState.errors.proposals[index]?.ratePerWatt?.message}</p>}
-                    </TableCell>
-                    <TableCell>
-                      <Controller
-                        control={form.control}
-                        name={`proposals.${index}.proposalDate`}
-                        render={({ field }) => (
-                          <Popover>
-                            <PopoverTrigger asChild>
-                                <Button
-                                  variant={"outline"}
-                                  className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
-                                >
-                                  <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {field.value ? format(parseISO(field.value), "PPP") : <span>Pick a date</span>}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                              <Calendar
-                                mode="single"
-                                selected={field.value ? parseISO(field.value) : undefined}
-                                onSelect={(date) => field.onChange(date ? format(date, 'yyyy-MM-dd') : '')}
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        )}
-                      />
-                      {form.formState.errors.proposals?.[index]?.proposalDate && <p className="text-xs text-destructive mt-1">{form.formState.errors.proposals[index]?.proposalDate?.message}</p>}
                     </TableCell>
                     <TableCell>
                       <Button type="button" variant="ghost" size="icon" onClick={() => fields.length > 1 && remove(index)} disabled={fields.length <= 1}>
