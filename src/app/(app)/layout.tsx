@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { ReactNode } from 'react';
@@ -35,7 +36,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <SidebarProvider>
-      <Sidebar>
+      <Sidebar collapsible="icon"> {/* Added collapsible="icon" */}
         <SidebarHeader>
           <Logo />
         </SidebarHeader>
