@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useTransition, useEffect } from 'react';
+import { useState, useTransition, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -69,35 +69,34 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
 
-  // Determine the schema and default values based on documentType
-  const currentSchema = (() => {
+  const memoizedSchema = useMemo(() => {
     switch (documentType) {
       case 'Purchase Order': return purchaseOrderSchema;
       case 'Contract': return contractSchema;
       // Add cases for other document types
       default: return genericSchema; // Fallback for other types
     }
-  })();
+  }, [documentType]);
 
-  const defaultValues = (() => {
+  const memoizedDefaultValues = useMemo(() => {
     switch (documentType) {
       case 'Purchase Order': return { customerName: '', amount: 0, itemDescription: '', relatedLeadId: '' };
       case 'Contract': return { clientName: '', effectiveDate: '', contractTerms: '', relatedLeadId: '' };
       default: return { title: '', details: '', relatedLeadId: ''};
     }
-  })();
+  }, [documentType]);
 
   const form = useForm({
-    resolver: zodResolver(currentSchema),
-    defaultValues,
+    resolver: zodResolver(memoizedSchema),
+    defaultValues: memoizedDefaultValues,
   });
 
   // Reset form when dialog opens with a new document type or new instance
   useEffect(() => {
     if (isOpen) {
-      form.reset(defaultValues);
+      form.reset(memoizedDefaultValues);
     }
-  }, [isOpen, documentType, form, defaultValues]);
+  }, [isOpen, form, memoizedDefaultValues]);
 
   const onSubmit = async (values: any) => { // Using 'any' here as values type depends on schema
     startTransition(async () => {
