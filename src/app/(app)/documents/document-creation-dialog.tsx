@@ -29,6 +29,7 @@ import { createDocumentInDrive } from './actions';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface DocumentCreationDialogProps {
   isOpen: boolean;
@@ -43,25 +44,36 @@ const purchaseOrderSchema = z.object({
   poDate: z.string().min(1, 'PO Date is required'),
   capacity: z.coerce.number().positive('Capacity (kW) must be a positive number'),
   ratePerWatt: z.coerce.number().positive('Rate per Watt (₹) must be a positive number'),
-  total: z.coerce.number().positive('Total amount (₹) must be a positive number'), // This will be calculated
+  // total: z.coerce.number().positive('Total amount (₹) must be a positive number'), // This will be calculated
 });
 
 const contractSchema = z.object({
   clientName: z.string().min(1, "Client name is required"),
   effectiveDate: z.string().min(1, "Effective date is required"),
   contractTerms: z.string().min(10, "Contract terms must be at least 10 characters"),
-  relatedLeadId: z.string().optional(),
 });
+
+const warrantyCertificateSchema = z.object({
+  clientName: z.string().min(1, "Client name is required"),
+  clientAddress: z.string().min(1, "Client address is required"),
+  capacity: z.coerce.number().positive("Capacity (kW) must be a positive number"),
+  moduleMake: z.enum(["Premier Energies", "Rayzon Solar", "ReNew Energies"], { required_error: "Module make is required" }),
+  moduleWattage: z.enum(["540", "545", "550", "585", "590"], { required_error: "Module wattage is required" }),
+  inverterMake: z.enum(["Growatt", "Sungrow"], { required_error: "Inverter make is required" }),
+  inverterRating: z.string().min(1, "Inverter rating is required"), // Will be selected from predefined values e.g., "3kW", "5kW"
+  dateOfCommissioning: z.string().min(1, "Date of commissioning is required"),
+});
+
 
 const genericSchema = z.object({
   title: z.string().min(1, "Title is required"),
   details: z.string().min(5, "Details must be at least 5 characters"),
-  relatedLeadId: z.string().optional(),
 });
 
 
 type PurchaseOrderFormValues = z.infer<typeof purchaseOrderSchema>;
 type ContractFormValues = z.infer<typeof contractSchema>;
+type WarrantyCertificateFormValues = z.infer<typeof warrantyCertificateSchema>;
 type GenericFormValues = z.infer<typeof genericSchema>;
 
 
@@ -73,6 +85,7 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
     switch (documentType) {
       case 'Purchase Order': return purchaseOrderSchema;
       case 'Contract': return contractSchema;
+      case 'Warranty Certificate': return warrantyCertificateSchema;
       default: return genericSchema;
     }
   }, [documentType]);
@@ -85,35 +98,39 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
         poDate: '',
         capacity: 0,
         ratePerWatt: 0,
-        total: 0, // Will be calculated
       };
-      case 'Contract': return { clientName: '', effectiveDate: '', contractTerms: '', relatedLeadId: '' };
-      default: return { title: '', details: '', relatedLeadId: ''};
+      case 'Contract': return { clientName: '', effectiveDate: '', contractTerms: '' };
+      case 'Warranty Certificate': return {
+        clientName: '',
+        clientAddress: '',
+        capacity: 0,
+        moduleMake: undefined, // For select placeholder
+        moduleWattage: undefined, // For select placeholder
+        inverterMake: undefined, // For select placeholder
+        inverterRating: undefined, // For select placeholder
+        dateOfCommissioning: '',
+      };
+      default: return { title: '', details: ''};
     }
   }, [documentType]);
 
   const form = useForm({
     resolver: zodResolver(currentSchema),
-    defaultValues: defaultValues,
+    defaultValues: defaultValues as any, // Use 'as any' due to dynamic schema/defaults
   });
   
   const capacityValue = form.watch('capacity');
   const ratePerWattValue = form.watch('ratePerWatt');
 
   const calculatedTotal = useMemo(() => {
+    if (documentType !== 'Purchase Order') return 0;
     const cap = parseFloat(capacityValue as any);
     const rate = parseFloat(ratePerWattValue as any);
     if (isNaN(cap) || isNaN(rate) || cap <= 0 || rate <= 0) {
         return 0;
     }
-    return cap * rate * 1000;
-  }, [capacityValue, ratePerWattValue]);
-
-  useEffect(() => {
-    if (documentType === 'Purchase Order') {
-      form.setValue('total', calculatedTotal, { shouldValidate: true });
-    }
-  }, [calculatedTotal, form, documentType]);
+    return cap * rate * 1000; // Capacity (kW) * Rate/Watt * 1000
+  }, [capacityValue, ratePerWattValue, documentType]);
   
   const gstRate = 0.138; // 13.8%
 
@@ -130,14 +147,17 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
 
   useEffect(() => {
     if (isOpen) {
-      form.reset(defaultValues);
+      form.reset(defaultValues as any);
     }
   }, [isOpen, form, defaultValues]);
 
   const onSubmit = async (values: any) => {
     startTransition(async () => {
       try {
-        const dataToSubmit = documentType === 'Purchase Order' ? { ...values, total: calculatedTotal } : values;
+        let dataToSubmit = values;
+        if (documentType === 'Purchase Order') {
+            dataToSubmit = { ...values, totalAmount: calculatedTotal, gstAmount: calculatedGST, grandTotalAmount: calculatedGrandTotal };
+        }
         const result = await createDocumentInDrive(documentType, dataToSubmit);
 
         if (result.success) {
@@ -163,6 +183,12 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
       }
     });
   };
+
+  const moduleMakeOptions = ["Premier Energies", "Rayzon Solar", "ReNew Energies"];
+  const moduleWattageOptions = ["540", "545", "550", "585", "590"];
+  const inverterMakeOptions = ["Growatt", "Sungrow"];
+  const inverterRatingOptions = [3, 5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100].map(r => ({ label: `${r} kW`, value: `${r}kW` }));
+
 
   const renderFormFields = () => {
     switch (documentType) {
@@ -229,7 +255,7 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
                     <FormItem>
                     <FormLabel>Rate/Watt (₹)</FormLabel>
                     <FormControl>
-                        <Input type="number" placeholder="0.50" step="0.01" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} />
+                        <Input type="number" placeholder="40" step="0.01" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} />
                     </FormControl>
                     <FormMessage />
                     </FormItem>
@@ -238,8 +264,8 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
             </div>
             
             <div className="space-y-1">
-                <FormLabel>Total Amount (₹)</FormLabel>
-                <Input readOnly value={calculatedTotal.toFixed(2)} className="bg-muted font-medium" />
+                <FormLabel>Total Amount (Calculated)</FormLabel>
+                <Input readOnly value={`₹${calculatedTotal.toFixed(2)}`} className="bg-muted font-medium" />
             </div>
             
             <Separator className="my-4" />
@@ -300,14 +326,150 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
                 </FormItem>
               )}
             />
+          </>
+        );
+      case 'Warranty Certificate':
+        return (
+          <>
             <FormField
               control={form.control}
-              name="relatedLeadId"
+              name="clientName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Related Lead ID (Optional)</FormLabel>
+                  <FormLabel>Client Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="Lead ID (e.g., L456)" {...field} />
+                    <Input placeholder="Client Full Name" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="clientAddress"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Client Address</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Full Address for Warranty" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="capacity"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Capacity (kW)</FormLabel>
+                  <FormControl>
+                    <Input type="number" placeholder="e.g., 10" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+             <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="moduleMake"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Module Make</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Module Make" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {moduleMakeOptions.map(make => (
+                          <SelectItem key={make} value={make}>{make}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="moduleWattage"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Module Wattage (W)</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Wattage" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {moduleWattageOptions.map(wattage => (
+                          <SelectItem key={wattage} value={wattage}>{wattage} W</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="inverterMake"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Inverter Make</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Inverter Make" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {inverterMakeOptions.map(make => (
+                          <SelectItem key={make} value={make}>{make}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="inverterRating"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Inverter Rating</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Rating" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {inverterRatingOptions.map(option => (
+                          <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField
+              control={form.control}
+              name="dateOfCommissioning"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Date of Commissioning</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -339,19 +501,6 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
                   <FormLabel>Details</FormLabel>
                   <FormControl>
                     <Textarea placeholder={`Enter relevant details for the ${documentType.toLowerCase()}...`} className="min-h-[150px]" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="relatedLeadId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Related Lead ID (Optional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Lead ID" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -396,3 +545,4 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
     </Dialog>
   );
 }
+

@@ -1,18 +1,19 @@
+
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { UsersRound, FileText, DollarSign, TrendingUp } from 'lucide-react';
+import { UsersRound, FileText, IndianRupee, TrendingUp } from 'lucide-react';
 
 export default function DashboardPage() {
   const stats = [
     { title: 'Active Leads', value: '125', icon: UsersRound, change: '+15%', changeType: 'positive' as const },
     { title: 'Quotations Sent', value: '42', icon: FileText, change: '+5', changeType: 'positive' as const },
-    { title: 'Deals Won', value: '18', icon: DollarSign, change: '-2', changeType: 'negative' as const },
+    { title: 'Deals Won', value: '18', icon: IndianRupee, change: '-2', changeType: 'negative' as const }, // Changed icon
     { title: 'Conversion Rate', value: '14.4%', icon: TrendingUp, change: '+1.2%', changeType: 'positive' as const },
   ];
 
   return (
     <>
-      <PageHeader title="Dashboard" description="Welcome to Solaris CRM. Here's an overview of your solar business." />
+      <PageHeader title="Dashboard" description="Welcome to Soryouth. Here's an overview of your renewable energy business." />
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
@@ -70,3 +71,4 @@ export default function DashboardPage() {
     </>
   );
 }
+
