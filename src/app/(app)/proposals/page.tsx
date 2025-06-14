@@ -8,18 +8,29 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { MOCK_PROPOSALS } from '@/lib/constants';
 import type { Proposal } from '@/types';
-import { FileText, PlusCircle, User, ArrowRight, IndianRupee } from 'lucide-react';
+import { FileText, PlusCircle, User, ArrowRight, Building, Home, Briefcase } from 'lucide-react';
 import { ProposalForm } from './proposal-form';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO } from 'date-fns';
+import { parseISO } from 'date-fns';
 
-interface ClientWithProposals {
+interface ClientSummary {
   clientId: string;
   clientName: string;
+  clientType: Proposal['clientType'];
   proposalCount: number;
-  mostRecentProposalDate?: string;
-  totalProposedValue: number;
+  latestProposalCapacity?: number;
+  mostRecentProposalTimestamp: string; // For sorting to find the latest proposal
 }
+
+const ClientTypeIcon = ({ type }: { type: Proposal['clientType'] }) => {
+  switch (type) {
+    case 'Individual/Bungalow': return <Home className="h-5 w-5 text-muted-foreground" />;
+    case 'Housing Society': return <Building className="h-5 w-5 text-muted-foreground" />;
+    case 'Commercial': return <Briefcase className="h-5 w-5 text-muted-foreground" />;
+    case 'Industrial': return <Briefcase className="h-5 w-5 text-primary" />; // Example different color
+    default: return <User className="h-5 w-5 text-muted-foreground" />;
+  }
+};
 
 export default function ProposalsListPage() {
   const [proposals, setProposals] = useState<Proposal[]>(MOCK_PROPOSALS);
@@ -35,12 +46,13 @@ export default function ProposalsListPage() {
   const handleFormSubmit = (submittedProposal: Proposal) => {
     const existingProposalIndex = proposals.findIndex(p => p.id === submittedProposal.id);
 
-    if (existingProposalIndex > -1) { 
+    if (existingProposalIndex > -1) { // Editing existing proposal
       const updatedProposals = [...proposals];
       updatedProposals[existingProposalIndex] = submittedProposal;
       setProposals(updatedProposals);
       toast({ title: "Proposal Updated", description: `Proposal ${submittedProposal.proposalNumber} has been updated.` });
-    } else { 
+    } else { // Adding new proposal
+      // If submittedProposal.clientId is new, it means a new client essentially
       setProposals(prev => [submittedProposal, ...prev]);
       toast({ title: "Proposal Created", description: `Proposal ${submittedProposal.proposalNumber} for ${submittedProposal.name} has been added.` });
     }
@@ -48,33 +60,40 @@ export default function ProposalsListPage() {
     setSelectedProposalForEdit(null);
   };
 
-  const clientsWithProposals = useMemo(() => {
-    const clientsMap = new Map<string, ClientWithProposals>();
+  const clientsSummary = useMemo(() => {
+    const clientsMap = new Map<string, ClientSummary>();
+
     proposals.forEach(proposal => {
       if (!clientsMap.has(proposal.clientId)) {
         clientsMap.set(proposal.clientId, {
           clientId: proposal.clientId,
-          clientName: proposal.name, 
+          clientName: proposal.name, // Use 'name' from proposal for client name
+          clientType: proposal.clientType,
           proposalCount: 0,
-          mostRecentProposalDate: proposal.createdAt, 
-          totalProposedValue: 0,
+          latestProposalCapacity: undefined,
+          mostRecentProposalTimestamp: '1970-01-01T00:00:00.000Z', // Oldest possible date
         });
       }
+
       const clientEntry = clientsMap.get(proposal.clientId)!;
       clientEntry.proposalCount++;
-      clientEntry.totalProposedValue += proposal.finalAmount; // finalAmount is now pre-subsidy
-      if (new Date(proposal.createdAt) > new Date(clientEntry.mostRecentProposalDate!)) {
-        clientEntry.mostRecentProposalDate = proposal.createdAt;
+
+      const proposalTimestamp = proposal.proposalDate || proposal.createdAt;
+      if (parseISO(proposalTimestamp) > parseISO(clientEntry.mostRecentProposalTimestamp)) {
+        clientEntry.mostRecentProposalTimestamp = proposalTimestamp;
+        clientEntry.latestProposalCapacity = proposal.capacity;
+        clientEntry.clientType = proposal.clientType; // Ensure client type reflects latest proposal's client type
       }
     });
-    return Array.from(clientsMap.values()).sort((a,b) => new Date(b.mostRecentProposalDate!).getTime() - new Date(a.mostRecentProposalDate!).getTime());
+
+    return Array.from(clientsMap.values()).sort((a, b) => a.clientName.localeCompare(b.clientName));
   }, [proposals]);
 
   return (
     <>
       <PageHeader
         title="Client Proposals"
-        description="View proposals grouped by client or create a new one."
+        description="View proposals grouped by client or create a new one for any client."
         icon={FileText}
         actions={
           <Button onClick={handleCreateNewProposal}>
@@ -83,7 +102,7 @@ export default function ProposalsListPage() {
         }
       />
 
-      {clientsWithProposals.length === 0 ? (
+      {clientsSummary.length === 0 ? (
         <Card>
           <CardContent className="pt-6 text-center text-muted-foreground">
             <FileText className="mx-auto h-12 w-12 mb-2" />
@@ -93,29 +112,29 @@ export default function ProposalsListPage() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {clientsWithProposals.map(client => (
+          {clientsSummary.map(client => (
             <Card key={client.clientId} className="hover:shadow-md transition-shadow">
               <CardHeader>
-                <div className="flex items-center gap-3">
-                  <User className="h-6 w-6 text-primary" />
+                <div className="flex items-center gap-3 mb-1">
+                  <ClientTypeIcon type={client.clientType} />
                   <CardTitle className="font-headline text-xl">{client.clientName}</CardTitle>
                 </div>
+                <CardDescription className="text-xs">
+                  {client.clientType}
+                </CardDescription>
                 <CardDescription>
                   {client.proposalCount} proposal(s)
-                  {client.mostRecentProposalDate && (
-                    <span className="block text-xs">
-                      Last activity: {format(parseISO(client.mostRecentProposalDate), 'dd/MM/yyyy')}
+                  {client.latestProposalCapacity !== undefined && (
+                    <span className="block text-sm mt-1">
+                      Latest Proposal Capacity: {client.latestProposalCapacity} kW
                     </span>
                   )}
-                   <span className="block text-xs mt-1">
-                      Total Proposed (Pre-Subsidy): <IndianRupee className="inline h-3 w-3 -mt-0.5"/>{client.totalProposedValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <Button asChild variant="outline" className="w-full">
                   <Link href={`/proposals/${client.clientId}`}>
-                    View Proposals <ArrowRight className="ml-2 h-4 w-4" />
+                    View Client Proposals <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
               </CardContent>
@@ -129,9 +148,12 @@ export default function ProposalsListPage() {
 
       <ProposalForm
         isOpen={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
+        onClose={() => { setIsFormOpen(false); setSelectedProposalForEdit(null); }}
         onSubmit={handleFormSubmit}
         proposal={selectedProposalForEdit}
+        // initialData is not passed here, as this button is for a potentially new client
+        // or an existing client where user will fill details.
+        // If editing, 'proposal' prop handles prefill.
       />
     </>
   );

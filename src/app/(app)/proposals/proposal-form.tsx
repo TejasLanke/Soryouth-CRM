@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Proposal, ClientType, ModuleType, DCRStatus } from '@/types';
+import type { Proposal, ClientType, ModuleType, DCRStatus, ModuleWattage } from '@/types';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, Controller } from 'react-hook-form';
 import * as z from 'zod';
@@ -31,7 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import React, { useEffect, useMemo } from 'react';
-import { CLIENT_TYPES, MODULE_TYPES, DCR_STATUSES } from '@/lib/constants';
+import { CLIENT_TYPES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS } from '@/lib/constants';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon, IndianRupee } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
@@ -48,11 +48,12 @@ const proposalSchema = z.object({
   location: z.string().min(3, { message: 'Location must be at least 3 characters.' }),
   capacity: z.coerce.number().positive({ message: 'Capacity (kW) must be a positive number.' }),
   moduleType: z.enum(MODULE_TYPES as [ModuleType, ...ModuleType[]], { required_error: "Module type is required."}),
+  moduleWattage: z.enum(MODULE_WATTAGE_OPTIONS as [ModuleWattage, ...ModuleWattage[]], { required_error: "Module wattage is required." }),
   dcrStatus: z.enum(DCR_STATUSES as [DCRStatus, ...DCRStatus[]], { required_error: "DCR/Non-DCR status is required."}),
   inverterRating: z.coerce.number().positive({ message: 'Inverter rating (kW) must be a positive number.' }),
   inverterQty: z.coerce.number().int().positive({ message: 'Inverter quantity must be a positive integer.' }),
   ratePerWatt: z.coerce.number().positive({ message: 'Rate per Watt (₹) must be a positive number.' }),
-  subsidyAmount: z.coerce.number().min(0, { message: 'Subsidy amount cannot be negative.' }),
+  subsidyAmount: z.coerce.number().min(0, { message: 'Subsidy amount cannot be negative.' }).optional(), // Made optional to handle auto-calc vs manual
   proposalDate: z.date({ required_error: "Proposal date is required." }),
 });
 
@@ -63,27 +64,29 @@ interface ProposalFormProps {
   onClose: () => void;
   onSubmit: (data: Proposal) => void;
   proposal?: Proposal | null;
-  initialData?: {
+  initialData?: { // Used when creating a proposal from a specific client's page
     clientId?: string;
-    name?: string;
+    name?: string; // Client's name
     clientType?: ClientType;
   };
 }
 
+// Static initial state for useForm to prevent hydration issues
 const initialFormStateForUseForm: ProposalFormValues = {
-  proposalNumber: "",
+  proposalNumber: "", // Will be generated client-side
   name: "",
   clientType: CLIENT_TYPES[0],
   contactPerson: "",
   location: "",
   capacity: 0,
   moduleType: MODULE_TYPES[0],
+  moduleWattage: MODULE_WATTAGE_OPTIONS[0],
   dcrStatus: DCR_STATUSES[0],
   inverterRating: 0,
   inverterQty: 1,
   ratePerWatt: 0,
   subsidyAmount: 0,
-  proposalDate: new Date(), 
+  proposalDate: new Date(), // Will be set to current date client-side for new proposals
 };
 
 export function ProposalForm({ isOpen, onClose, onSubmit, proposal, initialData }: ProposalFormProps) {
@@ -92,14 +95,16 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, initialData 
     defaultValues: initialFormStateForUseForm,
   });
 
+  // Client-side effects for dynamic defaults and updates
   useEffect(() => {
     if (isOpen) {
-      if (proposal) { 
+      if (proposal) { // Editing existing proposal
         form.reset({
           ...proposal,
           proposalDate: parseISO(proposal.proposalDate),
+          subsidyAmount: proposal.subsidyAmount, // ensure subsidyAmount is from proposal
         });
-      } else { 
+      } else { // Creating new proposal
         const clientSideProposalNumber = `P-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`;
         let initialContactPerson = '';
         if (initialData?.clientType === 'Individual/Bungalow' && initialData.name) {
@@ -107,20 +112,13 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, initialData 
         }
 
         form.reset({
-          ...initialFormStateForUseForm,
+          ...initialFormStateForUseForm, // Start with static defaults
           proposalNumber: clientSideProposalNumber,
+          proposalDate: new Date(),
           name: initialData?.name || '',
           clientType: initialData?.clientType || CLIENT_TYPES[0],
           contactPerson: initialContactPerson,
-          location: '',
-          capacity: 0,
-          moduleType: MODULE_TYPES[0],
-          dcrStatus: DCR_STATUSES[0],
-          inverterRating: 0,
-          inverterQty: 1,
-          ratePerWatt: 0,
-          subsidyAmount: 0,
-          proposalDate: new Date(),
+          // subsidyAmount will be calculated by the effect below based on clientType and capacity
         });
       }
     }
@@ -132,10 +130,12 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, initialData 
   const watchedClientType = form.watch('clientType');
   const watchedName = form.watch('name');
 
+  // Effect for contact person default
   useEffect(() => {
-    if (isOpen && !proposal) { 
+    if (isOpen && !proposal) { // Only for new proposals being created
         if (watchedClientType === 'Individual/Bungalow' && watchedName) {
             const currentContact = form.getValues('contactPerson');
+            // Only set if contact person is empty or doesn't match name (if name was filled first)
             if (!currentContact || currentContact === '' || currentContact !== watchedName) {
                  form.setValue('contactPerson', watchedName, { shouldValidate: true, shouldDirty: true });
             }
@@ -143,58 +143,78 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, initialData 
     }
   }, [watchedName, watchedClientType, form, isOpen, proposal]);
 
+  // Effect for inverter rating default
   useEffect(() => {
-     if (isOpen && !proposal) { 
+     if (isOpen && !proposal) { // Only for new proposals
         const currentInverterRating = form.getValues('inverterRating');
+        // Set inverter rating if capacity is positive and rating isn't already set or doesn't match
         if(watchedCapacity > 0 && (currentInverterRating === 0 || currentInverterRating !== watchedCapacity)){
              form.setValue('inverterRating', watchedCapacity, { shouldValidate: true, shouldDirty: true });
         }
      } else if (isOpen && proposal && watchedCapacity > 0 && form.getValues('inverterRating') !== watchedCapacity) {
-        // For existing proposals, if capacity changes, suggest inverter rating change
-        // This could be made more sophisticated, e.g., only if user hasn't manually changed inverter rating
-        // For now, let's keep it simple and update it.
+        // For existing proposals, if capacity changes, update inverter rating
         form.setValue('inverterRating', watchedCapacity, { shouldValidate: true, shouldDirty: true });
      }
   }, [watchedCapacity, form, isOpen, proposal]);
 
+  // Effect for DCR status default and subsidy calculation
+  useEffect(() => {
+    const capacity = parseFloat(watchedCapacity as any) || 0;
+    let newSubsidyAmount = 0;
+
+    if (watchedClientType === 'Commercial' || watchedClientType === 'Industrial') {
+      if (form.getValues('dcrStatus') !== 'Non-DCR') { // Default DCR to Non-DCR
+        form.setValue('dcrStatus', 'Non-DCR', { shouldValidate: true, shouldDirty: true });
+      }
+      newSubsidyAmount = 0; // Subsidy is 0
+    } else if (watchedClientType === 'Housing Society') {
+      newSubsidyAmount = 18000 * capacity;
+    } else if (watchedClientType === 'Individual/Bungalow') {
+      // For Individual/Bungalow, subsidy is manually entered.
+      // We don't auto-calculate here, but rely on the FormField value.
+      // If we wanted a default here, we could set it, e.g., form.getValues('subsidyAmount') || 0
+      // But since it's user-editable, we let the field control it.
+      // We can ensure subsidyAmount is not undefined if schema expects a number
+      if (form.getValues('subsidyAmount') === undefined) {
+        form.setValue('subsidyAmount', 0, { shouldValidate: true, shouldDirty: true });
+      }
+      // No return here, allow it to fall through to set subsidyAmount.
+    }
+    
+    // Only update subsidy if it has actually changed from what's in the form,
+    // unless it's Individual/Bungalow where it's manual.
+    if (watchedClientType !== 'Individual/Bungalow') {
+        if (form.getValues('subsidyAmount') !== newSubsidyAmount) {
+            form.setValue('subsidyAmount', newSubsidyAmount, { shouldValidate: true, shouldDirty: true });
+        }
+    }
+
+  }, [watchedClientType, watchedCapacity, form]);
+
+
   const calculatedValues = useMemo(() => {
     const capacity = parseFloat(watchedCapacity as any) || 0;
     const ratePerWatt = parseFloat(watchedRatePerWatt as any) || 0;
-    
+
     const baseAmount = ratePerWatt * capacity * 1000;
     const cgstAmount = baseAmount * 0.069;
     const sgstAmount = baseAmount * 0.069;
-    const subtotalAmount = baseAmount + cgstAmount + sgstAmount;
-    const finalAmount = subtotalAmount; // Final amount is now pre-subsidy
+    const subtotalAmount = baseAmount + cgstAmount + sgstAmount; // This is the final amount before subsidy
+    const finalAmount = subtotalAmount; // finalAmount in the Proposal object stores this pre-subsidy value.
 
     return { baseAmount, cgstAmount, sgstAmount, subtotalAmount, finalAmount };
   }, [watchedCapacity, watchedRatePerWatt]);
 
-  const isSubsidyEditable = watchedClientType === 'Individual/Bungalow';
 
-  useEffect(() => {
-    const capacity = parseFloat(watchedCapacity as any) || 0;
-    // This effect only auto-calculates subsidy if not 'Individual/Bungalow'
-    if (watchedClientType === 'Housing Society') {
-      const newSubsidyAmount = 18000 * capacity;
-      if (form.getValues('subsidyAmount') !== newSubsidyAmount) {
-        form.setValue('subsidyAmount', newSubsidyAmount, { shouldValidate: true, shouldDirty: true });
-      }
-    } else if (watchedClientType === 'Commercial' || watchedClientType === 'Industrial') {
-      if (form.getValues('subsidyAmount') !== 0) {
-        form.setValue('subsidyAmount', 0, { shouldValidate: true, shouldDirty: true });
-      }
-    }
-    // For 'Individual/Bungalow', subsidyAmount is user-editable, driven by its own FormField.
-  }, [watchedClientType, watchedCapacity, form]);
+  const isSubsidyEditable = watchedClientType === 'Individual/Bungalow';
+  const isDcrDisabled = watchedClientType === 'Commercial' || watchedClientType === 'Industrial';
 
 
   const handleFormSubmit = (values: ProposalFormValues) => {
+    // Recalculate financials on submit to ensure fresh values
     const capacity = parseFloat(values.capacity as any) || 0;
     const ratePerWatt = parseFloat(values.ratePerWatt as any) || 0;
     const clientType = values.clientType;
-    // Use the subsidy amount directly from the form values, as it's now correctly managed by its field & effects
-    const formSubsidyAmount = parseFloat(values.subsidyAmount as any) || 0;
 
     const baseAmount = ratePerWatt * capacity * 1000;
     const cgstAmount = baseAmount * 0.069;
@@ -202,23 +222,35 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, initialData 
     const subtotalAmount = baseAmount + cgstAmount + sgstAmount;
     const finalAmount = subtotalAmount; // Final amount is pre-subsidy
 
+    let currentSubsidyAmount = parseFloat(values.subsidyAmount as any);
+    if (isNaN(currentSubsidyAmount)) { // Ensure subsidyAmount is a number
+        currentSubsidyAmount = 0;
+    }
+
+    if (clientType === 'Housing Society') {
+        currentSubsidyAmount = 18000 * capacity;
+    } else if (clientType === 'Commercial' || clientType === 'Industrial') {
+        currentSubsidyAmount = 0;
+    }
+    // For 'Individual/Bungalow', currentSubsidyAmount is taken from the form directly.
+
     const submissionData: Proposal = {
-      id: proposal?.id || `prop${Date.now()}`,
-      clientId: proposal?.clientId || initialData?.clientId || `client${Date.now()}`,
-      ...values, 
+      id: proposal?.id || `prop${Date.now()}`, // Generate new ID if not editing
+      clientId: proposal?.clientId || initialData?.clientId || `client${Date.now()}`, // Use existing or generate new client ID
+      ...values, // Spread validated form values
       baseAmount,
       cgstAmount,
       sgstAmount,
       subtotalAmount,
-      finalAmount, 
-      subsidyAmount: formSubsidyAmount, 
-      proposalDate: values.proposalDate.toISOString(),
+      finalAmount, // This is pre-subsidy
+      subsidyAmount: currentSubsidyAmount, // Use the determined subsidy amount
+      proposalDate: values.proposalDate.toISOString(), // Convert date to ISO string
       createdAt: proposal?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
     onSubmit(submissionData);
   };
-  
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -284,7 +316,7 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, initialData 
                 )}
               />
             </div>
-            
+
             <Separator className="my-6" />
             <h3 className="text-lg font-medium text-foreground">Client Details</h3>
 
@@ -295,7 +327,7 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, initialData 
                 <FormItem>
                   <FormLabel>Client/Company Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter name" {...field} disabled={!!initialData?.name && !!proposal && !!proposal.clientId} />
+                    <Input placeholder="Enter name" {...field} disabled={!!initialData?.name && !!proposal && !!proposal.clientId /* Allow edit if not new & tied to specific client */} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -351,7 +383,7 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, initialData 
                 </FormItem>
               )}
             />
-            
+
             <Separator className="my-6" />
             <h3 className="text-lg font-medium text-foreground">System Details</h3>
 
@@ -391,17 +423,19 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, initialData 
               />
               <FormField
                 control={form.control}
-                name="dcrStatus"
+                name="moduleWattage"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>DCR/Non-DCR</FormLabel>
+                    <FormLabel>Module Wattage (W)</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger><SelectValue placeholder="Select DCR status" /></SelectTrigger>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Wattage" />
+                        </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {DCR_STATUSES.map(status => (
-                          <SelectItem key={status} value={status}>{status}</SelectItem>
+                        {MODULE_WATTAGE_OPTIONS.map(wattage => (
+                          <SelectItem key={wattage} value={wattage}>{wattage} W</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -410,36 +444,56 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, initialData 
                 )}
               />
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="inverterRating"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Inverter Rating (kW)</FormLabel>
-                    <FormControl>
-                      <Input type="number" placeholder="e.g., 10" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="inverterQty"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Inverter Quantity</FormLabel>
-                    <FormControl>
-                      <Input type="number" placeholder="e.g., 1" {...field} onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <FormField
+                    control={form.control}
+                    name="dcrStatus"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>DCR/Non-DCR</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={isDcrDisabled}>
+                        <FormControl>
+                            <SelectTrigger><SelectValue placeholder="Select DCR status" /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                            {DCR_STATUSES.map(status => (
+                            <SelectItem key={status} value={status}>{status}</SelectItem>
+                            ))}
+                        </SelectContent>
+                        </Select>
+                        {isDcrDisabled && <p className="text-xs text-muted-foreground">Auto-set to Non-DCR for Commercial/Industrial.</p>}
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="inverterRating"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Inverter Rating (kW)</FormLabel>
+                        <FormControl>
+                        <Input type="number" placeholder="e.g., 10" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="inverterQty"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Inverter Quantity</FormLabel>
+                        <FormControl>
+                        <Input type="number" placeholder="e.g., 1" {...field} onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
             </div>
-            
+
             <Separator className="my-6" />
             <h3 className="text-lg font-medium text-foreground">Financials</h3>
 
@@ -472,11 +526,11 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, initialData 
                 </div>
                  <Separator/>
                 <div className="flex justify-between items-center">
-                    <FormLabel className="font-medium">Subtotal (Pre-Subsidy)</FormLabel>
+                    <FormLabel className="font-medium">Subtotal</FormLabel>
                     <span className="font-bold text-md flex items-center"><IndianRupee className="h-4 w-4 mr-0.5"/>{calculatedValues.subtotalAmount.toFixed(2)}</span>
                 </div>
             </div>
-            
+
             <div className="space-y-1 p-3 border rounded-md bg-primary/10 mt-4">
                 <div className="flex justify-between items-center">
                     <FormLabel className="text-lg font-semibold text-primary">Final Proposal Amount (Pre-Subsidy)</FormLabel>
@@ -491,13 +545,14 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, initialData 
                 <FormItem className="mt-4">
                   <FormLabel>Subsidy Amount (₹)</FormLabel>
                   <FormControl>
-                    <Input 
-                        type="number" 
-                        placeholder="Enter subsidy if applicable" 
-                        {...field} 
-                        readOnly={!isSubsidyEditable} 
-                        className={cn(!isSubsidyEditable ? 'bg-muted cursor-not-allowed' : '', field.value === 0 && !isSubsidyEditable ? 'text-muted-foreground' : '')}
+                    <Input
+                        type="number"
+                        placeholder="Enter subsidy if applicable"
+                        {...field}
+                        value={field.value ?? 0} // Ensure value is not undefined
                         onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        readOnly={!isSubsidyEditable}
+                        className={cn(!isSubsidyEditable ? 'bg-muted cursor-not-allowed' : '', field.value === 0 && !isSubsidyEditable ? 'text-muted-foreground' : '')}
                     />
                   </FormControl>
                   {!isSubsidyEditable && <p className="text-xs text-muted-foreground">Auto-calculated for Housing Society. Zero for Commercial/Industrial.</p>}
@@ -506,7 +561,7 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, initialData 
                 </FormItem>
               )}
             />
-            
+
             <DialogFooter className="pt-6">
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancel
