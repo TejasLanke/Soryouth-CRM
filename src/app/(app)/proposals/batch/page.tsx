@@ -19,6 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
+import { FormField } from '@/components/ui/form'; // Added import
 
 // Schema for the entire batch form
 const batchProposalsSchema = z.object({
@@ -41,7 +42,7 @@ const getDefaultProposalRow = (): Omit<Proposal, 'id' | 'clientId' | 'createdAt'
   inverterRating: 0,
   inverterQty: 1,
   ratePerWatt: 0,
-  proposalDate: new Date().toISOString(),
+  proposalDate: format(new Date(), 'yyyy-MM-dd'), // Use format for consistency
 });
 
 
@@ -66,7 +67,7 @@ export default function BatchProposalsPage() {
     watchFieldArray.forEach((proposal, index) => {
       const currentClientType = proposal.clientType;
       const currentName = proposal.name;
-      const currentCapacity = proposal.capacity;
+      const currentCapacity = Number(proposal.capacity) || 0;
 
       // Default contactPerson
       if (currentClientType === 'Individual/Bungalow' && currentName && form.getValues(`proposals.${index}.contactPerson`) !== currentName) {
@@ -74,7 +75,7 @@ export default function BatchProposalsPage() {
       }
 
       // Default inverterRating
-      if (currentCapacity > 0 && form.getValues(`proposals.${index}.inverterRating`) !== currentCapacity) {
+      if (currentCapacity > 0 && Number(form.getValues(`proposals.${index}.inverterRating`)) !== currentCapacity) {
         form.setValue(`proposals.${index}.inverterRating`, currentCapacity, { shouldValidate: false, shouldDirty: true });
       }
       
@@ -105,7 +106,8 @@ export default function BatchProposalsPage() {
       } else if (clientType === 'Individual/Bungalow') {
         // In batch, subsidy for individual is not directly input. We'll assume 0 or a fixed logic if needed.
         // For now, keeping it 0 for Individual in batch context unless a different rule is defined.
-        subsidyAmount = Number(proposalData.subsidyAmount) || 0; // If subsidyAmount were a field in the batch row
+        // subsidyAmount = Number(proposalData.subsidyAmount) || 0; // If subsidyAmount were a field in the batch row
+        // Since subsidyAmount is not a field in the batch row, it remains 0 for Individual/Bungalow unless explicitly calculated here
       }
 
       const processedProposal: Proposal = {
@@ -345,3 +347,4 @@ export default function BatchProposalsPage() {
     </>
   );
 }
+
