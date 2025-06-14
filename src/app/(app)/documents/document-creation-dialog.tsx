@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -93,7 +93,7 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
   });
 
   // Reset form when dialog opens with a new document type or new instance
-  React.useEffect(() => {
+  useEffect(() => {
     if (isOpen) {
       form.reset(defaultValues);
     }
