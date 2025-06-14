@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -20,7 +21,7 @@ import {
   Edit as EditIcon,
   type LucideIcon
 } from 'lucide-react';
-import Link from 'next/link';
+import { DocumentCreationDialog } from './document-creation-dialog'; // New import
 import { useToast } from '@/hooks/use-toast';
 
 const DOCUMENT_TYPES_CONFIG: Array<{ type: DocumentType; icon: LucideIcon; description: string }> = [
@@ -30,24 +31,29 @@ const DOCUMENT_TYPES_CONFIG: Array<{ type: DocumentType; icon: LucideIcon; descr
   { type: 'Proposal Document', icon: EditIcon, description: 'Proposals and quotations for leads.' },
   { type: 'Site Survey Report', icon: Eye, description: 'Reports from on-site assessments.' },
   { type: 'Warranty Certificate', icon: Award, description: 'Certificates for product/service warranties.' },
+  // { type: 'Other', icon: Files, description: 'Other general documents.'} // Example for 'Other'
 ];
 
 export default function DocumentsPage() {
   const [selectedType, setSelectedType] = useState<DocumentType | null>(null);
-  const allDocuments = MOCK_DOCUMENTS;
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [documentTypeToCreate, setDocumentTypeToCreate] = useState<DocumentType | null>(null);
+  
+  const allDocuments = MOCK_DOCUMENTS; // In a real app, this would be fetched
   const { toast } = useToast();
 
   const handleTypeSelect = (type: DocumentType) => {
     setSelectedType(type);
   };
 
-  const handleCreateNew = (type: DocumentType) => {
-    toast({
-      title: `Create New ${type}`,
-      description: `Placeholder for creating a new ${type.toLowerCase()}. This would typically open a form or editor.`,
-    });
-    // In a real app, this would navigate to a form or open a dialog/modal
-    // For example: router.push(`/documents/new?type=${encodeURIComponent(type)}`);
+  const handleOpenCreateDialog = (type: DocumentType) => {
+    setDocumentTypeToCreate(type);
+    setIsCreateDialogOpen(true);
+  };
+
+  const handleCloseCreateDialog = () => {
+    setIsCreateDialogOpen(false);
+    setDocumentTypeToCreate(null);
   };
 
   const filteredDocuments = selectedType
@@ -63,9 +69,14 @@ export default function DocumentsPage() {
           description={`Manage your ${selectedType.toLowerCase()} documents.`}
           icon={selectedTypeConfig?.icon || Files}
         />
-        <Button onClick={() => setSelectedType(null)} variant="outline" className="mb-6">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Document Types
-        </Button>
+        <div className="mb-6 flex justify-between items-center">
+          <Button onClick={() => setSelectedType(null)} variant="outline">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Document Types
+          </Button>
+          <Button onClick={() => handleOpenCreateDialog(selectedType)}>
+             <PlusCircle className="mr-2 h-4 w-4" /> Create New {selectedType}
+          </Button>
+        </div>
 
         {filteredDocuments.length === 0 ? (
           <Card className="mt-6">
@@ -74,9 +85,7 @@ export default function DocumentsPage() {
                 {selectedTypeConfig?.icon ? <selectedTypeConfig.icon className="mx-auto h-12 w-12 mb-4 text-muted-foreground" /> : <Files className="mx-auto h-12 w-12 mb-4" /> }
                 <h3 className="text-xl font-semibold mb-2">No {selectedType}s Yet</h3>
                 <p className="mb-4">Start by creating your first {selectedType.toLowerCase()}.</p>
-                <Button onClick={() => handleCreateNew(selectedType)}>
-                  <PlusCircle className="mr-2 h-4 w-4" /> Create New {selectedType}
-                </Button>
+                 {/* Create button moved to header for this view */}
               </div>
             </CardContent>
           </Card>
@@ -96,7 +105,7 @@ export default function DocumentsPage() {
                 </CardContent>
                 <CardFooter className="flex justify-end gap-2">
                    <Button variant="outline" size="sm" disabled> {/* Placeholder actions */}
-                    <Eye className="mr-1.5 h-3.5 w-3.5" /> View
+                    <Eye className="mr-1.5 h-3.5 w-3.5" /> View/Preview
                   </Button>
                   <Button variant="outline" size="sm" disabled> {/* Placeholder actions */}
                     <Edit3 className="mr-1.5 h-3.5 w-3.5" /> Edit
@@ -112,6 +121,13 @@ export default function DocumentsPage() {
          <div className="mt-8">
           <img src={`https://placehold.co/1200x300.png`} data-ai-hint={`${selectedType?.toLowerCase().replace(/\s+/g, '_')} documents list`} alt={`${selectedType} documents`} className="w-full rounded-lg object-cover"/>
         </div>
+        {documentTypeToCreate && (
+          <DocumentCreationDialog
+            isOpen={isCreateDialogOpen}
+            onClose={handleCloseCreateDialog}
+            documentType={documentTypeToCreate}
+          />
+        )}
       </>
     );
   }
@@ -123,7 +139,7 @@ export default function DocumentsPage() {
         description="Select a document type to view existing files or create new ones."
         icon={Files}
       />
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3"> {/* Ensure 3 columns on large screens */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
         {DOCUMENT_TYPES_CONFIG.map(({ type, icon: Icon, description }) => (
           <Card key={type} className="flex flex-col justify-between shadow-md hover:shadow-lg transition-shadow">
             <CardHeader>
@@ -133,12 +149,12 @@ export default function DocumentsPage() {
               </div>
               <CardDescription>{description}</CardDescription>
             </CardHeader>
-            <CardContent className="flex-grow" /> {/* Spacer to push footer down */}
+            <CardContent className="flex-grow" />
             <CardFooter className="flex flex-col sm:flex-row justify-end gap-2 pt-4 border-t mt-4">
               <Button variant="outline" size="sm" onClick={() => handleTypeSelect(type)} className="w-full sm:w-auto">
                 <Eye className="mr-1.5 h-3.5 w-3.5" /> View Existing
               </Button>
-              <Button size="sm" onClick={() => handleCreateNew(type)} className="w-full sm:w-auto">
+              <Button size="sm" onClick={() => handleOpenCreateDialog(type)} className="w-full sm:w-auto">
                 <PlusCircle className="mr-1.5 h-3.5 w-3.5" /> Create New
               </Button>
             </CardFooter>
@@ -148,6 +164,14 @@ export default function DocumentsPage() {
       <div className="mt-8">
         <img src="https://placehold.co/1200x300.png" data-ai-hint="document types selection" alt="Document Type Selection" className="w-full rounded-lg object-cover"/>
       </div>
+      {documentTypeToCreate && (
+        <DocumentCreationDialog
+          isOpen={isCreateDialogOpen}
+          onClose={handleCloseCreateDialog}
+          documentType={documentTypeToCreate}
+        />
+      )}
     </>
   );
 }
+    
