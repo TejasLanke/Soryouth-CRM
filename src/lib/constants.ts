@@ -1,3 +1,4 @@
+
 import type { NavItem, Lead, Quotation, Document, Communication, DocumentType } from '@/types';
 import {
   LayoutDashboard,
@@ -9,9 +10,9 @@ import {
   TerminalSquare,
   CheckSquare,
   Award,
-  Edit,
-  Eye, // Will be used for Net Metering Agreement
-  FileSignature, // Will be used for Annexure I
+  Edit, // Icon for DCR Declaration (previously Proposal Document)
+  Eye, 
+  FileSignature, 
 } from 'lucide-react';
 
 export const APP_NAME = "Soryouth";
@@ -40,20 +41,20 @@ export const MOCK_QUOTATIONS: Quotation[] = [
 export const DOCUMENT_TYPES_CONFIG: Array<{ type: DocumentType; icon: React.ComponentType<{ className?: string }>; description: string }> = [
   { type: 'Work Completion Report', icon: CheckSquare, description: 'Reports confirming project completion.' },
   { type: 'Purchase Order', icon: FileText, description: 'Purchase orders for goods or services.' },
-  { type: 'Annexure I', icon: FileSignature, description: 'Annexure I documents.' }, // Renamed
-  { type: 'Proposal Document', icon: Edit, description: 'Proposals and quotations for leads.' },
-  { type: 'Net Metering Agreement', icon: Eye, description: 'Agreements for net metering.' }, // Renamed
+  { type: 'Annexure I', icon: FileSignature, description: 'Annexure I documents for compliance.' },
+  { type: 'DCR Declaration', icon: Edit, description: 'Declarations related to Daily Commissioning Reports.' }, // Changed from Proposal Document
+  { type: 'Net Metering Agreement', icon: Eye, description: 'Agreements for net metering services.' },
   { type: 'Warranty Certificate', icon: Award, description: 'Certificates for product/service warranties.' },
-  // { type: 'Other', icon: Files, description: 'Other general documents.'} // Example for 'Other'
+  // { type: 'Other', icon: Files, description: 'Other general documents.'}
 ];
 
 
 export const MOCK_DOCUMENTS: Document[] = [
   { id: 'd1', title: 'Work Completion for Project Sunbeam', type: 'Work Completion Report', relatedLeadId: '2', createdAt: new Date().toISOString() },
   { id: 'd2', title: 'Purchase Order PO-2024-050', type: 'Purchase Order', relatedLeadId: '1', createdAt: new Date(Date.now() - 172800000).toISOString() },
-  { id: 'd3', title: 'Standard Service Annexure Alpha', type: 'Annexure I', relatedLeadId: '1', createdAt: new Date(Date.now() - 86400000).toISOString() }, // Renamed type
-  { id: 'd4', title: 'Proposal for Green Energy Solutions', type: 'Proposal Document', relatedLeadId: '3', createdAt: new Date().toISOString() },
-  { id: 'd5', title: 'Net Metering - 123 Main St', type: 'Net Metering Agreement', relatedLeadId: '1', createdAt: new Date(Date.now() - 2*86400000).toISOString() }, // Renamed type
+  { id: 'd3', title: 'Standard Service Annexure Alpha', type: 'Annexure I', relatedLeadId: '1', createdAt: new Date(Date.now() - 86400000).toISOString() },
+  { id: 'd4', title: 'DCR Declaration for Green Energy Solutions', type: 'DCR Declaration', relatedLeadId: '3', createdAt: new Date().toISOString() }, // Changed type and title slightly
+  { id: 'd5', title: 'Net Metering - 123 Main St', type: 'Net Metering Agreement', relatedLeadId: '1', createdAt: new Date(Date.now() - 2*86400000).toISOString() },
   { id: 'd6', title: 'System Warranty - Project Sunbeam', type: 'Warranty Certificate', relatedLeadId: '2', createdAt: new Date().toISOString() },
   { id: 'd7', title: 'Purchase Order PO-2024-051', type: 'Purchase Order', relatedLeadId: '3', createdAt: new Date(Date.now() - 90000000).toISOString() },
 ];
@@ -64,3 +65,4 @@ export const MOCK_COMMUNICATIONS: Communication[] = [
     { id: 'c3', leadId: '2', type: 'System Alert', content: 'Lead status changed to "Contacted".', direction: 'Outgoing', timestamp: new Date(Date.now() - 3600000).toISOString() },
     { id: 'c4', leadId: '2', type: 'Meeting', subject: 'Site Visit', content: 'Scheduled site visit for next Tuesday.', direction: 'Outgoing', timestamp: new Date().toISOString(), recordedBy: 'Sales Rep B'},
 ];
+

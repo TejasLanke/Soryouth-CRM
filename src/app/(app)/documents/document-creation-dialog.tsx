@@ -53,7 +53,7 @@ const warrantyCertificateSchema = z.object({
   moduleMake: z.enum(["Premier Energies", "Rayzon Solar", "ReNew Energies"], { required_error: "Module make is required" }),
   moduleWattage: z.enum(["540", "545", "550", "585", "590"], { required_error: "Module wattage is required" }),
   inverterMake: z.enum(["Growatt", "Sungrow"], { required_error: "Inverter make is required" }),
-  inverterRating: z.string().min(1, "Inverter rating is required"),
+  inverterRating: z.string().min(1, "Inverter rating is required"), // Value will be like "10kW"
   dateOfCommissioning: z.string().min(1, "Date of commissioning is required"),
 });
 
@@ -84,10 +84,10 @@ const annexureISchema = z.object({
   email: z.string().email("Invalid email address"),
   inverterDetails: z.string().min(1, "Inverter details are required"),
   inverterRating: z.string().min(1, "Inverter rating is required"),
-  moduleTotalCapacity: z.coerce.number().positive("Module total capacity must be a positive number"),
+  moduleWattage: z.enum(["540", "545", "550", "585", "590"], { required_error: "Module wattage is required" }),
   numberOfModules: z.coerce.number().int().positive("Number of modules must be a positive integer"),
   projectModel: z.enum(['CAPEX', 'OPEX'], { required_error: "Project model is required" }),
-  district: z.string().min(1, "District is required"), 
+  district: z.string().min(1, "District is required"),
 });
 
 const genericSchema = z.object({
@@ -103,12 +103,18 @@ type AnnexureIFormValues = z.infer<typeof annexureISchema>;
 type GenericFormValues = z.infer<typeof genericSchema>;
 
 const maharashtraDistricts = [
-  "Mumbai", "Pune", "Nagpur", "Nashik", "Thane", "Aurangabad", "Solapur", 
+  "Mumbai", "Pune", "Nagpur", "Nashik", "Thane", "Aurangabad", "Solapur",
   "Kolhapur", "Satara", "Sangli", "Ahmednagar", "Amravati", "Beed", "Bhandara",
   "Buldhana", "Chandrapur", "Dhule", "Gadchiroli", "Gondia", "Hingoli", "Jalgaon",
   "Jalna", "Latur", "Nanded", "Nandurbar", "Osmanabad", "Palghar", "Parbhani",
   "Raigad", "Ratnagiri", "Sindhudurg", "Wardha", "Washim", "Yavatmal"
-]; 
+];
+
+const moduleMakeOptions = ["Premier Energies", "Rayzon Solar", "ReNew Energies"];
+const moduleWattageOptions = ["540", "545", "550", "585", "590"];
+const inverterMakeOptions = ["Growatt", "Sungrow"];
+const inverterRatingOptions = [3, 5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100].map(r => ({ label: `${r} kW`, value: `${r}kW` }));
+const projectModelOptions = ["CAPEX", "OPEX"];
 
 export function DocumentCreationDialog({ isOpen, onClose, documentType }: DocumentCreationDialogProps) {
   const [isPending, startTransition] = useTransition();
@@ -121,6 +127,7 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
       case 'Work Completion Report': return workCompletionReportSchema;
       case 'Annexure I': return annexureISchema;
       case 'Net Metering Agreement': return netMeteringAgreementSchema;
+      case 'DCR Declaration': return genericSchema; // Changed from Proposal Document
       default: return genericSchema;
     }
   }, [documentType]);
@@ -142,7 +149,7 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
         moduleMake: undefined,
         moduleWattage: undefined,
         inverterMake: undefined,
-        inverterRating: undefined, // Changed from '' to undefined for Select
+        inverterRating: undefined,
         dateOfCommissioning: '',
       };
       case 'Work Completion Report': return {
@@ -165,20 +172,21 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
         email: '',
         inverterDetails: '',
         inverterRating: '',
-        moduleTotalCapacity: 0, // Changed from undefined to 0 for Input type="number"
+        moduleWattage: undefined,
         numberOfModules: 0,
         projectModel: undefined,
         district: undefined,
       };
+      case 'DCR Declaration': // Changed from Proposal Document
       default: return { title: `New ${documentType}`, details: ''};
     }
   }, [documentType]);
 
   const form = useForm({
     resolver: zodResolver(currentSchema),
-    defaultValues: defaultValues as any, // Cast to any because defaultValues structure varies
+    defaultValues: defaultValues as any, 
   });
-  
+
   const capacityValue = form.watch('capacity');
   const ratePerWattValue = form.watch('ratePerWatt');
 
@@ -191,7 +199,7 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
     }
     return cap * rate * 1000;
   }, [capacityValue, ratePerWattValue, documentType]);
-  
+
   const gstRate = 0.138;
 
   const calculatedGST = useMemo(() => {
@@ -242,13 +250,6 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
       }
     });
   };
-
-  const moduleMakeOptions = ["Premier Energies", "Rayzon Solar", "ReNew Energies"];
-  const moduleWattageOptions = ["540", "545", "550", "585", "590"];
-  const inverterMakeOptions = ["Growatt", "Sungrow"];
-  const inverterRatingOptions = [3, 5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100].map(r => ({ label: `${r} kW`, value: `${r}kW` }));
-  const projectModelOptions = ["CAPEX", "OPEX"];
-
 
   const renderFormFields = () => {
     switch (documentType) {
@@ -322,12 +323,12 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
                 )}
                 />
             </div>
-            
+
             <div className="space-y-1">
                 <FormLabel>Total Amount (Calculated)</FormLabel>
                 <Input readOnly value={`₹${calculatedTotal.toFixed(2)}`} className="bg-muted font-medium" />
             </div>
-            
+
             <Separator className="my-4" />
 
             <div className="space-y-2">
@@ -340,7 +341,7 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
                     <span className="font-semibold text-lg">₹{calculatedGrandTotal.toFixed(2)}</span>
                 </div>
             </div>
-            
+
             <Separator className="my-4" />
           </>
         );
@@ -712,12 +713,25 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
                 </FormItem>
               )}
             />
-            <div className="grid grid-cols-2 gap-4">
-              <FormField control={form.control} name="moduleTotalCapacity"
+             <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="moduleWattage"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Module Capacity (Wp)</FormLabel>
-                    <FormControl><Input type="number" placeholder="e.g., 10.5" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl>
+                    <FormLabel>Module Wattage (W)</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Wattage" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {moduleWattageOptions.map(wattage => (
+                          <SelectItem key={wattage} value={wattage}>{wattage} W</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -770,7 +784,7 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
             />
           </>
         );
-      case 'Proposal Document': 
+      case 'DCR Declaration': // Changed from Proposal Document
       default:
         return (
            <>

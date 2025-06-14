@@ -1,3 +1,4 @@
+
 export interface Lead {
   id: string;
   name: string;
@@ -24,9 +25,9 @@ export interface Quotation {
 export type DocumentType =
   | 'Work Completion Report'
   | 'Purchase Order'
-  | 'Annexure I' // Renamed from Contract
-  | 'Proposal Document'
-  | 'Net Metering Agreement' // Renamed from Site Survey Report
+  | 'Annexure I'
+  | 'DCR Declaration' // Changed from Proposal Document
+  | 'Net Metering Agreement'
   | 'Warranty Certificate'
   | 'Other';
 
@@ -58,3 +59,4 @@ export interface NavItem {
   disabled?: boolean;
   children?: NavItem[];
 }
+
