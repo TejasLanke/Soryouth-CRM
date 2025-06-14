@@ -1,5 +1,5 @@
 
-import type { NavItem, Lead, Proposal, Document, Communication, DocumentType } from '@/types';
+import type { NavItem, Lead, Proposal, Document, Communication, DocumentType, ClientType, ModuleType, DCRStatus } from '@/types';
 import {
   LayoutDashboard,
   UsersRound,
@@ -13,7 +13,6 @@ import {
   Edit, 
   Eye, 
   FileSignature, 
-  IndianRupee
 } from 'lucide-react';
 
 export const APP_NAME = "Soryouth";
@@ -29,17 +28,120 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 export const MOCK_LEADS: Lead[] = [
-  { id: '1', name: 'John Doe', email: 'john.doe@example.com', phone: '555-1234', status: 'New', source: 'Website', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-  { id: '2', name: 'Jane Smith', email: 'jane.smith@example.com', phone: '555-5678', status: 'Contacted', source: 'Referral', assignedTo: 'Alice', createdAt: new Date(Date.now() - 86400000).toISOString(), updatedAt: new Date().toISOString() },
-  { id: '3', name: 'Robert Brown', email: 'robert.brown@example.com', status: 'Qualified', source: 'Cold Call', createdAt: new Date(Date.now() - 172800000).toISOString(), updatedAt: new Date().toISOString() },
+  { id: 'lead1', name: 'John Doe Lead', email: 'john.doe.lead@example.com', phone: '555-1234', status: 'New', source: 'Website', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: 'lead2', name: 'Jane Smith Lead', email: 'jane.smith.lead@example.com', phone: '555-5678', status: 'Contacted', source: 'Referral', assignedTo: 'Alice', createdAt: new Date(Date.now() - 86400000).toISOString(), updatedAt: new Date().toISOString() },
+  { id: 'lead3', name: 'Robert Brown Lead', email: 'robert.brown.lead@example.com', status: 'Qualified', source: 'Cold Call', createdAt: new Date(Date.now() - 172800000).toISOString(), updatedAt: new Date().toISOString() },
 ];
 
+export const CLIENT_TYPES: ClientType[] = ['Individual/Bungalow', 'Housing Society', 'Commercial', 'Industrial'];
+export const MODULE_TYPES: ModuleType[] = ['Mono PERC', 'TOPCon'];
+export const DCR_STATUSES: DCRStatus[] = ['DCR', 'Non-DCR'];
+export const PROPOSAL_STATUSES: Proposal['status'][] = ['Draft', 'Sent', 'Accepted', 'Rejected'];
+
+
+const calculateAmounts = (ratePerWatt: number, capacity: number, clientType: ClientType, manualSubsidy?: number): Pick<Proposal, 'baseAmount' | 'cgstAmount' | 'sgstAmount' | 'subtotalAmount' | 'subsidyAmount' | 'finalAmount'> => {
+  const baseAmount = ratePerWatt * capacity * 1000;
+  const cgstAmount = baseAmount * 0.069;
+  const sgstAmount = baseAmount * 0.069;
+  const subtotalAmount = baseAmount + cgstAmount + sgstAmount;
+  
+  let subsidyAmount = 0;
+  if (clientType === 'Housing Society') {
+    subsidyAmount = 18000 * capacity;
+  } else if (clientType === 'Individual/Bungalow') {
+    subsidyAmount = manualSubsidy || 0; // For mock, let's assume 0 if not specified
+  }
+  // For Commercial/Industrial, subsidy is 0 by default.
+
+  const finalAmount = subtotalAmount - subsidyAmount;
+
+  return { baseAmount, cgstAmount, sgstAmount, subtotalAmount, subsidyAmount, finalAmount };
+};
+
+
 export const MOCK_PROPOSALS: Proposal[] = [
-  { id: 'p1', leadId: '1', leadName: 'John Doe', proposalNumber: 'P-2024-001', amount: 150000, status: 'Draft', createdAt: new Date().toISOString(), validUntil: new Date(Date.now() + 2592000000).toISOString() },
-  { id: 'p2', leadId: '2', leadName: 'Jane Smith', proposalNumber: 'P-2024-002', amount: 220000, status: 'Sent', createdAt: new Date(Date.now() - 86400000).toISOString(), validUntil: new Date(Date.now() + 2505600000).toISOString() },
-  { id: 'p3', leadId: '3', leadName: 'Robert Brown', proposalNumber: 'P-2024-003', amount: 185000, status: 'Accepted', createdAt: new Date(Date.now() - 172800000).toISOString(), validUntil: new Date(Date.now() + 2419200000).toISOString() },
-  { id: 'p4', leadId: '1', leadName: 'John Doe', proposalNumber: 'P-2024-004', amount: 95000, status: 'Rejected', createdAt: new Date(Date.now() - 259200000).toISOString(), validUntil: new Date(Date.now() + 2332800000).toISOString() },
+  { 
+    id: 'prop1', 
+    proposalNumber: 'P-2024-001',
+    clientId: 'client1', 
+    name: 'Green Valley Society', 
+    clientType: 'Housing Society',
+    contactPerson: 'Mr. Sharma',
+    location: 'Pune, MH',
+    capacity: 50, // kW
+    moduleType: 'Mono PERC',
+    dcrStatus: 'DCR',
+    inverterRating: 50, // kW
+    inverterQty: 2,
+    ratePerWatt: 40, // ₹
+    ...calculateAmounts(40, 50, 'Housing Society'),
+    status: 'Sent', 
+    validUntil: new Date(Date.now() + 2592000000).toISOString(), // +30 days
+    createdAt: new Date(Date.now() - 86400000 * 5).toISOString(), // 5 days ago
+    updatedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+  },
+  { 
+    id: 'prop2', 
+    proposalNumber: 'P-2024-002',
+    clientId: 'client2', 
+    name: 'Mr. Anil Patel (Bungalow)', 
+    clientType: 'Individual/Bungalow',
+    contactPerson: 'Mr. Anil Patel',
+    location: 'Mumbai, MH',
+    capacity: 10, // kW
+    moduleType: 'TOPCon',
+    dcrStatus: 'Non-DCR',
+    inverterRating: 10, // kW
+    inverterQty: 1,
+    ratePerWatt: 45, // ₹
+    ...calculateAmounts(45, 10, 'Individual/Bungalow', 50000), // 50k manual subsidy
+    status: 'Accepted', 
+    validUntil: new Date(Date.now() + 2000000000).toISOString(),
+    createdAt: new Date(Date.now() - 86400000 * 10).toISOString(),
+    updatedAt: new Date(Date.now() - 86400000 * 1).toISOString(),
+  },
+  { 
+    id: 'prop3', 
+    proposalNumber: 'P-2024-003',
+    clientId: 'client3', 
+    name: 'FutureTech Industries', 
+    clientType: 'Commercial',
+    contactPerson: 'Ms. Priya Singh',
+    location: 'Nagpur, MH',
+    capacity: 200, // kW
+    moduleType: 'Mono PERC',
+    dcrStatus: 'DCR',
+    inverterRating: 200, // kW
+    inverterQty: 5,
+    ratePerWatt: 38, // ₹
+    ...calculateAmounts(38, 200, 'Commercial'),
+    status: 'Draft', 
+    validUntil: new Date(Date.now() + 1500000000).toISOString(),
+    createdAt: new Date(Date.now() - 86400000 * 1).toISOString(),
+    updatedAt: new Date(Date.now() - 86400000 * 1).toISOString(),
+  },
+   { 
+    id: 'prop4', 
+    proposalNumber: 'P-2024-004',
+    clientId: 'client1', // Another proposal for Green Valley Society
+    name: 'Green Valley Society - Phase 2', 
+    clientType: 'Housing Society',
+    contactPerson: 'Mr. Sharma',
+    location: 'Pune, MH',
+    capacity: 75, // kW
+    moduleType: 'TOPCon',
+    dcrStatus: 'DCR',
+    inverterRating: 75, // kW
+    inverterQty: 3,
+    ratePerWatt: 39, // ₹
+    ...calculateAmounts(39, 75, 'Housing Society'),
+    status: 'Draft', 
+    validUntil: new Date(Date.now() + 2592000000).toISOString(), 
+    createdAt: new Date().toISOString(), 
+    updatedAt: new Date().toISOString(),
+  },
 ];
+
 
 export const DOCUMENT_TYPES_CONFIG: Array<{ type: DocumentType; icon: React.ComponentType<{ className?: string }>; description: string }> = [
   { type: 'Work Completion Report', icon: CheckSquare, description: 'Reports confirming project completion.' },
@@ -48,26 +150,22 @@ export const DOCUMENT_TYPES_CONFIG: Array<{ type: DocumentType; icon: React.Comp
   { type: 'DCR Declaration', icon: Edit, description: 'Declarations related to Daily Commissioning Reports.' },
   { type: 'Net Metering Agreement', icon: Eye, description: 'Agreements for net metering services.' },
   { type: 'Warranty Certificate', icon: Award, description: 'Certificates for product/service warranties.' },
-  // { type: 'Other', icon: Files, description: 'Other general documents.'}
 ];
 
 
 export const MOCK_DOCUMENTS: Document[] = [
-  { id: 'd1', title: 'Work Completion for Project Sunbeam', type: 'Work Completion Report', relatedLeadId: '2', createdAt: new Date().toISOString() },
-  { id: 'd2', title: 'Purchase Order PO-2024-050', type: 'Purchase Order', relatedLeadId: '1', createdAt: new Date(Date.now() - 172800000).toISOString() },
-  { id: 'd3', title: 'Standard Service Annexure Alpha', type: 'Annexure I', relatedLeadId: '1', createdAt: new Date(Date.now() - 86400000).toISOString() },
-  { id: 'd4', title: 'DCR Declaration for Green Energy Solutions', type: 'DCR Declaration', relatedLeadId: '3', createdAt: new Date().toISOString() }, 
-  { id: 'd5', title: 'Net Metering - 123 Main St', type: 'Net Metering Agreement', relatedLeadId: '1', createdAt: new Date(Date.now() - 2*86400000).toISOString() },
-  { id: 'd6', title: 'System Warranty - Project Sunbeam', type: 'Warranty Certificate', relatedLeadId: '2', createdAt: new Date().toISOString() },
-  { id: 'd7', title: 'Purchase Order PO-2024-051', type: 'Purchase Order', relatedLeadId: '3', createdAt: new Date(Date.now() - 90000000).toISOString(), relatedProposalId: 'p3' },
+  { id: 'd1', title: 'Work Completion for Project Sunbeam', type: 'Work Completion Report', relatedLeadId: 'lead2', createdAt: new Date().toISOString(), relatedProposalId: 'prop2' },
+  { id: 'd2', title: 'Purchase Order PO-2024-050', type: 'Purchase Order', relatedLeadId: 'lead1', createdAt: new Date(Date.now() - 172800000).toISOString() },
+  { id: 'd3', title: 'Standard Service Annexure Alpha', type: 'Annexure I', relatedLeadId: 'lead1', createdAt: new Date(Date.now() - 86400000).toISOString() },
+  { id: 'd4', title: 'DCR Declaration for Green Energy Solutions', type: 'DCR Declaration', relatedLeadId: 'lead3', createdAt: new Date().toISOString() }, 
+  { id: 'd5', title: 'Net Metering - 123 Main St', type: 'Net Metering Agreement', relatedLeadId: 'lead1', createdAt: new Date(Date.now() - 2*86400000).toISOString() },
+  { id: 'd6', title: 'System Warranty - Project Sunbeam', type: 'Warranty Certificate', relatedLeadId: 'lead2', createdAt: new Date().toISOString(), relatedProposalId: 'prop2' },
+  { id: 'd7', title: 'Purchase Order PO-2024-051', type: 'Purchase Order', relatedLeadId: 'lead3', createdAt: new Date(Date.now() - 90000000).toISOString() },
 ];
 
 export const MOCK_COMMUNICATIONS: Communication[] = [
-    { id: 'c1', leadId: '1', type: 'Email', subject: 'Introductory Email', content: 'Sent initial contact email.', direction: 'Outgoing', timestamp: new Date(Date.now() - 86400000 * 2).toISOString(), recordedBy: 'System' },
-    { id: 'c2', leadId: '1', type: 'Call', content: 'Follow-up call regarding their solar needs. They are interested.', direction: 'Outgoing', timestamp: new Date(Date.now() - 86400000).toISOString(), recordedBy: 'Sales Rep A' },
-    { id: 'c3', leadId: '2', type: 'System Alert', content: 'Lead status changed to "Contacted".', direction: 'Outgoing', timestamp: new Date(Date.now() - 3600000).toISOString() },
-    { id: 'c4', leadId: '2', type: 'Meeting', subject: 'Site Visit', content: 'Scheduled site visit for next Tuesday.', direction: 'Outgoing', timestamp: new Date().toISOString(), recordedBy: 'Sales Rep B'},
+    { id: 'c1', leadId: 'lead1', type: 'Email', subject: 'Introductory Email', content: 'Sent initial contact email.', direction: 'Outgoing', timestamp: new Date(Date.now() - 86400000 * 2).toISOString(), recordedBy: 'System' },
+    { id: 'c2', leadId: 'lead1', type: 'Call', content: 'Follow-up call regarding their solar needs. They are interested.', direction: 'Outgoing', timestamp: new Date(Date.now() - 86400000).toISOString(), recordedBy: 'Sales Rep A' },
+    { id: 'c3', leadId: 'lead2', type: 'System Alert', content: 'Lead status changed to "Contacted".', direction: 'Outgoing', timestamp: new Date(Date.now() - 3600000).toISOString() },
+    { id: 'c4', leadId: 'lead2', type: 'Meeting', subject: 'Site Visit', content: 'Scheduled site visit for next Tuesday.', direction: 'Outgoing', timestamp: new Date().toISOString(), recordedBy: 'Sales Rep B'},
 ];
-
-export const PROPOSAL_STATUSES: Proposal['status'][] = ['Draft', 'Sent', 'Accepted', 'Rejected'];
-

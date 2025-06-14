@@ -11,15 +11,40 @@ export interface Lead {
   updatedAt: string;
 }
 
+export type ClientType = 'Individual/Bungalow' | 'Housing Society' | 'Commercial' | 'Industrial';
+export type ModuleType = 'Mono PERC' | 'TOPCon';
+export type DCRStatus = 'DCR' | 'Non-DCR';
+
 export interface Proposal {
-  id: string;
-  leadId: string;
-  leadName: string;
+  id: string; // Unique ID for the proposal itself
   proposalNumber: string;
-  amount: number;
+  clientId: string; // Identifier for the client this proposal belongs to
+  
+  // Client and Project Details
+  name: string; // Name of the client (person, housing society, company)
+  clientType: ClientType;
+  contactPerson: string;
+  location: string;
+  capacity: number; // kW
+  moduleType: ModuleType;
+  dcrStatus: DCRStatus;
+  inverterRating: number; // kW
+  inverterQty: number;
+  ratePerWatt: number; // ₹
+
+  // Financials
+  baseAmount: number; // Calculated: ratePerWatt * capacity * 1000
+  cgstAmount: number; // Calculated: baseAmount * 0.069
+  sgstAmount: number; // Calculated: baseAmount * 0.069
+  subtotalAmount: number; // Calculated: baseAmount + cgstAmount + sgstAmount
+  subsidyAmount: number;
+  finalAmount: number; // Calculated: subtotalAmount - subsidyAmount
+
+  // Proposal Status and Validity
   status: 'Draft' | 'Sent' | 'Accepted' | 'Rejected';
-  createdAt: string;
-  validUntil: string;
+  validUntil: string; // ISO date string
+  createdAt: string; // ISO date string
+  updatedAt?: string; // ISO date string
 }
 
 export type DocumentType =
@@ -35,10 +60,10 @@ export interface Document {
   id: string;
   title: string;
   type: DocumentType;
-  relatedLeadId?: string;
+  relatedLeadId?: string; // Kept for potential link to Leads module
   relatedProposalId?: string;
   createdAt: string;
-  filePath?: string; // or content string
+  filePath?: string; 
 }
 
 export interface Communication {
