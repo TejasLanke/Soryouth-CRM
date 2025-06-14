@@ -84,10 +84,10 @@ const annexureISchema = z.object({
   email: z.string().email("Invalid email address"),
   inverterDetails: z.string().min(1, "Inverter details are required"),
   inverterRating: z.string().min(1, "Inverter rating is required"),
-  moduleTotalCapacity: z.coerce.number().positive("Module total capacity (kWp) must be a positive number"),
+  moduleTotalCapacity: z.coerce.number().positive("Module total capacity must be a positive number"),
   numberOfModules: z.coerce.number().int().positive("Number of modules must be a positive integer"),
   projectModel: z.enum(['CAPEX', 'OPEX'], { required_error: "Project model is required" }),
-  district: z.string().min(1, "District is required"), // Full list of districts would be long for an enum here
+  district: z.string().min(1, "District is required"), 
 });
 
 const genericSchema = z.object({
@@ -108,7 +108,7 @@ const maharashtraDistricts = [
   "Buldhana", "Chandrapur", "Dhule", "Gadchiroli", "Gondia", "Hingoli", "Jalgaon",
   "Jalna", "Latur", "Nanded", "Nandurbar", "Osmanabad", "Palghar", "Parbhani",
   "Raigad", "Ratnagiri", "Sindhudurg", "Wardha", "Washim", "Yavatmal"
-]; // Subset for brevity, a full list can be used.
+]; 
 
 export function DocumentCreationDialog({ isOpen, onClose, documentType }: DocumentCreationDialogProps) {
   const [isPending, startTransition] = useTransition();
@@ -126,50 +126,46 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
   }, [documentType]);
 
   const defaultValues = useMemo(() => {
-    switch (documentType) {
-      case 'Purchase Order': return {
+    const commonFields = {
         clientName: '',
         clientAddress: '',
-        poDate: '',
         capacity: 0,
+    };
+    switch (documentType) {
+      case 'Purchase Order': return {
+        ...commonFields,
+        poDate: '',
         ratePerWatt: 0,
       };
       case 'Warranty Certificate': return {
-        clientName: '',
-        clientAddress: '',
-        capacity: 0,
+        ...commonFields,
         moduleMake: undefined,
         moduleWattage: undefined,
         inverterMake: undefined,
-        inverterRating: '', // Changed from undefined to empty string for text input
+        inverterRating: undefined, // Changed from '' to undefined for Select
         dateOfCommissioning: '',
       };
       case 'Work Completion Report': return {
-        clientName: '',
-        clientAddress: '',
+        ...commonFields,
         consumerNumber: '',
         sanctionNumber: '',
         sanctionDate: '',
         workCompletionDate: '',
       };
       case 'Net Metering Agreement': return {
-        clientName: '',
-        clientAddress: '',
+        ...commonFields,
         consumerNumber: '',
         agreementDate: '',
-        capacity: 0,
         discomSubdivision: '',
       };
       case 'Annexure I': return {
-        clientName: '',
-        clientAddress: '',
-        capacity: 0,
+        ...commonFields,
         phoneNumber: '',
         consumerNumber: '',
         email: '',
         inverterDetails: '',
         inverterRating: '',
-        moduleTotalCapacity: 0,
+        moduleTotalCapacity: 0, // Changed from undefined to 0 for Input type="number"
         numberOfModules: 0,
         projectModel: undefined,
         district: undefined,
@@ -180,7 +176,7 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
 
   const form = useForm({
     resolver: zodResolver(currentSchema),
-    defaultValues: defaultValues as any,
+    defaultValues: defaultValues as any, // Cast to any because defaultValues structure varies
   });
   
   const capacityValue = form.watch('capacity');
@@ -720,7 +716,7 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
               <FormField control={form.control} name="moduleTotalCapacity"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Module Total Capacity (kWp)</FormLabel>
+                    <FormLabel>Module Capacity (Wp)</FormLabel>
                     <FormControl><Input type="number" placeholder="e.g., 10.5" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl>
                     <FormMessage />
                   </FormItem>
@@ -774,7 +770,7 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
             />
           </>
         );
-      case 'Proposal Document': // Fallthrough to generic for now
+      case 'Proposal Document': 
       default:
         return (
            <>
