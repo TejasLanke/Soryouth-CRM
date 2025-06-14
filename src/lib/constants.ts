@@ -36,10 +36,9 @@ export const MOCK_LEADS: Lead[] = [
 export const CLIENT_TYPES: ClientType[] = ['Individual/Bungalow', 'Housing Society', 'Commercial', 'Industrial'];
 export const MODULE_TYPES: ModuleType[] = ['Mono PERC', 'TOPCon'];
 export const DCR_STATUSES: DCRStatus[] = ['DCR', 'Non-DCR'];
-export const PROPOSAL_STATUSES: Proposal['status'][] = ['Draft', 'Sent', 'Accepted', 'Rejected'];
+// export const PROPOSAL_STATUSES: Proposal['status'][] = ['Draft', 'Sent', 'Accepted', 'Rejected']; // Status removed from Proposal type
 
-
-const calculateAmounts = (ratePerWatt: number, capacity: number, clientType: ClientType, manualSubsidy?: number): Pick<Proposal, 'baseAmount' | 'cgstAmount' | 'sgstAmount' | 'subtotalAmount' | 'subsidyAmount' | 'finalAmount'> => {
+const calculateFinancials = (ratePerWatt: number, capacity: number, clientType: ClientType, manualSubsidyInput?: number): Pick<Proposal, 'baseAmount' | 'cgstAmount' | 'sgstAmount' | 'subtotalAmount' | 'finalAmount' | 'subsidyAmount'> => {
   const baseAmount = ratePerWatt * capacity * 1000;
   const cgstAmount = baseAmount * 0.069;
   const sgstAmount = baseAmount * 0.069;
@@ -49,13 +48,13 @@ const calculateAmounts = (ratePerWatt: number, capacity: number, clientType: Cli
   if (clientType === 'Housing Society') {
     subsidyAmount = 18000 * capacity;
   } else if (clientType === 'Individual/Bungalow') {
-    subsidyAmount = manualSubsidy || 0; // For mock, let's assume 0 if not specified
+    subsidyAmount = manualSubsidyInput || 0;
   }
   // For Commercial/Industrial, subsidy is 0 by default.
 
-  const finalAmount = subtotalAmount - subsidyAmount;
+  const finalAmount = subtotalAmount; // Final amount is now pre-subsidy
 
-  return { baseAmount, cgstAmount, sgstAmount, subtotalAmount, subsidyAmount, finalAmount };
+  return { baseAmount, cgstAmount, sgstAmount, subtotalAmount, finalAmount, subsidyAmount };
 };
 
 
@@ -68,16 +67,15 @@ export const MOCK_PROPOSALS: Proposal[] = [
     clientType: 'Housing Society',
     contactPerson: 'Mr. Sharma',
     location: 'Pune, MH',
-    capacity: 50, // kW
+    capacity: 50, 
     moduleType: 'Mono PERC',
     dcrStatus: 'DCR',
-    inverterRating: 50, // kW
+    inverterRating: 50, 
     inverterQty: 2,
-    ratePerWatt: 40, // ₹
-    ...calculateAmounts(40, 50, 'Housing Society'),
-    status: 'Sent', 
-    validUntil: new Date(Date.now() + 2592000000).toISOString(), // +30 days
-    createdAt: new Date(Date.now() - 86400000 * 5).toISOString(), // 5 days ago
+    ratePerWatt: 40, 
+    proposalDate: new Date(Date.now() - 86400000 * 7).toISOString(), // 7 days ago
+    ...calculateFinancials(40, 50, 'Housing Society'),
+    createdAt: new Date(Date.now() - 86400000 * 7).toISOString(), 
     updatedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
   },
   { 
@@ -88,16 +86,15 @@ export const MOCK_PROPOSALS: Proposal[] = [
     clientType: 'Individual/Bungalow',
     contactPerson: 'Mr. Anil Patel',
     location: 'Mumbai, MH',
-    capacity: 10, // kW
+    capacity: 10, 
     moduleType: 'TOPCon',
     dcrStatus: 'Non-DCR',
-    inverterRating: 10, // kW
+    inverterRating: 10, 
     inverterQty: 1,
-    ratePerWatt: 45, // ₹
-    ...calculateAmounts(45, 10, 'Individual/Bungalow', 50000), // 50k manual subsidy
-    status: 'Accepted', 
-    validUntil: new Date(Date.now() + 2000000000).toISOString(),
-    createdAt: new Date(Date.now() - 86400000 * 10).toISOString(),
+    ratePerWatt: 45, 
+    proposalDate: new Date(Date.now() - 86400000 * 12).toISOString(), // 12 days ago
+    ...calculateFinancials(45, 10, 'Individual/Bungalow', 50000), 
+    createdAt: new Date(Date.now() - 86400000 * 12).toISOString(),
     updatedAt: new Date(Date.now() - 86400000 * 1).toISOString(),
   },
   { 
@@ -108,35 +105,33 @@ export const MOCK_PROPOSALS: Proposal[] = [
     clientType: 'Commercial',
     contactPerson: 'Ms. Priya Singh',
     location: 'Nagpur, MH',
-    capacity: 200, // kW
+    capacity: 200, 
     moduleType: 'Mono PERC',
     dcrStatus: 'DCR',
-    inverterRating: 200, // kW
+    inverterRating: 200, 
     inverterQty: 5,
-    ratePerWatt: 38, // ₹
-    ...calculateAmounts(38, 200, 'Commercial'),
-    status: 'Draft', 
-    validUntil: new Date(Date.now() + 1500000000).toISOString(),
-    createdAt: new Date(Date.now() - 86400000 * 1).toISOString(),
+    ratePerWatt: 38, 
+    proposalDate: new Date(Date.now() - 86400000 * 3).toISOString(), // 3 days ago
+    ...calculateFinancials(38, 200, 'Commercial'),
+    createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
     updatedAt: new Date(Date.now() - 86400000 * 1).toISOString(),
   },
    { 
     id: 'prop4', 
     proposalNumber: 'P-2024-004',
-    clientId: 'client1', // Another proposal for Green Valley Society
+    clientId: 'client1', 
     name: 'Green Valley Society - Phase 2', 
     clientType: 'Housing Society',
     contactPerson: 'Mr. Sharma',
     location: 'Pune, MH',
-    capacity: 75, // kW
+    capacity: 75, 
     moduleType: 'TOPCon',
     dcrStatus: 'DCR',
-    inverterRating: 75, // kW
+    inverterRating: 75, 
     inverterQty: 3,
-    ratePerWatt: 39, // ₹
-    ...calculateAmounts(39, 75, 'Housing Society'),
-    status: 'Draft', 
-    validUntil: new Date(Date.now() + 2592000000).toISOString(), 
+    ratePerWatt: 39, 
+    proposalDate: new Date(Date.now() - 86400000 * 1).toISOString(), // 1 day ago
+    ...calculateFinancials(39, 75, 'Housing Society'),
     createdAt: new Date().toISOString(), 
     updatedAt: new Date().toISOString(),
   },
@@ -147,7 +142,7 @@ export const DOCUMENT_TYPES_CONFIG: Array<{ type: DocumentType; icon: React.Comp
   { type: 'Work Completion Report', icon: CheckSquare, description: 'Reports confirming project completion.' },
   { type: 'Purchase Order', icon: FileText, description: 'Purchase orders for goods or services.' },
   { type: 'Annexure I', icon: FileSignature, description: 'Annexure I documents for compliance.' },
-  { type: 'DCR Declaration', icon: Edit, description: 'Declarations related to Daily Commissioning Reports.' },
+  { type: 'DCR Declaration', icon: Edit, description: 'Declarations related to domestic content requirement.' },
   { type: 'Net Metering Agreement', icon: Eye, description: 'Agreements for net metering services.' },
   { type: 'Warranty Certificate', icon: Award, description: 'Certificates for product/service warranties.' },
 ];
@@ -169,3 +164,6 @@ export const MOCK_COMMUNICATIONS: Communication[] = [
     { id: 'c3', leadId: 'lead2', type: 'System Alert', content: 'Lead status changed to "Contacted".', direction: 'Outgoing', timestamp: new Date(Date.now() - 3600000).toISOString() },
     { id: 'c4', leadId: 'lead2', type: 'Meeting', subject: 'Site Visit', content: 'Scheduled site visit for next Tuesday.', direction: 'Outgoing', timestamp: new Date().toISOString(), recordedBy: 'Sales Rep B'},
 ];
+
+// Used in ProposalForm
+export const PROPOSAL_STATUSES_REMOVED = ['Draft', 'Sent', 'Accepted', 'Rejected'];

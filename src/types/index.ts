@@ -16,35 +16,31 @@ export type ModuleType = 'Mono PERC' | 'TOPCon';
 export type DCRStatus = 'DCR' | 'Non-DCR';
 
 export interface Proposal {
-  id: string; // Unique ID for the proposal itself
+  id: string; 
   proposalNumber: string;
-  clientId: string; // Identifier for the client this proposal belongs to
+  clientId: string; 
   
-  // Client and Project Details
-  name: string; // Name of the client (person, housing society, company)
+  name: string; 
   clientType: ClientType;
   contactPerson: string;
   location: string;
-  capacity: number; // kW
+  capacity: number; 
   moduleType: ModuleType;
   dcrStatus: DCRStatus;
-  inverterRating: number; // kW
+  inverterRating: number; 
   inverterQty: number;
-  ratePerWatt: number; // ₹
+  ratePerWatt: number; 
+  proposalDate: string; // ISO date string
 
-  // Financials
-  baseAmount: number; // Calculated: ratePerWatt * capacity * 1000
-  cgstAmount: number; // Calculated: baseAmount * 0.069
-  sgstAmount: number; // Calculated: baseAmount * 0.069
-  subtotalAmount: number; // Calculated: baseAmount + cgstAmount + sgstAmount
-  subsidyAmount: number;
-  finalAmount: number; // Calculated: subtotalAmount - subsidyAmount
+  baseAmount: number; 
+  cgstAmount: number; 
+  sgstAmount: number; 
+  subtotalAmount: number; // baseAmount + cgstAmount + sgstAmount
+  finalAmount: number; // This will be the same as subtotalAmount
+  subsidyAmount: number; // Stored separately, not used in finalAmount calculation here
 
-  // Proposal Status and Validity
-  status: 'Draft' | 'Sent' | 'Accepted' | 'Rejected';
-  validUntil: string; // ISO date string
-  createdAt: string; // ISO date string
-  updatedAt?: string; // ISO date string
+  createdAt: string; 
+  updatedAt?: string; 
 }
 
 export type DocumentType =
@@ -60,7 +56,7 @@ export interface Document {
   id: string;
   title: string;
   type: DocumentType;
-  relatedLeadId?: string; // Kept for potential link to Leads module
+  relatedLeadId?: string; 
   relatedProposalId?: string;
   createdAt: string;
   filePath?: string; 

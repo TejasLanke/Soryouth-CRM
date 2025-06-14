@@ -11,7 +11,7 @@ import type { Proposal } from '@/types';
 import { FileText, PlusCircle, User, ArrowRight, IndianRupee } from 'lucide-react';
 import { ProposalForm } from './proposal-form';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 interface ClientWithProposals {
   clientId: string;
@@ -33,22 +33,19 @@ export default function ProposalsListPage() {
   };
 
   const handleFormSubmit = (submittedProposal: Proposal) => {
-    // If submittedProposal.id is in proposals, it's an edit.
-    // If not, it's a new proposal.
-    // clientId is now part of the Proposal object.
-    
     const existingProposalIndex = proposals.findIndex(p => p.id === submittedProposal.id);
 
-    if (existingProposalIndex > -1) { // Editing existing proposal
+    if (existingProposalIndex > -1) { 
       const updatedProposals = [...proposals];
       updatedProposals[existingProposalIndex] = submittedProposal;
       setProposals(updatedProposals);
       toast({ title: "Proposal Updated", description: `Proposal ${submittedProposal.proposalNumber} has been updated.` });
-    } else { // Adding new proposal
+    } else { 
       setProposals(prev => [submittedProposal, ...prev]);
       toast({ title: "Proposal Created", description: `Proposal ${submittedProposal.proposalNumber} for ${submittedProposal.name} has been added.` });
     }
     setIsFormOpen(false);
+    setSelectedProposalForEdit(null);
   };
 
   const clientsWithProposals = useMemo(() => {
@@ -57,15 +54,15 @@ export default function ProposalsListPage() {
       if (!clientsMap.has(proposal.clientId)) {
         clientsMap.set(proposal.clientId, {
           clientId: proposal.clientId,
-          clientName: proposal.name, // Use the 'name' field from proposal for client name
+          clientName: proposal.name, 
           proposalCount: 0,
-          mostRecentProposalDate: proposal.createdAt,
+          mostRecentProposalDate: proposal.createdAt, 
           totalProposedValue: 0,
         });
       }
       const clientEntry = clientsMap.get(proposal.clientId)!;
       clientEntry.proposalCount++;
-      clientEntry.totalProposedValue += proposal.finalAmount;
+      clientEntry.totalProposedValue += proposal.finalAmount; // finalAmount is now pre-subsidy
       if (new Date(proposal.createdAt) > new Date(clientEntry.mostRecentProposalDate!)) {
         clientEntry.mostRecentProposalDate = proposal.createdAt;
       }
@@ -107,11 +104,11 @@ export default function ProposalsListPage() {
                   {client.proposalCount} proposal(s)
                   {client.mostRecentProposalDate && (
                     <span className="block text-xs">
-                      Last activity: {format(new Date(client.mostRecentProposalDate), 'dd/MM/yyyy')}
+                      Last activity: {format(parseISO(client.mostRecentProposalDate), 'dd/MM/yyyy')}
                     </span>
                   )}
                    <span className="block text-xs mt-1">
-                      Total Proposed: <IndianRupee className="inline h-3 w-3 -mt-0.5"/>{client.totalProposedValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      Total Proposed (Pre-Subsidy): <IndianRupee className="inline h-3 w-3 -mt-0.5"/>{client.totalProposedValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                 </CardDescription>
               </CardHeader>
@@ -135,8 +132,6 @@ export default function ProposalsListPage() {
         onClose={() => setIsFormOpen(false)}
         onSubmit={handleFormSubmit}
         proposal={selectedProposalForEdit}
-        // For general creation, initialData is not pre-filled with client specifics here.
-        // The form itself will handle generating a new clientId if one isn't part of an existing proposal.
       />
     </>
   );
