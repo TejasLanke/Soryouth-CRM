@@ -28,6 +28,7 @@ import type { DocumentType } from '@/types';
 import { createDocumentInDrive } from './actions';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
 
 interface DocumentCreationDialogProps {
   isOpen: boolean;
@@ -37,9 +38,12 @@ interface DocumentCreationDialogProps {
 
 // Define schemas for different document types
 const purchaseOrderSchema = z.object({
-  customerName: z.string().min(1, 'Customer name is required'), // Or 'Supplier Name' if more appropriate contextually
-  amount: z.coerce.number().positive('Amount must be a positive number'),
-  itemDescription: z.string().min(1, 'Item description is required'),
+  clientName: z.string().min(1, 'Client name is required'),
+  clientAddress: z.string().min(1, 'Client address is required'),
+  poDate: z.string().min(1, 'PO Date is required'), // Using string for date input, can be refined with a date picker
+  capacity: z.coerce.number().positive('Capacity must be a positive number'),
+  ratePerWatt: z.coerce.number().positive('Rate per Watt must be a positive number'),
+  total: z.coerce.number().positive('Total amount must be a positive number'),
   relatedLeadId: z.string().optional(),
 });
 
@@ -80,7 +84,15 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
 
   const memoizedDefaultValues = useMemo(() => {
     switch (documentType) {
-      case 'Purchase Order': return { customerName: '', amount: 0, itemDescription: '', relatedLeadId: '' };
+      case 'Purchase Order': return { 
+        clientName: '', 
+        clientAddress: '',
+        poDate: '',
+        capacity: 0,
+        ratePerWatt: 0,
+        total: 0, 
+        relatedLeadId: '' 
+      };
       case 'Contract': return { clientName: '', effectiveDate: '', contractTerms: '', relatedLeadId: '' };
       default: return { title: '', details: '', relatedLeadId: ''};
     }
@@ -90,6 +102,20 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
     resolver: zodResolver(memoizedSchema),
     defaultValues: memoizedDefaultValues,
   });
+  
+  const poTotal = form.watch('total');
+  const gstRate = 0.138; // 13.8%
+
+  const calculatedGST = useMemo(() => {
+    const totalVal = parseFloat(poTotal as any);
+    return isNaN(totalVal) || totalVal <= 0 ? 0 : totalVal * gstRate;
+  }, [poTotal]);
+
+  const calculatedGrandTotal = useMemo(() => {
+    const totalVal = parseFloat(poTotal as any);
+    return isNaN(totalVal) || totalVal <= 0 ? 0 : totalVal + calculatedGST;
+  }, [poTotal, calculatedGST]);
+
 
   // Reset form when dialog opens with a new document type or new instance
   useEffect(() => {
@@ -101,11 +127,14 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
   const onSubmit = async (values: any) => { // Using 'any' here as values type depends on schema
     startTransition(async () => {
       try {
+        // For Purchase Order, ensure the payload includes the necessary fields
+        // The actual 'values' object will already conform to the schema
         const result = await createDocumentInDrive(documentType, values);
+
         if (result.success) {
           toast({
             title: 'Document Generation Started',
-            description: `${documentType} for ${values.customerName || values.clientName || values.title} is being generated.`,
+            description: `${documentType} for ${values.clientName || values.title} is being generated.`,
           });
           onClose();
         } else {
@@ -133,12 +162,12 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
           <>
             <FormField
               control={form.control}
-              name="customerName" // Keeping as customerName for consistency with existing structure, can be re-labeled
+              name="clientName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Customer/Project Name</FormLabel>
+                  <FormLabel>Client Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="John Doe Project" {...field} />
+                    <Input placeholder="ABC Corp" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -146,12 +175,12 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
             />
             <FormField
               control={form.control}
-              name="amount"
+              name="clientAddress"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Amount</FormLabel>
+                  <FormLabel>Client Address</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="1500.00" {...field} />
+                    <Textarea placeholder="123 Business Rd, Suite 400, City, Country" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -159,17 +188,74 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
             />
             <FormField
               control={form.control}
-              name="itemDescription"
+              name="poDate"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Item/Service Description</FormLabel>
+                  <FormLabel>PO Date</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="E.g., Supply of 10 Solar Panels (Model X)" {...field} />
+                    <Input type="date" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
+             <div className="grid grid-cols-2 gap-4">
+                <FormField
+                control={form.control}
+                name="capacity"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Capacity (kW)</FormLabel>
+                    <FormControl>
+                        <Input type="number" placeholder="10" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                <FormField
+                control={form.control}
+                name="ratePerWatt"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Rate/Watt ($)</FormLabel>
+                    <FormControl>
+                        <Input type="number" placeholder="0.50" step="0.01" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+            </div>
+            <FormField
+              control={form.control}
+              name="total"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Total Amount ($)</FormLabel>
+                  <FormControl>
+                    <Input type="number" placeholder="5000.00" step="0.01" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <Separator className="my-4" />
+
+            <div className="space-y-2">
+                <div className="flex justify-between">
+                    <FormLabel>GST (13.8%)</FormLabel>
+                    <span className="font-medium">${calculatedGST.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                    <FormLabel>Grand Total</FormLabel>
+                    <span className="font-semibold text-lg">${calculatedGrandTotal.toFixed(2)}</span>
+                </div>
+            </div>
+            
+            <Separator className="my-4" />
+
             <FormField
               control={form.control}
               name="relatedLeadId"
@@ -324,3 +410,4 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
     </Dialog>
   );
 }
+
