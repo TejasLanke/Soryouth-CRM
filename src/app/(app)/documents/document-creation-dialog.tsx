@@ -41,16 +41,9 @@ interface DocumentCreationDialogProps {
 const purchaseOrderSchema = z.object({
   clientName: z.string().min(1, 'Client name is required'),
   clientAddress: z.string().min(1, 'Client address is required'),
-  poDate: z.string().min(1, 'PO Date is required'),
+  poDate: z.string().min(1, 'PO Date is required'), // Assuming date as string for simple input type="date"
   capacity: z.coerce.number().positive('Capacity (kW) must be a positive number'),
   ratePerWatt: z.coerce.number().positive('Rate per Watt (₹) must be a positive number'),
-  // total: z.coerce.number().positive('Total amount (₹) must be a positive number'), // This will be calculated
-});
-
-const contractSchema = z.object({
-  clientName: z.string().min(1, "Client name is required"),
-  effectiveDate: z.string().min(1, "Effective date is required"),
-  contractTerms: z.string().min(10, "Contract terms must be at least 10 characters"),
 });
 
 const warrantyCertificateSchema = z.object({
@@ -60,22 +53,28 @@ const warrantyCertificateSchema = z.object({
   moduleMake: z.enum(["Premier Energies", "Rayzon Solar", "ReNew Energies"], { required_error: "Module make is required" }),
   moduleWattage: z.enum(["540", "545", "550", "585", "590"], { required_error: "Module wattage is required" }),
   inverterMake: z.enum(["Growatt", "Sungrow"], { required_error: "Inverter make is required" }),
-  inverterRating: z.string().min(1, "Inverter rating is required"), // Will be selected from predefined values e.g., "3kW", "5kW"
+  inverterRating: z.string().min(1, "Inverter rating is required"),
   dateOfCommissioning: z.string().min(1, "Date of commissioning is required"),
 });
 
+const workCompletionReportSchema = z.object({
+  clientName: z.string().min(1, "Client name is required"),
+  clientAddress: z.string().min(1, "Client address is required"),
+  consumerNumber: z.string().min(1, "Consumer number is required"),
+  sanctionNumber: z.string().min(1, "Sanction number is required"),
+  sanctionDate: z.string().min(1, "Sanction date is required"),
+  workCompletionDate: z.string().min(1, "Work completion date is required"),
+});
 
 const genericSchema = z.object({
   title: z.string().min(1, "Title is required"),
   details: z.string().min(5, "Details must be at least 5 characters"),
 });
 
-
 type PurchaseOrderFormValues = z.infer<typeof purchaseOrderSchema>;
-type ContractFormValues = z.infer<typeof contractSchema>;
 type WarrantyCertificateFormValues = z.infer<typeof warrantyCertificateSchema>;
+type WorkCompletionReportFormValues = z.infer<typeof workCompletionReportSchema>;
 type GenericFormValues = z.infer<typeof genericSchema>;
-
 
 export function DocumentCreationDialog({ isOpen, onClose, documentType }: DocumentCreationDialogProps) {
   const [isPending, startTransition] = useTransition();
@@ -84,8 +83,10 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
   const currentSchema = useMemo(() => {
     switch (documentType) {
       case 'Purchase Order': return purchaseOrderSchema;
-      case 'Contract': return contractSchema;
       case 'Warranty Certificate': return warrantyCertificateSchema;
+      case 'Work Completion Report': return workCompletionReportSchema;
+      case 'Annexure I': return genericSchema; // Using generic for now
+      case 'Net Metering Agreement': return genericSchema; // Using generic for now
       default: return genericSchema;
     }
   }, [documentType]);
@@ -99,24 +100,33 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
         capacity: 0,
         ratePerWatt: 0,
       };
-      case 'Contract': return { clientName: '', effectiveDate: '', contractTerms: '' };
       case 'Warranty Certificate': return {
         clientName: '',
         clientAddress: '',
         capacity: 0,
-        moduleMake: undefined, // For select placeholder
-        moduleWattage: undefined, // For select placeholder
-        inverterMake: undefined, // For select placeholder
-        inverterRating: undefined, // For select placeholder
+        moduleMake: undefined,
+        moduleWattage: undefined,
+        inverterMake: undefined,
+        inverterRating: undefined,
         dateOfCommissioning: '',
       };
+      case 'Work Completion Report': return {
+        clientName: '',
+        clientAddress: '',
+        consumerNumber: '',
+        sanctionNumber: '',
+        sanctionDate: '',
+        workCompletionDate: '',
+      };
+      case 'Annexure I': return { title: `Annexure I for `, details: '' };
+      case 'Net Metering Agreement': return { title: `Net Metering Agreement for `, details: '' };
       default: return { title: '', details: ''};
     }
   }, [documentType]);
 
   const form = useForm({
     resolver: zodResolver(currentSchema),
-    defaultValues: defaultValues as any, // Use 'as any' due to dynamic schema/defaults
+    defaultValues: defaultValues as any,
   });
   
   const capacityValue = form.watch('capacity');
@@ -129,10 +139,10 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
     if (isNaN(cap) || isNaN(rate) || cap <= 0 || rate <= 0) {
         return 0;
     }
-    return cap * rate * 1000; // Capacity (kW) * Rate/Watt * 1000
+    return cap * rate * 1000;
   }, [capacityValue, ratePerWattValue, documentType]);
   
-  const gstRate = 0.138; // 13.8%
+  const gstRate = 0.138;
 
   const calculatedGST = useMemo(() => {
     if (documentType !== 'Purchase Order') return 0;
@@ -144,12 +154,11 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
     return calculatedTotal + calculatedGST;
   }, [calculatedTotal, calculatedGST, documentType]);
 
-
   useEffect(() => {
     if (isOpen) {
       form.reset(defaultValues as any);
     }
-  }, [isOpen, form, defaultValues]);
+  }, [isOpen, form, defaultValues, documentType]); // Added documentType as a dependency
 
   const onSubmit = async (values: any) => {
     startTransition(async () => {
@@ -188,7 +197,6 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
   const moduleWattageOptions = ["540", "545", "550", "585", "590"];
   const inverterMakeOptions = ["Growatt", "Sungrow"];
   const inverterRatingOptions = [3, 5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100].map(r => ({ label: `${r} kW`, value: `${r}kW` }));
-
 
   const renderFormFields = () => {
     switch (documentType) {
@@ -282,50 +290,6 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
             </div>
             
             <Separator className="my-4" />
-          </>
-        );
-      case 'Contract':
-        return (
-          <>
-            <FormField
-              control={form.control}
-              name="clientName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Client Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Jane Smith Corp." {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="effectiveDate"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Effective Date</FormLabel>
-                  <FormControl>
-                    <Input type="date" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-             <FormField
-              control={form.control}
-              name="contractTerms"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Contract Terms</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Describe the key terms of the contract..." className="min-h-[100px]" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
           </>
         );
       case 'Warranty Certificate':
@@ -477,6 +441,92 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
             />
           </>
         );
+      case 'Work Completion Report':
+        return (
+          <>
+            <FormField
+              control={form.control}
+              name="clientName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Client Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Full Name" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="clientAddress"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Client Address</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Complete Address" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="consumerNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Consumer Number</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., CON12345" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="sanctionNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Sanction Number</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., SAN67890" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="sanctionDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Sanction Date</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="workCompletionDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Work Completion Date</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </>
+        );
+      case 'Annexure I': // Fallthrough to generic for now
+      case 'Net Metering Agreement': // Fallthrough to generic for now
+      case 'Proposal Document': // Fallthrough to generic for now
       default:
         return (
            <>
@@ -511,7 +561,6 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
     }
   };
 
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
@@ -545,4 +594,3 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
     </Dialog>
   );
 }
-

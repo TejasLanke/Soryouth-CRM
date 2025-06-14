@@ -24,9 +24,9 @@ export interface Quotation {
 export type DocumentType =
   | 'Work Completion Report'
   | 'Purchase Order'
-  | 'Contract'
+  | 'Annexure I' // Renamed from Contract
   | 'Proposal Document'
-  | 'Site Survey Report'
+  | 'Net Metering Agreement' // Renamed from Site Survey Report
   | 'Warranty Certificate'
   | 'Other';
 
