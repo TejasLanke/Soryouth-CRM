@@ -11,6 +11,7 @@ import { FileText, PlusCircle, Download, Eye, Edit3, IndianRupee } from 'lucide-
 import { Badge } from '@/components/ui/badge';
 import { ProposalForm } from './proposal-form'; 
 import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 
 type ProposalStatus = Proposal['status'];
 
@@ -109,10 +110,10 @@ export default function ProposalsPage() {
                            <IndianRupee className="h-5 w-5 mr-1" />{proposal.amount.toLocaleString()}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Created: {new Date(proposal.createdAt).toLocaleDateString()}
+                          Created: {format(new Date(proposal.createdAt), 'dd/MM/yyyy')}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Valid Until: {new Date(proposal.validUntil).toLocaleDateString()}
+                          Valid Until: {format(new Date(proposal.validUntil), 'dd/MM/yyyy')}
                         </p>
                       </CardContent>
                       <CardFooter className="flex justify-end gap-1.5 border-t pt-3 pb-3 px-4">
