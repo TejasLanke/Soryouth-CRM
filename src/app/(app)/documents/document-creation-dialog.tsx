@@ -53,7 +53,7 @@ const warrantyCertificateSchema = z.object({
   moduleMake: z.enum(["Premier Energies", "Rayzon Solar", "ReNew Energies"], { required_error: "Module make is required" }),
   moduleWattage: z.enum(["540", "545", "550", "585", "590"], { required_error: "Module wattage is required" }),
   inverterMake: z.enum(["Growatt", "Sungrow"], { required_error: "Inverter make is required" }),
-  inverterRating: z.string().min(1, "Inverter rating is required"), // Value will be like "10kW"
+  inverterRating: z.string().min(1, "Inverter rating is required").optional().or(z.literal(undefined)),
   dateOfCommissioning: z.string().min(1, "Date of commissioning is required"),
 });
 
@@ -72,6 +72,7 @@ const netMeteringAgreementSchema = z.object({
   consumerNumber: z.string().min(1, "Consumer number is required"),
   agreementDate: z.string().min(1, "Agreement date is required"),
   capacity: z.coerce.number().positive("Capacity (kW) must be a positive number"),
+  discomSection: z.string().min(1, "DISCOM Section is required"),
   discomSubdivision: z.string().min(1, "DISCOM Subdivision is required"),
 });
 
@@ -127,7 +128,7 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
       case 'Work Completion Report': return workCompletionReportSchema;
       case 'Annexure I': return annexureISchema;
       case 'Net Metering Agreement': return netMeteringAgreementSchema;
-      case 'DCR Declaration': return genericSchema; // Changed from Proposal Document
+      case 'DCR Declaration': return genericSchema;
       default: return genericSchema;
     }
   }, [documentType]);
@@ -163,6 +164,7 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
         ...commonFields,
         consumerNumber: '',
         agreementDate: '',
+        discomSection: '',
         discomSubdivision: '',
       };
       case 'Annexure I': return {
@@ -177,7 +179,7 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
         projectModel: undefined,
         district: undefined,
       };
-      case 'DCR Declaration': // Changed from Proposal Document
+      case 'DCR Declaration':
       default: return { title: `New ${documentType}`, details: ''};
     }
   }, [documentType]);
@@ -625,6 +627,15 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
                 </FormItem>
               )}
             />
+            <FormField control={form.control} name="discomSection"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>DISCOM Section</FormLabel>
+                  <FormControl><Input placeholder="e.g., ABC Section" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField control={form.control} name="discomSubdivision"
               render={({ field }) => (
                 <FormItem>
@@ -784,7 +795,7 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
             />
           </>
         );
-      case 'DCR Declaration': // Changed from Proposal Document
+      case 'DCR Declaration':
       default:
         return (
            <>

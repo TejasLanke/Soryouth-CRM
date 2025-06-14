@@ -11,11 +11,11 @@ export interface Lead {
   updatedAt: string;
 }
 
-export interface Quotation {
+export interface Proposal {
   id: string;
   leadId: string;
   leadName: string;
-  quotationNumber: string;
+  proposalNumber: string;
   amount: number;
   status: 'Draft' | 'Sent' | 'Accepted' | 'Rejected';
   createdAt: string;
@@ -26,7 +26,7 @@ export type DocumentType =
   | 'Work Completion Report'
   | 'Purchase Order'
   | 'Annexure I'
-  | 'DCR Declaration' // Changed from Proposal Document
+  | 'DCR Declaration'
   | 'Net Metering Agreement'
   | 'Warranty Certificate'
   | 'Other';
@@ -36,7 +36,7 @@ export interface Document {
   title: string;
   type: DocumentType;
   relatedLeadId?: string;
-  relatedQuotationId?: string;
+  relatedProposalId?: string;
   createdAt: string;
   filePath?: string; // or content string
 }
@@ -59,4 +59,3 @@ export interface NavItem {
   disabled?: boolean;
   children?: NavItem[];
 }
-

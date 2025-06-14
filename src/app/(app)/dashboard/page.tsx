@@ -6,7 +6,7 @@ import { UsersRound, FileText, IndianRupee, TrendingUp } from 'lucide-react';
 export default function DashboardPage() {
   const stats = [
     { title: 'Active Leads', value: '125', icon: UsersRound, change: '+15%', changeType: 'positive' as const },
-    { title: 'Quotations Sent', value: '42', icon: FileText, change: '+5', changeType: 'positive' as const },
+    { title: 'Proposals Sent', value: '42', icon: FileText, change: '+5', changeType: 'positive' as const }, // Changed from Quotations Sent
     { title: 'Deals Won', value: '18', icon: IndianRupee, change: '-2', changeType: 'negative' as const },
     { title: 'Conversion Rate', value: '14.4%', icon: TrendingUp, change: '+1.2%', changeType: 'positive' as const },
   ];
@@ -42,7 +42,7 @@ export default function DashboardPage() {
             <ul className="space-y-3">
               {[
                 { text: 'New lead: Mark Johnson from website.', time: '10m ago' },
-                { text: 'Quotation Q-2024-042 accepted by Green Solar Ltd.', time: '1h ago' },
+                { text: 'Proposal P-2024-042 accepted by Green Solar Ltd.', time: '1h ago' }, // Changed from Quotation
                 { text: 'Follow-up call scheduled with Sarah Connor.', time: '3h ago' },
                 { text: 'Work completion report generated for Sky High Towers.', time: 'Yesterday' },
               ].map(item => (
