@@ -1,23 +1,28 @@
 
 'use client';
 
-import { useState } from 'react';
+// This page mirrors /proposals/page.tsx for consistency after renaming.
+// Consider removing this route if /proposals is the sole intended path.
+
+import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { MOCK_PROPOSALS, PROPOSAL_STATUSES } from '@/lib/constants';
-import type { Proposal } from '@/types';
-import { FileText, PlusCircle, Download, Eye, Edit3, IndianRupee } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-// Assuming proposal-form.tsx is in the proposals directory, adjust path if necessary
-// For a file in /quotations/page.tsx to access /proposals/proposal-form.tsx:
-import { ProposalForm } from '../proposals/proposal-form';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { MOCK_PROPOSALS } from '@/lib/constants'; // Corrected import
+import type { Proposal } from '@/types'; // Corrected import
+import { FileText, PlusCircle, User, ArrowRight } from 'lucide-react';
+import { ProposalForm } from '../proposals/proposal-form'; // Adjusted path to use the single ProposalForm
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
 
-type ProposalStatus = Proposal['status'];
+interface LeadWithProposals {
+  leadId: string;
+  leadName: string;
+  proposalCount: number;
+  mostRecentProposalDate?: string;
+}
 
-export default function QuotationsPage() { // Or ProposalsPage, router uses folder name
+export default function QuotationsListPageRedirect() { // Renamed component for clarity
   const [proposals, setProposals] = useState<Proposal[]>(MOCK_PROPOSALS);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
@@ -28,21 +33,16 @@ export default function QuotationsPage() { // Or ProposalsPage, router uses fold
     setIsFormOpen(true);
   };
 
-  const handleEditProposal = (proposal: Proposal) => {
-    setSelectedProposal(proposal);
-    setIsFormOpen(true);
-  };
-
   const handleFormSubmit = (proposalData: Omit<Proposal, 'id' | 'createdAt'> | Proposal) => {
     if ('id' in proposalData && proposalData.id) {
       setProposals(proposals.map(p => p.id === proposalData.id ? { ...p, ...proposalData } : p));
       toast({ title: "Proposal Updated", description: `Proposal ${proposalData.proposalNumber} has been updated.` });
     } else {
       const newProposal: Proposal = {
-        ...proposalData,
+        ...(proposalData as Omit<Proposal, 'id' | 'createdAt'>),
         id: `p${proposals.length + 1 + Date.now()}`,
         createdAt: new Date().toISOString(),
-        ...( ('leadId' in proposalData && proposalData.leadId) ? { leadId: proposalData.leadId } : { leadId: `mockLead${Date.now()}` } )
+        leadId: ('leadId' in proposalData && proposalData.leadId) ? proposalData.leadId : `mockLead${Date.now()}`,
       };
       setProposals([newProposal, ...proposals]);
       toast({ title: "Proposal Created", description: `Proposal ${newProposal.proposalNumber} has been added.` });
@@ -50,28 +50,31 @@ export default function QuotationsPage() { // Or ProposalsPage, router uses fold
     setIsFormOpen(false);
   };
 
-
-  const proposalsByStatus = PROPOSAL_STATUSES.reduce((acc, status) => {
-    acc[status] = proposals.filter(p => p.status === status);
-    return acc;
-  }, {} as Record<ProposalStatus, Proposal[]>);
-
-  const getStatusBadgeVariant = (status: ProposalStatus) => {
-    switch (status) {
-      case 'Draft': return 'secondary';
-      case 'Sent': return 'default';
-      case 'Accepted': return 'default';
-      case 'Rejected': return 'destructive';
-      default: return 'outline';
-    }
-  };
-
+  const leadsWithProposals = useMemo(() => {
+    const leadsMap = new Map<string, LeadWithProposals>();
+    proposals.forEach(proposal => {
+      if (!leadsMap.has(proposal.leadId)) {
+        leadsMap.set(proposal.leadId, {
+          leadId: proposal.leadId,
+          leadName: proposal.leadName,
+          proposalCount: 0,
+          mostRecentProposalDate: proposal.createdAt,
+        });
+      }
+      const leadEntry = leadsMap.get(proposal.leadId)!;
+      leadEntry.proposalCount++;
+      if (new Date(proposal.createdAt) > new Date(leadEntry.mostRecentProposalDate!)) {
+        leadEntry.mostRecentProposalDate = proposal.createdAt;
+      }
+    });
+    return Array.from(leadsMap.values()).sort((a,b) => b.leadName.localeCompare(a.leadName));
+  }, [proposals]);
 
   return (
     <>
       <PageHeader
-        title="Proposals"
-        description="Manage and generate proposals for your clients using a Kanban view."
+        title="Client Proposals (via /quotations)" // Updated title for clarity
+        description="View proposals grouped by client or create a new one. This page mirrors /proposals."
         icon={FileText}
         actions={
           <Button onClick={handleCreateNewProposal}>
@@ -80,68 +83,47 @@ export default function QuotationsPage() { // Or ProposalsPage, router uses fold
         }
       />
 
-      <div className="flex flex-col lg:flex-row gap-6 w-full overflow-x-auto pb-4">
-        {PROPOSAL_STATUSES.map((status) => (
-          <div key={status} className="flex-shrink-0 w-full lg:w-1/4 min-w-[300px]">
-            <Card className="bg-muted/50 h-full">
-              <CardHeader className="pb-4">
-                <CardTitle className="font-headline text-lg flex items-center justify-between">
-                  {status}
-                  <span className="text-sm font-normal text-muted-foreground ml-2">
-                    ({proposalsByStatus[status].length})
-                  </span>
-                </CardTitle>
+      {leadsWithProposals.length === 0 ? (
+        <Card>
+          <CardContent className="pt-6 text-center text-muted-foreground">
+            <FileText className="mx-auto h-12 w-12 mb-2" />
+            <p>No proposals found for any clients yet.</p>
+            <p className="text-sm">Start by creating a new proposal.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {leadsWithProposals.map(lead => (
+            <Card key={lead.leadId} className="hover:shadow-md transition-shadow">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <User className="h-6 w-6 text-primary" />
+                  <CardTitle className="font-headline text-xl">{lead.leadName}</CardTitle>
+                </div>
+                <CardDescription>
+                  {lead.proposalCount} proposal(s)
+                  {lead.mostRecentProposalDate && (
+                    <span className="block text-xs">
+                      Last activity: {new Date(lead.mostRecentProposalDate).toLocaleDateString()}
+                    </span>
+                  )}
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4 h-[calc(100%-4rem)] overflow-y-auto p-4 pt-0">
-                {proposalsByStatus[status].length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">No proposals in this stage.</p>
-                ) : (
-                  proposalsByStatus[status].map((proposal) => (
-                    <Card key={proposal.id} className="shadow-sm bg-card">
-                      <CardHeader className="pb-3">
-                        <div className="flex justify-between items-start">
-                          <CardTitle className="text-md font-semibold">{proposal.proposalNumber}</CardTitle>
-                           <Badge variant={getStatusBadgeVariant(proposal.status)} className="capitalize text-xs">
-                            {proposal.status}
-                          </Badge>
-                        </div>
-                        <CardDescription className="text-xs">For: {proposal.leadName}</CardDescription>
-                      </CardHeader>
-                      <CardContent className="pb-3">
-                        <p className="text-lg font-bold text-primary flex items-center">
-                           <IndianRupee className="h-5 w-5 mr-1" />{proposal.amount.toLocaleString()}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Created: {format(new Date(proposal.createdAt), 'dd/MM/yyyy')}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Valid Until: {format(new Date(proposal.validUntil), 'dd/MM/yyyy')}
-                        </p>
-                      </CardContent>
-                      <CardFooter className="flex justify-end gap-1.5 border-t pt-3 pb-3 px-4">
-                        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => handleEditProposal(proposal)}>
-                          <Edit3 className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="h-7 px-2"> {/* Placeholder */}
-                          <Eye className="h-3.5 w-3.5" />
-                        </Button>
-                         <Button variant="ghost" size="sm" className="h-7 px-2"> {/* Placeholder */}
-                          <Download className="h-3.5 w-3.5" />
-                         </Button>
-                      </CardFooter>
-                    </Card>
-                  ))
-                )}
+              <CardContent>
+                 {/* Link to /quotations/[leadId] to maintain consistency for this route */}
+                <Button asChild variant="outline" className="w-full">
+                  <Link href={`/quotations/${lead.leadId}`}>
+                    View Proposals <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
               </CardContent>
             </Card>
-          </div>
-        ))}
-      </div>
-
+          ))}
+        </div>
+      )}
        <div className="mt-8">
-        <img src="https://placehold.co/1200x300.png" data-ai-hint="proposals kanban board" alt="Proposals Kanban Board" className="w-full rounded-lg object-cover"/>
+        <img src="https://placehold.co/1200x300.png" data-ai-hint="client list proposals" alt="Client List for Proposals" className="w-full rounded-lg object-cover"/>
       </div>
-
       <ProposalForm
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}

@@ -51,35 +51,42 @@ type ProposalFormValues = z.infer<typeof proposalSchema>;
 interface ProposalFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: ProposalFormValues | Omit<Proposal, 'id' | 'createdAt' | 'leadId'>) => void;
-  proposal?: Proposal | null;
+  onSubmit: (data: ProposalFormValues | Omit<Proposal, 'id' | 'createdAt' | 'leadId'> | Proposal) => void;
+  proposal?: Proposal | null; // For editing
+  initialData?: { // For pre-filling new proposals, especially leadName and leadId
+    leadId?: string;
+    leadName?: string;
+  };
 }
 
-export function ProposalForm({ isOpen, onClose, onSubmit, proposal }: ProposalFormProps) {
+export function ProposalForm({ isOpen, onClose, onSubmit, proposal, initialData }: ProposalFormProps) {
   const form = useForm<ProposalFormValues>({
     resolver: zodResolver(proposalSchema),
-    defaultValues: proposal ? {
-      ...proposal,
-      validUntil: new Date(proposal.validUntil), // Convert string to Date
-    } : {
-      leadName: '',
-      proposalNumber: `P-${new Date().getFullYear()}-${String(Math.floor(Math.random()*1000)).padStart(3, '0')}`,
-      amount: 0,
-      status: 'Draft',
-      validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Default to 30 days from now
-    },
+    // Default values logic:
+    // 1. If 'proposal' (for editing) is provided, use its values.
+    // 2. If 'initialData' (for new, pre-filled) is provided, use its leadName.
+    // 3. Otherwise, use generic defaults for a completely new proposal.
+    defaultValues: proposal 
+      ? { ...proposal, validUntil: new Date(proposal.validUntil) } 
+      : {
+          leadName: initialData?.leadName || '',
+          proposalNumber: `P-${new Date().getFullYear()}-${String(Math.floor(Math.random()*1000)).padStart(3, '0')}`,
+          amount: 0,
+          status: 'Draft',
+          validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Default to 30 days from now
+        },
   });
 
   useEffect(() => {
     if (isOpen) {
-      if (proposal) {
+      if (proposal) { // Editing existing proposal
         form.reset({
           ...proposal,
           validUntil: new Date(proposal.validUntil),
         });
-      } else {
+      } else { // Creating new proposal
         form.reset({
-          leadName: '',
+          leadName: initialData?.leadName || '',
           proposalNumber: `P-${new Date().getFullYear()}-${String(Math.floor(Math.random()*1000)).padStart(3, '0')}`,
           amount: 0,
           status: 'Draft',
@@ -87,20 +94,23 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal }: ProposalFo
         });
       }
     }
-  }, [proposal, form, isOpen]);
+  }, [proposal, initialData, form, isOpen]);
 
 
   const handleSubmit = (values: ProposalFormValues) => {
+    // values contains: leadName, proposalNumber, amount, status, validUntil (as Date)
     const submissionData = {
       ...values,
       validUntil: values.validUntil.toISOString(), // Convert Date to string for submission
     };
-    if (proposal) {
-      // For editing, we want to make sure we pass the full proposal structure expected by the page
+
+    if (proposal) { // Editing existing proposal
+      // The parent's onSubmit expects a full Proposal object for editing
       onSubmit({ ...proposal, ...submissionData });
-    } else {
-      // For new proposals, map ProposalFormValues to Omit<Proposal, 'id' | 'createdAt' | 'leadId'>
-      // This ensures 'leadId' is not part of the form data directly but can be added by the parent if needed
+    } else { // Creating a new proposal
+      // The parent's onSubmit expects Omit<Proposal, 'id' | 'createdAt' | 'leadId'>
+      // The `initialData.leadId` (if present) will be handled by the parent page's submit handler.
+      // This component just passes up the form data.
       const { leadName, proposalNumber, amount, status, validUntil } = submissionData;
       onSubmit({ leadName, proposalNumber, amount, status, validUntil });
     }
@@ -114,6 +124,7 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal }: ProposalFo
           <DialogTitle>{proposal ? 'Edit Proposal' : 'Create New Proposal'}</DialogTitle>
           <DialogDescription>
             {proposal ? "Update the proposal's information." : 'Enter the details for the new proposal.'}
+            {initialData?.leadName && !proposal && <span className="block mt-1 text-sm">For: {initialData.leadName}</span>}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -125,7 +136,7 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal }: ProposalFo
                 <FormItem>
                   <FormLabel>Lead Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter lead name" {...field} />
+                    <Input placeholder="Enter lead name" {...field} disabled={!!initialData?.leadName && !proposal} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
