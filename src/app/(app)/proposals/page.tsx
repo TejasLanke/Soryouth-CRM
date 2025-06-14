@@ -9,7 +9,7 @@ import { MOCK_PROPOSALS, PROPOSAL_STATUSES } from '@/lib/constants';
 import type { Proposal } from '@/types';
 import { FileText, PlusCircle, Download, Eye, Edit3, IndianRupee } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { ProposalForm } from './proposal-form'; // To be created
+import { ProposalForm } from './proposal-form'; 
 import { useToast } from '@/hooks/use-toast';
 
 type ProposalStatus = Proposal['status'];
@@ -31,16 +31,14 @@ export default function ProposalsPage() {
   };
   
   const handleFormSubmit = (proposalData: Omit<Proposal, 'id' | 'createdAt'> | Proposal) => {
-    if ('id' in proposalData && proposalData.id) { // Editing existing proposal
+    if ('id' in proposalData && proposalData.id) { 
       setProposals(proposals.map(p => p.id === proposalData.id ? { ...p, ...proposalData } : p));
       toast({ title: "Proposal Updated", description: `Proposal ${proposalData.proposalNumber} has been updated.` });
-    } else { // Adding new proposal
+    } else { 
       const newProposal: Proposal = {
         ...proposalData,
-        id: `p${proposals.length + 1 + Date.now()}`, // simple ID generation
+        id: `p${proposals.length + 1 + Date.now()}`, 
         createdAt: new Date().toISOString(),
-        // Ensure leadId is handled if it's expected in the Proposal type but not in Omit
-        // For this mock setup, leadId is part of Proposal, so we might need to add a placeholder or make it optional in the form if not directly collected
         ...( ('leadId' in proposalData && proposalData.leadId) ? { leadId: proposalData.leadId } : { leadId: `mockLead${Date.now()}` } )
       };
       setProposals([newProposal, ...proposals]);

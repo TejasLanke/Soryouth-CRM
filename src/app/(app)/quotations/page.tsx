@@ -1,23 +1,67 @@
 
+'use client';
+
+import { useState } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { MOCK_QUOTATIONS } from '@/lib/constants';
-import type { Quotation } from '@/types';
-import { FileText, PlusCircle, Download, Eye, Edit3 } from 'lucide-react';
-import Link from 'next/link';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { MOCK_PROPOSALS, PROPOSAL_STATUSES } from '@/lib/constants';
+import type { Proposal } from '@/types';
+import { FileText, PlusCircle, Download, Eye, Edit3, IndianRupee } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+// Assuming proposal-form.tsx is in the proposals directory, adjust path if necessary
+// For a file in /quotations/page.tsx to access /proposals/proposal-form.tsx:
+import { ProposalForm } from '../proposals/proposal-form';
+import { useToast } from '@/hooks/use-toast';
 
-export default function QuotationsPage() {
-  const quotations = MOCK_QUOTATIONS;
+type ProposalStatus = Proposal['status'];
 
-  const getStatusColor = (status: Quotation['status']) => {
+export default function QuotationsPage() { // Or ProposalsPage, router uses folder name
+  const [proposals, setProposals] = useState<Proposal[]>(MOCK_PROPOSALS);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
+  const { toast } = useToast();
+
+  const handleCreateNewProposal = () => {
+    setSelectedProposal(null);
+    setIsFormOpen(true);
+  };
+
+  const handleEditProposal = (proposal: Proposal) => {
+    setSelectedProposal(proposal);
+    setIsFormOpen(true);
+  };
+
+  const handleFormSubmit = (proposalData: Omit<Proposal, 'id' | 'createdAt'> | Proposal) => {
+    if ('id' in proposalData && proposalData.id) {
+      setProposals(proposals.map(p => p.id === proposalData.id ? { ...p, ...proposalData } : p));
+      toast({ title: "Proposal Updated", description: `Proposal ${proposalData.proposalNumber} has been updated.` });
+    } else {
+      const newProposal: Proposal = {
+        ...proposalData,
+        id: `p${proposals.length + 1 + Date.now()}`,
+        createdAt: new Date().toISOString(),
+        ...( ('leadId' in proposalData && proposalData.leadId) ? { leadId: proposalData.leadId } : { leadId: `mockLead${Date.now()}` } )
+      };
+      setProposals([newProposal, ...proposals]);
+      toast({ title: "Proposal Created", description: `Proposal ${newProposal.proposalNumber} has been added.` });
+    }
+    setIsFormOpen(false);
+  };
+
+
+  const proposalsByStatus = PROPOSAL_STATUSES.reduce((acc, status) => {
+    acc[status] = proposals.filter(p => p.status === status);
+    return acc;
+  }, {} as Record<ProposalStatus, Proposal[]>);
+
+  const getStatusBadgeVariant = (status: ProposalStatus) => {
     switch (status) {
-      case 'Draft': return 'bg-yellow-500 hover:bg-yellow-600';
-      case 'Sent': return 'bg-blue-500 hover:bg-blue-600';
-      case 'Accepted': return 'bg-green-500 hover:bg-green-600';
-      case 'Rejected': return 'bg-red-500 hover:bg-red-600';
-      default: return 'bg-gray-500 hover:bg-gray-600';
+      case 'Draft': return 'secondary';
+      case 'Sent': return 'default';
+      case 'Accepted': return 'default';
+      case 'Rejected': return 'destructive';
+      default: return 'outline';
     }
   };
 
@@ -25,68 +69,84 @@ export default function QuotationsPage() {
   return (
     <>
       <PageHeader
-        title="Quotations"
-        description="Manage and generate quotations for your clients."
+        title="Proposals"
+        description="Manage and generate proposals for your clients using a Kanban view."
         icon={FileText}
         actions={
-          <Button>
-            <PlusCircle className="mr-2 h-4 w-4" /> Create New Quotation
+          <Button onClick={handleCreateNewProposal}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Create New Proposal
           </Button>
         }
       />
-      {quotations.length === 0 ? (
-        <Card className="mt-6">
-          <CardContent className="pt-6">
-            <div className="text-center text-muted-foreground">
-              <FileText className="mx-auto h-12 w-12 mb-4" />
-              <h3 className="text-xl font-semibold mb-2">No Quotations Yet</h3>
-              <p className="mb-4">Start by creating your first quotation.</p>
-              <Button>
-                <PlusCircle className="mr-2 h-4 w-4" /> Create New Quotation
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {quotations.map((quotation) => (
-            <Card key={quotation.id} className="flex flex-col">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <CardTitle className="font-headline">{quotation.quotationNumber}</CardTitle>
-                  <Badge variant={quotation.status === 'Accepted' ? 'default' : quotation.status === 'Rejected' ? 'destructive' : 'secondary'}>
-                    {quotation.status}
-                  </Badge>
-                </div>
-                <CardDescription>For: {quotation.leadName}</CardDescription>
+
+      <div className="flex flex-col lg:flex-row gap-6 w-full overflow-x-auto pb-4">
+        {PROPOSAL_STATUSES.map((status) => (
+          <div key={status} className="flex-shrink-0 w-full lg:w-1/4 min-w-[300px]">
+            <Card className="bg-muted/50 h-full">
+              <CardHeader className="pb-4">
+                <CardTitle className="font-headline text-lg flex items-center justify-between">
+                  {status}
+                  <span className="text-sm font-normal text-muted-foreground ml-2">
+                    ({proposalsByStatus[status].length})
+                  </span>
+                </CardTitle>
               </CardHeader>
-              <CardContent className="flex-grow">
-                <p className="text-2xl font-semibold text-primary">₹{quotation.amount.toLocaleString()}</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Created: {new Date(quotation.createdAt).toLocaleDateString()}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Valid Until: {new Date(quotation.validUntil).toLocaleDateString()}
-                </p>
+              <CardContent className="space-y-4 h-[calc(100%-4rem)] overflow-y-auto p-4 pt-0">
+                {proposalsByStatus[status].length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No proposals in this stage.</p>
+                ) : (
+                  proposalsByStatus[status].map((proposal) => (
+                    <Card key={proposal.id} className="shadow-sm bg-card">
+                      <CardHeader className="pb-3">
+                        <div className="flex justify-between items-start">
+                          <CardTitle className="text-md font-semibold">{proposal.proposalNumber}</CardTitle>
+                           <Badge variant={getStatusBadgeVariant(proposal.status)} className="capitalize text-xs">
+                            {proposal.status}
+                          </Badge>
+                        </div>
+                        <CardDescription className="text-xs">For: {proposal.leadName}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="pb-3">
+                        <p className="text-lg font-bold text-primary flex items-center">
+                           <IndianRupee className="h-5 w-5 mr-1" />{proposal.amount.toLocaleString()}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Created: {new Date(proposal.createdAt).toLocaleDateString()}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Valid Until: {new Date(proposal.validUntil).toLocaleDateString()}
+                        </p>
+                      </CardContent>
+                      <CardFooter className="flex justify-end gap-1.5 border-t pt-3 pb-3 px-4">
+                        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => handleEditProposal(proposal)}>
+                          <Edit3 className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 px-2"> {/* Placeholder */}
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                         <Button variant="ghost" size="sm" className="h-7 px-2"> {/* Placeholder */}
+                          <Download className="h-3.5 w-3.5" />
+                         </Button>
+                      </CardFooter>
+                    </Card>
+                  ))
+                )}
               </CardContent>
-              <CardFooter className="flex justify-end gap-2">
-                <Button variant="outline" size="sm">
-                  <Eye className="mr-1.5 h-3.5 w-3.5" /> View
-                </Button>
-                <Button variant="outline" size="sm">
-                  <Edit3 className="mr-1.5 h-3.5 w-3.5" /> Edit
-                </Button>
-                 <Button size="sm">
-                  <Download className="mr-1.5 h-3.5 w-3.5" /> Download
-                 </Button>
-              </CardFooter>
             </Card>
-          ))}
-        </div>
-      )}
-       <div className="mt-8">
-        <img src="https://placehold.co/1200x300.png" data-ai-hint="quotation process" alt="Quotation Process Banner" className="w-full rounded-lg object-cover"/>
+          </div>
+        ))}
       </div>
+
+       <div className="mt-8">
+        <img src="https://placehold.co/1200x300.png" data-ai-hint="proposals kanban board" alt="Proposals Kanban Board" className="w-full rounded-lg object-cover"/>
+      </div>
+
+      <ProposalForm
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        onSubmit={handleFormSubmit}
+        proposal={selectedProposal}
+      />
     </>
   );
 }
