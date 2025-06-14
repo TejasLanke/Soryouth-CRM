@@ -41,7 +41,7 @@ interface DocumentCreationDialogProps {
 const purchaseOrderSchema = z.object({
   clientName: z.string().min(1, 'Client name is required'),
   clientAddress: z.string().min(1, 'Client address is required'),
-  poDate: z.string().min(1, 'PO Date is required'), // Assuming date as string for simple input type="date"
+  poDate: z.string().min(1, 'PO Date is required'),
   capacity: z.coerce.number().positive('Capacity (kW) must be a positive number'),
   ratePerWatt: z.coerce.number().positive('Rate per Watt (₹) must be a positive number'),
 });
@@ -66,6 +66,30 @@ const workCompletionReportSchema = z.object({
   workCompletionDate: z.string().min(1, "Work completion date is required"),
 });
 
+const netMeteringAgreementSchema = z.object({
+  clientName: z.string().min(1, "Client name is required"),
+  clientAddress: z.string().min(1, "Client address is required"),
+  consumerNumber: z.string().min(1, "Consumer number is required"),
+  agreementDate: z.string().min(1, "Agreement date is required"),
+  capacity: z.coerce.number().positive("Capacity (kW) must be a positive number"),
+  discomSubdivision: z.string().min(1, "DISCOM Subdivision is required"),
+});
+
+const annexureISchema = z.object({
+  clientName: z.string().min(1, "Client name is required"),
+  clientAddress: z.string().min(1, "Client address is required"),
+  capacity: z.coerce.number().positive("Capacity (kW) must be a positive number"),
+  phoneNumber: z.string().min(1, "Phone number is required"),
+  consumerNumber: z.string().min(1, "Consumer number is required"),
+  email: z.string().email("Invalid email address"),
+  inverterDetails: z.string().min(1, "Inverter details are required"),
+  inverterRating: z.string().min(1, "Inverter rating is required"),
+  moduleTotalCapacity: z.coerce.number().positive("Module total capacity (kWp) must be a positive number"),
+  numberOfModules: z.coerce.number().int().positive("Number of modules must be a positive integer"),
+  projectModel: z.enum(['CAPEX', 'OPEX'], { required_error: "Project model is required" }),
+  district: z.string().min(1, "District is required"), // Full list of districts would be long for an enum here
+});
+
 const genericSchema = z.object({
   title: z.string().min(1, "Title is required"),
   details: z.string().min(5, "Details must be at least 5 characters"),
@@ -74,7 +98,17 @@ const genericSchema = z.object({
 type PurchaseOrderFormValues = z.infer<typeof purchaseOrderSchema>;
 type WarrantyCertificateFormValues = z.infer<typeof warrantyCertificateSchema>;
 type WorkCompletionReportFormValues = z.infer<typeof workCompletionReportSchema>;
+type NetMeteringAgreementFormValues = z.infer<typeof netMeteringAgreementSchema>;
+type AnnexureIFormValues = z.infer<typeof annexureISchema>;
 type GenericFormValues = z.infer<typeof genericSchema>;
+
+const maharashtraDistricts = [
+  "Mumbai", "Pune", "Nagpur", "Nashik", "Thane", "Aurangabad", "Solapur", 
+  "Kolhapur", "Satara", "Sangli", "Ahmednagar", "Amravati", "Beed", "Bhandara",
+  "Buldhana", "Chandrapur", "Dhule", "Gadchiroli", "Gondia", "Hingoli", "Jalgaon",
+  "Jalna", "Latur", "Nanded", "Nandurbar", "Osmanabad", "Palghar", "Parbhani",
+  "Raigad", "Ratnagiri", "Sindhudurg", "Wardha", "Washim", "Yavatmal"
+]; // Subset for brevity, a full list can be used.
 
 export function DocumentCreationDialog({ isOpen, onClose, documentType }: DocumentCreationDialogProps) {
   const [isPending, startTransition] = useTransition();
@@ -85,8 +119,8 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
       case 'Purchase Order': return purchaseOrderSchema;
       case 'Warranty Certificate': return warrantyCertificateSchema;
       case 'Work Completion Report': return workCompletionReportSchema;
-      case 'Annexure I': return genericSchema; // Using generic for now
-      case 'Net Metering Agreement': return genericSchema; // Using generic for now
+      case 'Annexure I': return annexureISchema;
+      case 'Net Metering Agreement': return netMeteringAgreementSchema;
       default: return genericSchema;
     }
   }, [documentType]);
@@ -107,7 +141,7 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
         moduleMake: undefined,
         moduleWattage: undefined,
         inverterMake: undefined,
-        inverterRating: undefined,
+        inverterRating: '', // Changed from undefined to empty string for text input
         dateOfCommissioning: '',
       };
       case 'Work Completion Report': return {
@@ -118,9 +152,29 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
         sanctionDate: '',
         workCompletionDate: '',
       };
-      case 'Annexure I': return { title: `Annexure I for `, details: '' };
-      case 'Net Metering Agreement': return { title: `Net Metering Agreement for `, details: '' };
-      default: return { title: '', details: ''};
+      case 'Net Metering Agreement': return {
+        clientName: '',
+        clientAddress: '',
+        consumerNumber: '',
+        agreementDate: '',
+        capacity: 0,
+        discomSubdivision: '',
+      };
+      case 'Annexure I': return {
+        clientName: '',
+        clientAddress: '',
+        capacity: 0,
+        phoneNumber: '',
+        consumerNumber: '',
+        email: '',
+        inverterDetails: '',
+        inverterRating: '',
+        moduleTotalCapacity: 0,
+        numberOfModules: 0,
+        projectModel: undefined,
+        district: undefined,
+      };
+      default: return { title: `New ${documentType}`, details: ''};
     }
   }, [documentType]);
 
@@ -158,7 +212,7 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
     if (isOpen) {
       form.reset(defaultValues as any);
     }
-  }, [isOpen, form, defaultValues, documentType]); // Added documentType as a dependency
+  }, [isOpen, form, defaultValues, documentType]);
 
   const onSubmit = async (values: any) => {
     startTransition(async () => {
@@ -197,6 +251,8 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
   const moduleWattageOptions = ["540", "545", "550", "585", "590"];
   const inverterMakeOptions = ["Growatt", "Sungrow"];
   const inverterRatingOptions = [3, 5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100].map(r => ({ label: `${r} kW`, value: `${r}kW` }));
+  const projectModelOptions = ["CAPEX", "OPEX"];
+
 
   const renderFormFields = () => {
     switch (documentType) {
@@ -524,8 +580,200 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
             />
           </>
         );
-      case 'Annexure I': // Fallthrough to generic for now
-      case 'Net Metering Agreement': // Fallthrough to generic for now
+      case 'Net Metering Agreement':
+        return (
+          <>
+            <FormField control={form.control} name="clientName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Client Name</FormLabel>
+                  <FormControl><Input placeholder="Client Full Name" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField control={form.control} name="clientAddress"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Client Address</FormLabel>
+                  <FormControl><Textarea placeholder="Full Client Address" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField control={form.control} name="consumerNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Consumer Number</FormLabel>
+                  <FormControl><Input placeholder="e.g., 1234567890" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField control={form.control} name="agreementDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Agreement Date</FormLabel>
+                  <FormControl><Input type="date" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField control={form.control} name="capacity"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Capacity (kW)</FormLabel>
+                  <FormControl><Input type="number" placeholder="e.g., 5" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField control={form.control} name="discomSubdivision"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>DISCOM Subdivision</FormLabel>
+                  <FormControl><Input placeholder="e.g., XYZ Subdivision" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </>
+        );
+      case 'Annexure I':
+        return (
+          <>
+            <FormField control={form.control} name="clientName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Client Name</FormLabel>
+                  <FormControl><Input placeholder="Client Full Name" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField control={form.control} name="clientAddress"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Client Address</FormLabel>
+                  <FormControl><Textarea placeholder="Full Client Address" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField control={form.control} name="capacity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Capacity (kW)</FormLabel>
+                    <FormControl><Input type="number" placeholder="e.g., 10" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}/></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField control={form.control} name="phoneNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone Number</FormLabel>
+                    <FormControl><Input type="tel" placeholder="e.g., 9876543210" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField control={form.control} name="consumerNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Consumer Number</FormLabel>
+                  <FormControl><Input placeholder="e.g., 1234567890" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField control={form.control} name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl><Input type="email" placeholder="client@example.com" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField control={form.control} name="inverterDetails"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Inverter Details (Make/Model)</FormLabel>
+                  <FormControl><Input placeholder="e.g., Growatt 5kW" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField control={form.control} name="inverterRating"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Inverter Rating</FormLabel>
+                  <FormControl><Input placeholder="e.g., 5kW / 10kVA" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField control={form.control} name="moduleTotalCapacity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Module Total Capacity (kWp)</FormLabel>
+                    <FormControl><Input type="number" placeholder="e.g., 10.5" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField control={form.control} name="numberOfModules"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Number of Modules</FormLabel>
+                    <FormControl><Input type="number" placeholder="e.g., 20" {...field} onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}/></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <FormField control={form.control} name="projectModel"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Project Model</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger><SelectValue placeholder="Select Project Model" /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {projectModelOptions.map(model => (
+                        <SelectItem key={model} value={model}>{model}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField control={form.control} name="district"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>District (Maharashtra)</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger><SelectValue placeholder="Select District" /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {maharashtraDistricts.map(district => (
+                        <SelectItem key={district} value={district}>{district}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </>
+        );
       case 'Proposal Document': // Fallthrough to generic for now
       default:
         return (
@@ -594,3 +842,4 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
     </Dialog>
   );
 }
+
