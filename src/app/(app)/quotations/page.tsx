@@ -14,6 +14,7 @@ import type { Proposal } from '@/types'; // Corrected import
 import { FileText, PlusCircle, User, ArrowRight } from 'lucide-react';
 import { ProposalForm } from '../proposals/proposal-form'; // Adjusted path to use the single ProposalForm
 import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 
 interface LeadWithProposals {
   leadId: string;
@@ -104,7 +105,7 @@ export default function QuotationsListPageRedirect() { // Renamed component for 
                   {lead.proposalCount} proposal(s)
                   {lead.mostRecentProposalDate && (
                     <span className="block text-xs">
-                      Last activity: {new Date(lead.mostRecentProposalDate).toLocaleDateString()}
+                      Last activity: {format(new Date(lead.mostRecentProposalDate), 'dd/MM/yyyy')}
                     </span>
                   )}
                 </CardDescription>
