@@ -1,3 +1,4 @@
+
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -60,7 +61,7 @@ export default function QuotationsPage() {
                 <CardDescription>For: {quotation.leadName}</CardDescription>
               </CardHeader>
               <CardContent className="flex-grow">
-                <p className="text-2xl font-semibold text-primary">${quotation.amount.toLocaleString()}</p>
+                <p className="text-2xl font-semibold text-primary">₹{quotation.amount.toLocaleString()}</p>
                 <p className="text-sm text-muted-foreground mt-1">
                   Created: {new Date(quotation.createdAt).toLocaleDateString()}
                 </p>
@@ -77,7 +78,7 @@ export default function QuotationsPage() {
                 </Button>
                  <Button size="sm">
                   <Download className="mr-1.5 h-3.5 w-3.5" /> Download
-                </Button>
+                 </Button>
               </CardFooter>
             </Card>
           ))}

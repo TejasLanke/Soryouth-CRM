@@ -40,23 +40,19 @@ interface DocumentCreationDialogProps {
 const purchaseOrderSchema = z.object({
   clientName: z.string().min(1, 'Client name is required'),
   clientAddress: z.string().min(1, 'Client address is required'),
-  poDate: z.string().min(1, 'PO Date is required'), // Using string for date input, can be refined with a date picker
-  capacity: z.coerce.number().positive('Capacity must be a positive number'),
-  ratePerWatt: z.coerce.number().positive('Rate per Watt must be a positive number'),
-  total: z.coerce.number().positive('Total amount must be a positive number'),
-  relatedLeadId: z.string().optional(),
+  poDate: z.string().min(1, 'PO Date is required'),
+  capacity: z.coerce.number().positive('Capacity (kW) must be a positive number'),
+  ratePerWatt: z.coerce.number().positive('Rate per Watt (₹) must be a positive number'),
+  total: z.coerce.number().positive('Total amount (₹) must be a positive number'), // This will be calculated
 });
 
 const contractSchema = z.object({
   clientName: z.string().min(1, "Client name is required"),
-  effectiveDate: z.string().min(1, "Effective date is required"), // Consider using a date picker
+  effectiveDate: z.string().min(1, "Effective date is required"),
   contractTerms: z.string().min(10, "Contract terms must be at least 10 characters"),
   relatedLeadId: z.string().optional(),
 });
 
-// Add other schemas as needed, e.g., workCompletionReportSchema
-
-// A generic schema for now, refine later if needed
 const genericSchema = z.object({
   title: z.string().min(1, "Title is required"),
   details: z.string().min(5, "Details must be at least 5 characters"),
@@ -73,25 +69,23 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
 
-  const memoizedSchema = useMemo(() => {
+  const currentSchema = useMemo(() => {
     switch (documentType) {
       case 'Purchase Order': return purchaseOrderSchema;
       case 'Contract': return contractSchema;
-      // Add cases for other document types
-      default: return genericSchema; // Fallback for other types
+      default: return genericSchema;
     }
   }, [documentType]);
 
-  const memoizedDefaultValues = useMemo(() => {
+  const defaultValues = useMemo(() => {
     switch (documentType) {
-      case 'Purchase Order': return { 
-        clientName: '', 
+      case 'Purchase Order': return {
+        clientName: '',
         clientAddress: '',
         poDate: '',
         capacity: 0,
         ratePerWatt: 0,
-        total: 0, 
-        relatedLeadId: '' 
+        total: 0, // Will be calculated
       };
       case 'Contract': return { clientName: '', effectiveDate: '', contractTerms: '', relatedLeadId: '' };
       default: return { title: '', details: '', relatedLeadId: ''};
@@ -99,37 +93,52 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
   }, [documentType]);
 
   const form = useForm({
-    resolver: zodResolver(memoizedSchema),
-    defaultValues: memoizedDefaultValues,
+    resolver: zodResolver(currentSchema),
+    defaultValues: defaultValues,
   });
   
-  const poTotal = form.watch('total');
+  const capacityValue = form.watch('capacity');
+  const ratePerWattValue = form.watch('ratePerWatt');
+
+  const calculatedTotal = useMemo(() => {
+    const cap = parseFloat(capacityValue as any);
+    const rate = parseFloat(ratePerWattValue as any);
+    if (isNaN(cap) || isNaN(rate) || cap <= 0 || rate <= 0) {
+        return 0;
+    }
+    return cap * rate * 1000;
+  }, [capacityValue, ratePerWattValue]);
+
+  useEffect(() => {
+    if (documentType === 'Purchase Order') {
+      form.setValue('total', calculatedTotal, { shouldValidate: true });
+    }
+  }, [calculatedTotal, form, documentType]);
+  
   const gstRate = 0.138; // 13.8%
 
   const calculatedGST = useMemo(() => {
-    const totalVal = parseFloat(poTotal as any);
-    return isNaN(totalVal) || totalVal <= 0 ? 0 : totalVal * gstRate;
-  }, [poTotal]);
+    if (documentType !== 'Purchase Order') return 0;
+    return calculatedTotal * gstRate;
+  }, [calculatedTotal, documentType]);
 
   const calculatedGrandTotal = useMemo(() => {
-    const totalVal = parseFloat(poTotal as any);
-    return isNaN(totalVal) || totalVal <= 0 ? 0 : totalVal + calculatedGST;
-  }, [poTotal, calculatedGST]);
+    if (documentType !== 'Purchase Order') return 0;
+    return calculatedTotal + calculatedGST;
+  }, [calculatedTotal, calculatedGST, documentType]);
 
 
-  // Reset form when dialog opens with a new document type or new instance
   useEffect(() => {
     if (isOpen) {
-      form.reset(memoizedDefaultValues);
+      form.reset(defaultValues);
     }
-  }, [isOpen, form, memoizedDefaultValues]);
+  }, [isOpen, form, defaultValues]);
 
-  const onSubmit = async (values: any) => { // Using 'any' here as values type depends on schema
+  const onSubmit = async (values: any) => {
     startTransition(async () => {
       try {
-        // For Purchase Order, ensure the payload includes the necessary fields
-        // The actual 'values' object will already conform to the schema
-        const result = await createDocumentInDrive(documentType, values);
+        const dataToSubmit = documentType === 'Purchase Order' ? { ...values, total: calculatedTotal } : values;
+        const result = await createDocumentInDrive(documentType, dataToSubmit);
 
         if (result.success) {
           toast({
@@ -207,7 +216,7 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
                     <FormItem>
                     <FormLabel>Capacity (kW)</FormLabel>
                     <FormControl>
-                        <Input type="number" placeholder="10" {...field} />
+                        <Input type="number" placeholder="10" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} />
                     </FormControl>
                     <FormMessage />
                     </FormItem>
@@ -218,57 +227,35 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
                 name="ratePerWatt"
                 render={({ field }) => (
                     <FormItem>
-                    <FormLabel>Rate/Watt ($)</FormLabel>
+                    <FormLabel>Rate/Watt (₹)</FormLabel>
                     <FormControl>
-                        <Input type="number" placeholder="0.50" step="0.01" {...field} />
+                        <Input type="number" placeholder="0.50" step="0.01" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} />
                     </FormControl>
                     <FormMessage />
                     </FormItem>
                 )}
                 />
             </div>
-            <FormField
-              control={form.control}
-              name="total"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Total Amount ($)</FormLabel>
-                  <FormControl>
-                    <Input type="number" placeholder="5000.00" step="0.01" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            
+            <div className="space-y-1">
+                <FormLabel>Total Amount (₹)</FormLabel>
+                <Input readOnly value={calculatedTotal.toFixed(2)} className="bg-muted font-medium" />
+            </div>
             
             <Separator className="my-4" />
 
             <div className="space-y-2">
                 <div className="flex justify-between">
                     <FormLabel>GST (13.8%)</FormLabel>
-                    <span className="font-medium">${calculatedGST.toFixed(2)}</span>
+                    <span className="font-medium">₹{calculatedGST.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                     <FormLabel>Grand Total</FormLabel>
-                    <span className="font-semibold text-lg">${calculatedGrandTotal.toFixed(2)}</span>
+                    <span className="font-semibold text-lg">₹{calculatedGrandTotal.toFixed(2)}</span>
                 </div>
             </div>
             
             <Separator className="my-4" />
-
-            <FormField
-              control={form.control}
-              name="relatedLeadId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Related Lead ID (Optional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Lead ID (e.g., L123)" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
           </>
         );
       case 'Contract':
@@ -328,8 +315,7 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
             />
           </>
         );
-      // Add cases for other document types here
-      default: // Fallback for 'Work Completion Report', 'Proposal Document', 'Site Survey Report', 'Warranty Certificate', 'Other'
+      default:
         return (
            <>
             <FormField
@@ -410,4 +396,3 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
     </Dialog>
   );
 }
-
