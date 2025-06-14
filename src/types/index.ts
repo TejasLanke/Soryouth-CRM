@@ -21,10 +21,19 @@ export interface Quotation {
   validUntil: string;
 }
 
+export type DocumentType =
+  | 'Work Completion Report'
+  | 'Invoice'
+  | 'Contract'
+  | 'Proposal Document'
+  | 'Site Survey Report'
+  | 'Warranty Certificate'
+  | 'Other';
+
 export interface Document {
   id: string;
   title: string;
-  type: 'Work Completion Report' | 'Invoice' | 'Contract' | 'Other';
+  type: DocumentType;
   relatedLeadId?: string;
   relatedQuotationId?: string;
   createdAt: string;

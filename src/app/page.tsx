@@ -16,8 +16,7 @@ export default function HomePage() {
             href="/dashboard"
             className="text-sm font-medium hover:underline underline-offset-4"
             prefetch={false}
-          >
-            Login
+          >Login
           </Link>
           <Button asChild>
             <Link href="/dashboard">Get Started</Link>

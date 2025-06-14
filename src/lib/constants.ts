@@ -35,6 +35,11 @@ export const MOCK_QUOTATIONS: Quotation[] = [
 export const MOCK_DOCUMENTS: Document[] = [
   { id: 'd1', title: 'Work Completion for Project Sunbeam', type: 'Work Completion Report', relatedLeadId: '2', createdAt: new Date().toISOString() },
   { id: 'd2', title: 'Invoice INV-2024-050', type: 'Invoice', relatedLeadId: '1', createdAt: new Date(Date.now() - 172800000).toISOString() },
+  { id: 'd3', title: 'Standard Service Contract Alpha', type: 'Contract', relatedLeadId: '1', createdAt: new Date(Date.now() - 86400000).toISOString() },
+  { id: 'd4', title: 'Proposal for Green Energy Solutions', type: 'Proposal Document', relatedLeadId: '3', createdAt: new Date().toISOString() },
+  { id: 'd5', title: 'Site Survey - 123 Main St', type: 'Site Survey Report', relatedLeadId: '1', createdAt: new Date(Date.now() - 2*86400000).toISOString() },
+  { id: 'd6', title: 'System Warranty - Project Sunbeam', type: 'Warranty Certificate', relatedLeadId: '2', createdAt: new Date().toISOString() },
+  { id: 'd7', title: 'Invoice INV-2024-051', type: 'Invoice', relatedLeadId: '3', createdAt: new Date(Date.now() - 90000000).toISOString() },
 ];
 
 export const MOCK_COMMUNICATIONS: Communication[] = [
