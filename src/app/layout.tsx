@@ -1,28 +1,25 @@
 
-import type { Metadata } from 'next';
 import './globals.css';
-import { Toaster } from "@/components/ui/toaster";
+import type { ReactNode } from 'react';
 
-export const metadata: Metadata = {
-  title: 'Soryouth',
-  description: 'Empowering your renewable energy business with Soryouth.',
+export const metadata = {
+  title: 'Soryouth - Minimal Test',
+  description: 'Minimal test to resolve module loading issue.',
 };
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: ReactNode;
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=PT+Sans:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet" />
+        {/* Font imports removed for minimal test */}
       </head>
       <body className="font-body antialiased">
         {children}
-        <Toaster />
+        {/* Toaster removed for minimal test */}
       </body>
     </html>
   );
