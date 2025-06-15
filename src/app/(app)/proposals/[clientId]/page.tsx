@@ -90,16 +90,7 @@ export default function ClientProposalsPage() {
     <>
       <PageHeader
         title={`Proposals for ${currentClient.name}`}
-        description={
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <ClientTypeIcon type={currentClient.clientType} /> 
-                <span>{currentClient.clientType}</span>
-                <span className="mx-1">|</span>
-                <span>Contact: {currentClient.contactPerson}</span>
-                 <span className="mx-1">|</span>
-                <span>Location: {currentClient.location}</span>
-            </div>
-        }
+        description={`${currentClient.clientType} | Contact: ${currentClient.contactPerson} | Location: ${currentClient.location}`}
         icon={User}
         actions={
           <Button onClick={handleCreateNewProposalForClient}>

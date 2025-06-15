@@ -2,7 +2,7 @@ import type { LucideIcon } from 'lucide-react';
 
 interface PageHeaderProps {
   title: string;
-  description?: string;
+  description?: string | React.ReactNode;
   icon?: LucideIcon;
   actions?: React.ReactNode;
 }
@@ -17,7 +17,11 @@ export function PageHeader({ title, description, icon: Icon, actions }: PageHead
         </div>
         {actions && <div className="flex items-center gap-2">{actions}</div>}
       </div>
-      {description && <p className="mt-2 text-muted-foreground">{description}</p>}
+      {description && (
+        typeof description === 'string' ?
+        <p className="mt-2 text-muted-foreground">{description}</p> :
+        <div className="mt-2 text-muted-foreground">{description}</div>
+      )}
     </div>
   );
 }
