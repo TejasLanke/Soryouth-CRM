@@ -15,5 +15,4 @@ export default function AppRootPage() {
 
   return null; // Or a loading spinner, but redirect is usually fast enough
 }
-
     
