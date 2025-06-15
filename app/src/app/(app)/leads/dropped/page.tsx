@@ -1,6 +1,6 @@
 
 import { PageHeader } from '@/components/page-header';
-import { LeadsTable } from '../leads-table'; // Adjusted import path
+import { LeadsTable } from '@/app/(app)/leads/leads-table'; // Adjusted import path
 import { MOCK_LEADS } from '@/lib/constants';
 import { UserX } from 'lucide-react'; // Icon for dropped leads
 import type { Lead } from '@/types';

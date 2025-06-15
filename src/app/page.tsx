@@ -1,3 +1,4 @@
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { AppLogoIcon } from '@/components/app-logo-icon'; // Changed from SunMedium
