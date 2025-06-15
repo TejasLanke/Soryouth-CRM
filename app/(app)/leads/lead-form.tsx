@@ -1,6 +1,7 @@
+
 'use client';
 
-import type { Lead } from '@/types';
+import type { Lead, LeadStatusType } from '@/types';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -30,12 +31,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import React, { useEffect } from 'react';
+import { LEAD_STATUS_OPTIONS } from '@/lib/constants';
 
+// Use the imported LEAD_STATUS_OPTIONS for the enum
 const leadSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   email: z.string().email({ message: 'Invalid email address.' }),
   phone: z.string().optional(),
-  status: z.enum(['New', 'Contacted', 'Qualified', 'Proposal Sent', 'Won', 'Lost']),
+  status: z.enum(LEAD_STATUS_OPTIONS), // Validate against the customizable list
   source: z.string().optional(),
   assignedTo: z.string().optional(),
 });
@@ -56,33 +59,36 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead }: LeadFormProps) {
       name: '',
       email: '',
       phone: '',
-      status: 'New',
+      status: LEAD_STATUS_OPTIONS[0], // Default to the first status in the customizable list
       source: '',
       assignedTo: '',
     },
   });
 
   useEffect(() => {
-    if (lead) {
-      form.reset(lead);
-    } else {
-      form.reset({
-        name: '',
-        email: '',
-        phone: '',
-        status: 'New',
-        source: '',
-        assignedTo: '',
-      });
+    if (isOpen) {
+      if (lead) {
+        form.reset(lead);
+      } else {
+        form.reset({
+          name: '',
+          email: '',
+          phone: '',
+          status: LEAD_STATUS_OPTIONS[0], // Default to the first status
+          source: '',
+          assignedTo: '',
+        });
+      }
     }
   }, [lead, form, isOpen]);
 
 
   const handleSubmit = (values: LeadFormValues) => {
     if (lead) {
-      onSubmit({ ...lead, ...values });
+      // Ensure status type matches LeadStatusType for the onSubmit prop if it expects strict typing
+      onSubmit({ ...lead, ...values, status: values.status as LeadStatusType });
     } else {
-      onSubmit(values);
+      onSubmit({ ...values, status: values.status as LeadStatusType });
     }
   };
 
@@ -149,7 +155,7 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead }: LeadFormProps) {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {['New', 'Contacted', 'Qualified', 'Proposal Sent', 'Won', 'Lost'].map(statusValue => (
+                      {LEAD_STATUS_OPTIONS.map(statusValue => (
                         <SelectItem key={statusValue} value={statusValue}>{statusValue}</SelectItem>
                       ))}
                     </SelectContent>

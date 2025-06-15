@@ -1,10 +1,15 @@
 
+import type { LEAD_STATUS_OPTIONS } from '@/lib/constants';
+
+// Deriving LeadStatusType from the LEAD_STATUS_OPTIONS const array
+export type LeadStatusType = typeof LEAD_STATUS_OPTIONS[number];
+
 export interface Lead {
   id: string;
   name: string;
   email: string;
   phone?: string;
-  status: 'New' | 'Contacted' | 'Qualified' | 'Proposal Sent' | 'Won' | 'Lost';
+  status: LeadStatusType; // Use the derived type for statuses
   source?: string;
   assignedTo?: string;
   createdAt: string;

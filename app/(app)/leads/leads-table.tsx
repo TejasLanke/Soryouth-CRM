@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Lead } from '@/types';
+import type { Lead, LeadStatusType } from '@/types';
 import React, { useState } from 'react';
 import {
   Table,
@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Button, buttonVariants } from '@/components/ui/button'; // Added buttonVariants
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
@@ -33,7 +33,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent } from '@/components/ui/card'; // Import Card and CardContent
+import { Card, CardContent } from '@/components/ui/card';
+import { LEAD_STATUS_OPTIONS } from '@/lib/constants'; // Import for default new lead status if needed
 
 interface LeadsTableProps {
   initialLeads: Lead[];
@@ -60,16 +61,17 @@ export function LeadsTable({ initialLeads }: LeadsTableProps) {
     toast({ title: "Lead Deleted", description: "The lead has been successfully deleted." });
   };
 
-  const handleFormSubmit = (leadData: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'> | Lead) => {
+  const handleFormSubmit = (leadData: Omit<Lead, 'id' | 'createdAt' | 'updatedAt' | 'status'> & { status: LeadStatusType } | Lead) => {
     if ('id' in leadData && leadData.id) { // Editing existing lead
-      setLeads(leads.map(l => l.id === leadData.id ? { ...l, ...leadData, updatedAt: new Date().toISOString() } : l));
+      setLeads(leads.map(l => l.id === leadData.id ? { ...l, ...leadData, status: leadData.status as LeadStatusType, updatedAt: new Date().toISOString() } : l));
       toast({ title: "Lead Updated", description: `${leadData.name}'s information has been updated.` });
     } else { // Adding new lead
       const newLead: Lead = {
         ...leadData,
-        id: `lead-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // more unique ID
+        id: `lead-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        status: leadData.status as LeadStatusType, // Ensure status is correctly typed
       };
       setLeads([newLead, ...leads]);
       toast({ title: "Lead Added", description: `${newLead.name} has been added to leads.` });
@@ -77,15 +79,17 @@ export function LeadsTable({ initialLeads }: LeadsTableProps) {
     setIsFormOpen(false);
   };
   
-  const getBadgeVariant = (status: Lead['status']) => {
+  const getBadgeVariant = (status: LeadStatusType): VariantProps<typeof Badge>['variant'] => {
     switch (status) {
       case 'New': return 'default';
       case 'Contacted': return 'secondary';
       case 'Qualified': return 'outline'; 
-      case 'Proposal Sent': return 'default'; 
-      case 'Won': return 'default'; 
+      case 'Proposal Sent': return 'default'; // Consider a specific color, e.g., blue
+      case 'Negotiation': return 'default'; // Consider a specific color, e.g., purple
+      case 'Won': return 'default'; // Consider a specific color, e.g., green
       case 'Lost': return 'destructive';
-      default: return 'outline';
+      case 'On Hold': return 'secondary'; // Consider a specific color, e.g., yellow/orange
+      default: return 'outline'; // Default for any other custom status
     }
   };
 

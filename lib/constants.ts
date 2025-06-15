@@ -1,5 +1,5 @@
 
-import type { NavItem, Lead, Proposal, Document, Communication, DocumentType, ClientType, ModuleType, DCRStatus, ModuleWattage } from '@/types';
+import type { NavItem, Lead, Proposal, Document, Communication, DocumentType, ClientType, ModuleType, DCRStatus, ModuleWattage, LeadStatusType } from '@/types';
 import {
   LayoutDashboard,
   UsersRound,
@@ -25,12 +25,12 @@ export const APP_NAME = "Soryouth";
 export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/leads', label: 'Leads', icon: UsersRound },
-  { href: '/proposals', label: 'Clients', icon: Briefcase }, // Clients page links to proposals list
+  { href: '/proposals', label: 'Clients', icon: Briefcase },
   { href: '/communications', label: 'Communications', icon: MessageSquareText },
   { href: '/leads/dropped', label: 'Dropped Leads', icon: UserX },
 ];
 
-// Secondary Navigation for tools/other sections, to be placed in a dropdown
+// Secondary Navigation for tools/other sections, in user profile dropdown
 export const TOOLS_NAV_ITEMS: NavItem[] = [
   { href: '/proposals/batch', label: 'Batch Proposals', icon: Rows },
   { href: '/documents', label: 'Documents', icon: Files },
@@ -38,12 +38,17 @@ export const TOOLS_NAV_ITEMS: NavItem[] = [
   { href: '/automation', label: 'Automation Scripts', icon: TerminalSquare },
 ];
 
+// Customizable Lead Statuses - Edit this array to change available statuses in the Lead Form
+export const LEAD_STATUS_OPTIONS = ['New', 'Contacted', 'Qualified', 'Proposal Sent', 'Negotiation', 'Won', 'Lost', 'On Hold'] as const;
+export type LeadStatus = typeof LEAD_STATUS_OPTIONS[number];
+
 
 export const MOCK_LEADS: Lead[] = [
   { id: 'lead1', name: 'John Doe Lead', email: 'john.doe.lead@example.com', phone: '555-1234', status: 'New', source: 'Website', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
   { id: 'lead2', name: 'Jane Smith Lead', email: 'jane.smith.lead@example.com', phone: '555-5678', status: 'Contacted', source: 'Referral', assignedTo: 'Alice', createdAt: new Date(Date.now() - 86400000).toISOString(), updatedAt: new Date().toISOString() },
   { id: 'lead3', name: 'Robert Brown Lead', email: 'robert.brown.lead@example.com', status: 'Qualified', source: 'Cold Call', createdAt: new Date(Date.now() - 172800000).toISOString(), updatedAt: new Date().toISOString() },
   { id: 'lead4', name: 'Lost Cause Ltd', email: 'lost.cause@example.com', phone: '555-0000', status: 'Lost', source: 'Old Database', createdAt: new Date(Date.now() - 259200000).toISOString(), updatedAt: new Date(Date.now() - 86400000).toISOString() },
+  { id: 'lead5', name: 'Pending Project Corp', email: 'pending@example.com', phone: '555-1111', status: 'Proposal Sent', source: 'Trade Show', assignedTo: 'Bob', createdAt: new Date(Date.now() - 86400000 * 5).toISOString(), updatedAt: new Date().toISOString() },
 ];
 
 export const CLIENT_TYPES: ClientType[] = ['Individual/Bungalow', 'Housing Society', 'Commercial', 'Industrial'];
