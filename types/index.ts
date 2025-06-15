@@ -7,13 +7,17 @@ export type LeadStatusType = typeof LEAD_STATUS_OPTIONS[number];
 export interface Lead {
   id: string;
   name: string;
-  email: string;
+  email: string; // Retain email for internal use / form, though not shown in new table
   phone?: string;
-  status: LeadStatusType; // Use the derived type for statuses
+  status: LeadStatusType; // This will represent "Stage"
   source?: string;
-  assignedTo?: string;
+  assignedTo?: string; // Retain for internal use / form
   createdAt: string;
   updatedAt: string;
+  lastCommentText?: string;
+  lastCommentDate?: string;
+  nextFollowUpDate?: string;
+  kilowatt?: number;
 }
 
 export type ClientType = 'Individual/Bungalow' | 'Housing Society' | 'Commercial' | 'Industrial';
@@ -65,7 +69,7 @@ export interface Document {
   title: string;
   type: DocumentType;
   relatedLeadId?: string;
-  relatedProposalId?: string; // Changed from relatedQuotationId
+  relatedProposalId?: string;
   createdAt: string;
   filePath?: string;
 }
@@ -87,4 +91,11 @@ export interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   disabled?: boolean;
   children?: NavItem[];
+}
+
+// For the new status filter bar
+export interface StatusFilterItem {
+  label: LeadStatusType | 'Show all';
+  count: number;
+  value: LeadStatusType | 'all';
 }
