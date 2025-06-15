@@ -16,10 +16,10 @@ export default function HomePage() {
           </Link>
           <nav className="flex items-center gap-4">
             <Button variant="ghost" asChild>
-              <Link href="/dashboard">Login</Link>
+              <Link href="/login">Login</Link>
             </Button>
             <Button asChild>
-              <Link href="/dashboard">Get Started <ArrowRight className="ml-2 h-4 w-4" /></Link>
+              <Link href="/signup">Get Started <ArrowRight className="ml-2 h-4 w-4" /></Link>
             </Button>
           </nav>
         </div>
@@ -36,7 +36,7 @@ export default function HomePage() {
           </p>
           <div className="mt-10 flex flex-wrap justify-center gap-4">
             <Button size="lg" asChild className="shadow-lg hover:shadow-xl transition-shadow">
-              <Link href="/dashboard">
+              <Link href="/signup">
                 Explore Dashboard
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
@@ -89,7 +89,7 @@ export default function HomePage() {
               </p>
               <div className="mt-8">
                 <Button size="lg" asChild className="shadow-md">
-                  <Link href="/dashboard">
+                  <Link href="/signup">
                     Get Started for Free
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Link>

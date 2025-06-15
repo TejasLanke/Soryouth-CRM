@@ -3,7 +3,7 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation'; // Added useRouter
 import {
   SidebarProvider,
   Sidebar,
@@ -27,9 +27,16 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter(); // Initialize useRouter
 
   const toggleTheme = () => {
     document.documentElement.classList.toggle('dark');
+  };
+
+  const handleLogout = () => {
+    // In a real app, you'd clear session, tokens, etc.
+    console.log("User logging out...");
+    router.push('/login'); // Redirect to login page
   };
 
 
@@ -43,8 +50,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           <SidebarMenu>
             {NAV_ITEMS.map((item) => {
               const isDashboard = item.href === '/dashboard';
-              // For non-dashboard items, check if the pathname starts with the item's href.
-              // For the dashboard, it must be an exact match.
               const isActive = isDashboard ? pathname === item.href : (item.href !== '/dashboard' && pathname.startsWith(item.href));
               return (
                 <SidebarMenuItem key={item.label}>
@@ -98,7 +103,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
                 </DropdownMenuItem>
               ))}
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogout}> {/* Updated to onClick */}
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Log out</span>
               </DropdownMenuItem>
@@ -110,9 +115,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-4">
           <SidebarTrigger className="sm:hidden" />
           <div className="flex-1">
-             {/* Potentially breadcrumbs or page title here, handled by PageHeader in child pages for now */}
           </div>
-          {/* Additional header elements can go here, e.g. search, notifications */}
         </header>
         <main className="flex-1 p-4 sm:px-6 sm:py-0 md:gap-8">
           {children}
@@ -122,4 +125,3 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     </SidebarProvider>
   );
 }
-    
