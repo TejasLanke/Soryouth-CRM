@@ -2,7 +2,7 @@
 'use client';
 
 import type { Lead, SortConfig, DropReasonType } from '@/types';
-import React from 'react';
+import React, { useState, useEffect } from 'react'; // Added useState, useEffect
 import {
   Table,
   TableBody,
@@ -43,8 +43,42 @@ interface LeadsTableProps {
   onDeleteLead?: (leadId: string) => void;
   sortConfig?: SortConfig | null;
   requestSort?: (key: keyof Lead) => void;
-  viewType?: 'active' | 'dropped'; // To differentiate between active and dropped leads view
+  viewType?: 'active' | 'dropped';
 }
+
+// Helper function for date formatting (kept here for use by ClientFormattedDateTime)
+const formatDateInternal = (dateString?: string, includeTime: boolean = false) => {
+  if (!dateString) return '-';
+  try {
+    const date = parseISO(dateString);
+    if (isValid(date)) {
+      return includeTime ? format(date, 'dd-MM-yyyy HH:mm') : format(date, 'dd-MM-yyyy');
+    }
+    return dateString; 
+  } catch (e) {
+    return dateString; 
+  }
+};
+
+// New component to handle client-side date/time formatting
+const ClientFormattedDateTime: React.FC<{ dateString?: string }> = ({ dateString }) => {
+  const [formattedDate, setFormattedDate] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (dateString) {
+      setFormattedDate(formatDateInternal(dateString, true));
+    } else {
+      setFormattedDate('-');
+    }
+  }, [dateString]);
+
+  if (formattedDate === null) {
+    // Render a placeholder or nothing until client-side rendering
+    return <span className="text-muted-foreground">Loading time...</span>;
+  }
+  return <>{formattedDate}</>;
+};
+
 
 export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, requestSort, viewType = 'active' }: LeadsTableProps) {
   
@@ -66,18 +100,11 @@ export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, reques
       <ArrowUpDown className="ml-1 h-3 w-3 transform rotate-180 text-primary" />;
   };
   
-  const formatDate = (dateString?: string, includeTime: boolean = false) => {
-    if (!dateString) return '-';
-    try {
-      const date = parseISO(dateString);
-      if (isValid(date)) {
-        return includeTime ? format(date, 'dd-MM-yyyy HH:mm') : format(date, 'dd-MM-yyyy');
-      }
-      return dateString; 
-    } catch (e) {
-      return dateString; 
-    }
+  // formatDate function for general use (mostly without time now)
+  const formatDate = (dateString?: string) => {
+    return formatDateInternal(dateString, false); // Default to no time
   };
+
 
   const renderHeaderCell = (label: string, sortKey: keyof Lead) => (
     <TableHead className="text-muted-foreground whitespace-nowrap">
@@ -163,7 +190,9 @@ export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, reques
         <Checkbox id={`select-lead-${lead.id}`} aria-label={`Select lead ${lead.name}`} />
       </TableCell>
       <TableCell className="py-3 text-center">{index + 1}</TableCell>
-      <TableCell className="py-3 text-xs whitespace-nowrap">{formatDate(lead.createdAt, true)}</TableCell>
+      <TableCell className="py-3 text-xs whitespace-nowrap">
+        <ClientFormattedDateTime dateString={lead.createdAt} />
+      </TableCell>
       <TableCell className="font-medium py-3">{lead.name}</TableCell>
       <TableCell className="py-3">{lead.phone || '-'}</TableCell>
       <TableCell className="py-3">{lead.dropReason || '-'}</TableCell>
@@ -233,3 +262,4 @@ export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, reques
     </div>
   );
 }
+
