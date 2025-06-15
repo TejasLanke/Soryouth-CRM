@@ -17,7 +17,7 @@ export default async function DroppedLeadsPage() {
         description="View leads that have been marked as 'Lost'."
         icon={UserX}
       />
-      <LeadsTable initialLeads={droppedLeads} />
+      <LeadsTable leads={droppedLeads} />
        <div className="mt-8">
         <img src="https://placehold.co/1200x300.png" data-ai-hint="dropped leads list" alt="Dropped Leads" className="w-full rounded-lg object-cover"/>
       </div>
