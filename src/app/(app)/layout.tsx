@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { NAV_ITEMS, APP_NAME } from '@/lib/constants';
+import { NAV_ITEMS, TOOLS_NAV_ITEMS, APP_NAME } from '@/lib/constants';
 import { Logo } from '@/components/logo';
 import { SunMedium, Moon, Settings, LogOut } from 'lucide-react';
 import { Toaster } from '@/components/ui/toaster';
@@ -28,7 +28,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 export default function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
-  // A simple theme toggle example (not fully functional without theme provider logic)
   const toggleTheme = () => {
     document.documentElement.classList.toggle('dark');
   };
@@ -36,26 +35,30 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <SidebarProvider>
-      <Sidebar collapsible="icon"> {/* Added collapsible="icon" */}
+      <Sidebar collapsible="icon">
         <SidebarHeader>
           <Logo />
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            {NAV_ITEMS.map((item) => (
-              <SidebarMenuItem key={item.label}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname.startsWith(item.href)}
-                  tooltip={item.label}
-                >
-                  <Link href={item.href}>
-                    <item.icon />
-                    <span>{item.label}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
+            {NAV_ITEMS.map((item) => {
+              const isDashboard = item.href === '/dashboard';
+              const isActive = isDashboard ? pathname === item.href : pathname.startsWith(item.href);
+              return (
+                <SidebarMenuItem key={item.label}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive}
+                    tooltip={item.label}
+                  >
+                    <Link href={item.href}>
+                      <item.icon />
+                      <span>{item.label}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            })}
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter>
@@ -81,6 +84,17 @@ export default function AppLayout({ children }: { children: ReactNode }) {
                  <Moon className="absolute mr-2 h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
                 <span>Toggle theme</span>
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Tools & Sections</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {TOOLS_NAV_ITEMS.map((item) => (
+                <DropdownMenuItem key={item.label} asChild>
+                  <Link href={item.href}>
+                    <item.icon className="mr-2 h-4 w-4" />
+                    <span>{item.label}</span>
+                  </Link>
+                </DropdownMenuItem>
+              ))}
               <DropdownMenuSeparator />
               <DropdownMenuItem>
                 <LogOut className="mr-2 h-4 w-4" />
