@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { Lead } from '@/types';
@@ -10,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button'; // Added buttonVariants
 import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
@@ -32,6 +33,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { Card, CardContent } from '@/components/ui/card'; // Import Card and CardContent
 
 interface LeadsTableProps {
   initialLeads: Lead[];
@@ -65,7 +67,7 @@ export function LeadsTable({ initialLeads }: LeadsTableProps) {
     } else { // Adding new lead
       const newLead: Lead = {
         ...leadData,
-        id: (leads.length + 1).toString(), // simple ID generation for mock
+        id: `lead-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // more unique ID
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -79,9 +81,9 @@ export function LeadsTable({ initialLeads }: LeadsTableProps) {
     switch (status) {
       case 'New': return 'default';
       case 'Contacted': return 'secondary';
-      case 'Qualified': return 'outline'; // You might want specific colors here
-      case 'Proposal Sent': return 'default'; // Potentially a different color like blue
-      case 'Won': return 'default'; // Potentially green
+      case 'Qualified': return 'outline'; 
+      case 'Proposal Sent': return 'default'; 
+      case 'Won': return 'default'; 
       case 'Lost': return 'destructive';
       default: return 'outline';
     }
@@ -174,9 +176,3 @@ export function LeadsTable({ initialLeads }: LeadsTableProps) {
     </div>
   );
 }
-
-// Dummy Card components for structure if not globally available
-// In a real app, import these from '@/components/ui/card'
-const Card = ({className, children}: {className?: string, children: React.ReactNode}) => <div className={`rounded-lg border bg-card text-card-foreground ${className}`}>{children}</div>;
-const CardContent = ({className, children}: {className?: string, children: React.ReactNode}) => <div className={`p-6 pt-0 ${className}`}>{children}</div>;
-import { buttonVariants } from "@/components/ui/button";
