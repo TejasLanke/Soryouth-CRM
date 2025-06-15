@@ -13,25 +13,37 @@ import {
   Edit,
   Eye,
   FileSignature,
+  Briefcase, // For Clients
+  UserX,     // For Dropped Leads
+  Rows,      // For Batch Proposals
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 export const APP_NAME = "Soryouth";
 
+// Primary CRM Navigation for the main sidebar
 export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/leads', label: 'Leads', icon: UsersRound },
-  { href: '/proposals', label: 'Proposals', icon: FileText },
-  { href: '/documents', label: 'Documents', icon: Files },
+  { href: '/proposals', label: 'Clients', icon: Briefcase }, // Clients page links to proposals list
   { href: '/communications', label: 'Communications', icon: MessageSquareText },
+  { href: '/leads/dropped', label: 'Dropped Leads', icon: UserX },
+];
+
+// Secondary Navigation for tools/other sections, to be placed in a dropdown
+export const TOOLS_NAV_ITEMS: NavItem[] = [
+  { href: '/proposals/batch', label: 'Batch Proposals', icon: Rows },
+  { href: '/documents', label: 'Documents', icon: Files },
   { href: '/document-customizer', label: 'AI Document Customizer', icon: WandSparkles },
   { href: '/automation', label: 'Automation Scripts', icon: TerminalSquare },
 ];
+
 
 export const MOCK_LEADS: Lead[] = [
   { id: 'lead1', name: 'John Doe Lead', email: 'john.doe.lead@example.com', phone: '555-1234', status: 'New', source: 'Website', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
   { id: 'lead2', name: 'Jane Smith Lead', email: 'jane.smith.lead@example.com', phone: '555-5678', status: 'Contacted', source: 'Referral', assignedTo: 'Alice', createdAt: new Date(Date.now() - 86400000).toISOString(), updatedAt: new Date().toISOString() },
   { id: 'lead3', name: 'Robert Brown Lead', email: 'robert.brown.lead@example.com', status: 'Qualified', source: 'Cold Call', createdAt: new Date(Date.now() - 172800000).toISOString(), updatedAt: new Date().toISOString() },
+  { id: 'lead4', name: 'Lost Cause Ltd', email: 'lost.cause@example.com', phone: '555-0000', status: 'Lost', source: 'Old Database', createdAt: new Date(Date.now() - 259200000).toISOString(), updatedAt: new Date(Date.now() - 86400000).toISOString() },
 ];
 
 export const CLIENT_TYPES: ClientType[] = ['Individual/Bungalow', 'Housing Society', 'Commercial', 'Industrial'];
@@ -66,7 +78,7 @@ export const MOCK_PROPOSALS: Proposal[] = [
   {
     id: 'prop1',
     proposalNumber: 'P-2024-001',
-    clientId: 'client1',
+    clientId: 'client1', // Corresponds to a lead/client
     name: 'Green Valley Society',
     clientType: 'Housing Society',
     contactPerson: 'Mr. Sharma',
@@ -86,7 +98,7 @@ export const MOCK_PROPOSALS: Proposal[] = [
   {
     id: 'prop2',
     proposalNumber: 'P-2024-002',
-    clientId: 'client2',
+    clientId: 'client2', // Corresponds to a lead/client
     name: 'Mr. Anil Patel (Bungalow)',
     clientType: 'Individual/Bungalow',
     contactPerson: 'Mr. Anil Patel',
@@ -99,14 +111,14 @@ export const MOCK_PROPOSALS: Proposal[] = [
     inverterQty: 1,
     ratePerWatt: 45,
     proposalDate: format(new Date(Date.now() - 86400000 * 12), 'yyyy-MM-dd'),
-    ...calculateFinancialsAndSubsidy(45, 10, 'Individual/Bungalow'), // Subsidy now calculated
+    ...calculateFinancialsAndSubsidy(45, 10, 'Individual/Bungalow'),
     createdAt: new Date(Date.now() - 86400000 * 12).toISOString(),
     updatedAt: new Date(Date.now() - 86400000 * 1).toISOString(),
   },
   {
     id: 'prop3',
     proposalNumber: 'P-2024-003',
-    clientId: 'client3',
+    clientId: 'client3', // Corresponds to a lead/client
     name: 'FutureTech Industries',
     clientType: 'Commercial',
     contactPerson: 'Ms. Priya Singh',
@@ -114,7 +126,7 @@ export const MOCK_PROPOSALS: Proposal[] = [
     capacity: 200,
     moduleType: 'Mono PERC',
     moduleWattage: '550',
-    dcrStatus: 'Non-DCR', // Should be Non-DCR for commercial
+    dcrStatus: 'Non-DCR', 
     inverterRating: 200,
     inverterQty: 5,
     ratePerWatt: 38,
@@ -126,7 +138,7 @@ export const MOCK_PROPOSALS: Proposal[] = [
    {
     id: 'prop4',
     proposalNumber: 'P-2024-004',
-    clientId: 'client1',
+    clientId: 'client1', // Another proposal for Green Valley Society
     name: 'Green Valley Society',
     clientType: 'Housing Society',
     contactPerson: 'Mr. Sharma',
@@ -143,7 +155,7 @@ export const MOCK_PROPOSALS: Proposal[] = [
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
-  { // Example for 1kW Individual to test subsidy
+  { 
     id: 'prop5',
     proposalNumber: 'P-2024-005',
     clientId: 'client4',
@@ -151,7 +163,7 @@ export const MOCK_PROPOSALS: Proposal[] = [
     clientType: 'Individual/Bungalow',
     contactPerson: 'Mrs. Sunita Rao',
     location: 'Nashik, MH',
-    capacity: 1, // 1kW capacity
+    capacity: 1, 
     moduleType: 'Mono PERC',
     moduleWattage: '540',
     dcrStatus: 'DCR',
@@ -159,11 +171,11 @@ export const MOCK_PROPOSALS: Proposal[] = [
     inverterQty: 1,
     ratePerWatt: 50,
     proposalDate: format(new Date(Date.now() - 86400000 * 2), 'yyyy-MM-dd'),
-    ...calculateFinancialsAndSubsidy(50, 1, 'Individual/Bungalow'), // Subsidy should be 30000
+    ...calculateFinancialsAndSubsidy(50, 1, 'Individual/Bungalow'), 
     createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
     updatedAt: new Date().toISOString(),
   },
-  { // Example for 2kW Individual to test subsidy
+  { 
     id: 'prop6',
     proposalNumber: 'P-2024-006',
     clientId: 'client5',
@@ -171,7 +183,7 @@ export const MOCK_PROPOSALS: Proposal[] = [
     clientType: 'Individual/Bungalow',
     contactPerson: 'Mr. Vijay Kumar',
     location: 'Aurangabad, MH',
-    capacity: 2, // 2kW capacity
+    capacity: 2, 
     moduleType: 'TOPCon',
     moduleWattage: '550',
     dcrStatus: 'Non-DCR',
@@ -179,7 +191,7 @@ export const MOCK_PROPOSALS: Proposal[] = [
     inverterQty: 1,
     ratePerWatt: 48,
     proposalDate: format(new Date(Date.now() - 86400000 * 5), 'yyyy-MM-dd'),
-    ...calculateFinancialsAndSubsidy(48, 2, 'Individual/Bungalow'), // Subsidy should be 60000
+    ...calculateFinancialsAndSubsidy(48, 2, 'Individual/Bungalow'), 
     createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
     updatedAt: new Date().toISOString(),
   },
@@ -213,3 +225,5 @@ export const MOCK_COMMUNICATIONS: Communication[] = [
     { id: 'c4', leadId: 'lead2', type: 'Meeting', subject: 'Site Visit', content: 'Scheduled site visit for next Tuesday.', direction: 'Outgoing', timestamp: new Date().toISOString(), recordedBy: 'Sales Rep B'},
 ];
 
+
+    

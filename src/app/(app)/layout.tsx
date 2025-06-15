@@ -43,7 +43,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           <SidebarMenu>
             {NAV_ITEMS.map((item) => {
               const isDashboard = item.href === '/dashboard';
-              const isActive = isDashboard ? pathname === item.href : pathname.startsWith(item.href);
+              // For non-dashboard items, check if the pathname starts with the item's href.
+              // For the dashboard, it must be an exact match.
+              const isActive = isDashboard ? pathname === item.href : (item.href !== '/dashboard' && pathname.startsWith(item.href));
               return (
                 <SidebarMenuItem key={item.label}>
                   <SidebarMenuButton
@@ -66,7 +68,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="w-full justify-start gap-2 px-2">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src="https://placehold.co/40x40.png" alt="User" />
+                  <AvatarImage src="https://placehold.co/40x40.png" data-ai-hint="user avatar" alt="User" />
                   <AvatarFallback>U</AvatarFallback>
                 </Avatar>
                 <span className="truncate group-data-[collapsible=icon]:hidden">User Name</span>
@@ -120,3 +122,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     </SidebarProvider>
   );
 }
+
+
+    
