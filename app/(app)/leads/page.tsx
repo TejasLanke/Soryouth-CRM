@@ -4,12 +4,13 @@ import React, { useState, useMemo } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { LeadsTable } from './leads-table';
 import { MOCK_LEADS, LEAD_STATUS_OPTIONS } from '@/lib/constants';
-import { UsersRound, Filter, Search, Upload, PlusCircle, Settings2, ListFilter, CheckSquare } from 'lucide-react';
+import { UsersRound, Filter, Search, Upload, PlusCircle, Settings2, ListFilter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LeadForm } from './lead-form';
 import { useToast } from "@/hooks/use-toast";
-import type { Lead, LeadStatusType, StatusFilterItem } from '@/types';
+import type { Lead, LeadStatusType, StatusFilterItem, SortConfig } from '@/types';
 import { Badge } from '@/components/ui/badge';
+import { format, parseISO } from 'date-fns';
 
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>(MOCK_LEADS);
@@ -17,6 +18,7 @@ export default function LeadsPage() {
   const [selectedLeadForEdit, setSelectedLeadForEdit] = useState<Lead | null>(null);
   const { toast } = useToast();
   const [activeFilter, setActiveFilter] = useState<LeadStatusType | 'all'>('all');
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
 
   const handleAddLead = () => {
     setSelectedLeadForEdit(null);
@@ -32,7 +34,7 @@ export default function LeadsPage() {
         id: `lead-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        email: leadData.email || '', // Ensure email has a default
+        email: leadData.email || '', 
         ...leadData,
         status: leadData.status as LeadStatusType,
       };
@@ -44,7 +46,7 @@ export default function LeadsPage() {
   };
   
   const statusFilters = useMemo((): StatusFilterItem[] => {
-    const counts: Record<LeadStatusType, number> = {} as any;
+    const counts: Record<string, number> = {};
     LEAD_STATUS_OPTIONS.forEach(status => counts[status] = 0);
     
     leads.forEach(lead => {
@@ -55,7 +57,6 @@ export default function LeadsPage() {
 
     const filters: StatusFilterItem[] = [{ label: 'Show all', count: leads.length, value: 'all' }];
     LEAD_STATUS_OPTIONS.forEach(status => {
-      // Only include statuses present in MOCK_LEADS or if count > 0
       if (counts[status] > 0 || MOCK_LEADS.some(l => l.status === status)) {
         filters.push({ label: status, count: counts[status] || 0, value: status });
       }
@@ -63,12 +64,54 @@ export default function LeadsPage() {
     return filters;
   }, [leads]);
 
-  const filteredLeads = useMemo(() => {
-    if (activeFilter === 'all') {
-      return leads;
+  const sortedAndFilteredLeads = useMemo(() => {
+    let leadsToDisplay = activeFilter === 'all' ? leads : leads.filter(lead => lead.status === activeFilter);
+
+    if (sortConfig !== null) {
+      leadsToDisplay.sort((a, b) => {
+        const aValue = a[sortConfig.key];
+        const bValue = b[sortConfig.key];
+
+        if (aValue === undefined && bValue === undefined) return 0;
+        if (aValue === undefined) return sortConfig.direction === 'ascending' ? 1 : -1;
+        if (bValue === undefined) return sortConfig.direction === 'ascending' ? -1 : 1;
+        
+        // Handle date sorting for nextFollowUpDate
+        if (sortConfig.key === 'nextFollowUpDate') {
+          const dateA = aValue ? parseISO(aValue as string).getTime() : 0;
+          const dateB = bValue ? parseISO(bValue as string).getTime() : 0;
+          if (dateA < dateB) return sortConfig.direction === 'ascending' ? -1 : 1;
+          if (dateA > dateB) return sortConfig.direction === 'ascending' ? 1 : -1;
+          return 0;
+        }
+        
+        // Handle numeric sorting for kilowatt
+        if (sortConfig.key === 'kilowatt') {
+           if (Number(aValue) < Number(bValue)) return sortConfig.direction === 'ascending' ? -1 : 1;
+           if (Number(aValue) > Number(bValue)) return sortConfig.direction === 'ascending' ? 1 : -1;
+           return 0;
+        }
+
+        // Default string/generic comparison
+        if (String(aValue).toLowerCase() < String(bValue).toLowerCase()) {
+          return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (String(aValue).toLowerCase() > String(bValue).toLowerCase()) {
+          return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
+      });
     }
-    return leads.filter(lead => lead.status === activeFilter);
-  }, [leads, activeFilter]);
+    return leadsToDisplay;
+  }, [leads, activeFilter, sortConfig]);
+
+  const requestSort = (key: keyof Lead) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
 
   return (
     <>
@@ -114,12 +157,14 @@ export default function LeadsPage() {
       </div>
       
       <LeadsTable 
-        initialLeads={filteredLeads} 
+        leads={sortedAndFilteredLeads} 
         onEditLead={(lead) => { setSelectedLeadForEdit(lead); setIsFormOpen(true); }}
         onDeleteLead={(leadId) => { 
           setLeads(prev => prev.filter(l => l.id !== leadId)); 
           toast({ title: "Lead Deleted" });
         }}
+        sortConfig={sortConfig}
+        requestSort={requestSort}
       />
 
       {isFormOpen && (

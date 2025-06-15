@@ -1,23 +1,30 @@
 
-import type { LEAD_STATUS_OPTIONS } from '@/lib/constants';
+import type { LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, LEAD_SOURCE_OPTIONS, USER_OPTIONS } from '@/lib/constants';
 
 // Deriving LeadStatusType from the LEAD_STATUS_OPTIONS const array
 export type LeadStatusType = typeof LEAD_STATUS_OPTIONS[number];
+export type LeadPriorityType = typeof LEAD_PRIORITY_OPTIONS[number];
+export type LeadSourceOptionType = typeof LEAD_SOURCE_OPTIONS[number];
+export type UserOptionType = typeof USER_OPTIONS[number];
+
 
 export interface Lead {
   id: string;
   name: string;
-  email: string; // Retain email for internal use / form, though not shown in new table
+  email?: string; // Optional
   phone?: string;
   status: LeadStatusType; // This will represent "Stage"
-  source?: string;
-  assignedTo?: string; // Retain for internal use / form
+  source?: LeadSourceOptionType;
+  assignedTo?: UserOptionType;
   createdAt: string;
   updatedAt: string;
   lastCommentText?: string;
-  lastCommentDate?: string;
-  nextFollowUpDate?: string;
+  lastCommentDate?: string; // Format: dd-MM-yyyy
+  nextFollowUpDate?: string; // Format: yyyy-MM-dd
+  nextFollowUpTime?: string; // Format: HH:mm
   kilowatt?: number;
+  address?: string;
+  priority?: LeadPriorityType;
 }
 
 export type ClientType = 'Individual/Bungalow' | 'Housing Society' | 'Commercial' | 'Industrial';
@@ -98,4 +105,10 @@ export interface StatusFilterItem {
   label: LeadStatusType | 'Show all';
   count: number;
   value: LeadStatusType | 'all';
+}
+
+// For table sorting
+export interface SortConfig {
+  key: keyof Lead;
+  direction: 'ascending' | 'descending';
 }

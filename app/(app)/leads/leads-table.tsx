@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Lead, LeadStatusType } from '@/types';
+import type { Lead, LeadStatusType, SortConfig } from '@/types';
 import React from 'react';
 import {
   Table,
@@ -14,7 +14,7 @@ import {
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Edit2, Trash2, MoreVertical, ArrowUpDown } from 'lucide-react'; // MoreVertical for potential future actions
+import { Edit2, Trash2, MoreVertical, ArrowUpDown, UsersRound } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,19 +33,47 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Card, CardContent } from '@/components/ui/card';
+import { format, parseISO, isValid } from 'date-fns';
 
 interface LeadsTableProps {
-  initialLeads: Lead[];
+  leads: Lead[]; // Changed from initialLeads
   onEditLead: (lead: Lead) => void;
   onDeleteLead: (leadId: string) => void;
+  sortConfig: SortConfig | null;
+  requestSort: (key: keyof Lead) => void;
 }
 
-export function LeadsTable({ initialLeads, onEditLead, onDeleteLead }: LeadsTableProps) {
+export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, requestSort }: LeadsTableProps) {
   
   const getSourceBadgeVariant = (source?: string) => {
-    if (source?.toLowerCase() === 'facebook') return 'default'; // Example: 'default' could be blue for Facebook
-    if (source?.toLowerCase() === 'website') return 'secondary';
+    if (!source) return 'outline';
+    const lowerSource = source.toLowerCase();
+    if (lowerSource.includes('facebook')) return 'default';
+    if (lowerSource.includes('website') || lowerSource.includes('online')) return 'secondary';
+    if (lowerSource.includes('referral')) return 'default'; // Example: 'default' could be blue for Facebook
     return 'outline';
+  };
+
+  const getSortIndicator = (key: keyof Lead) => {
+    if (!sortConfig || sortConfig.key !== key) {
+      return <ArrowUpDown className="ml-1 h-3 w-3 opacity-50" />;
+    }
+    return sortConfig.direction === 'ascending' ? 
+      <ArrowUpDown className="ml-1 h-3 w-3 transform rotate-0 text-primary" /> : 
+      <ArrowUpDown className="ml-1 h-3 w-3 transform rotate-180 text-primary" />;
+  };
+  
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '-';
+    try {
+      const date = parseISO(dateString);
+      if (isValid(date)) {
+        return format(date, 'dd/MM/yyyy');
+      }
+      return dateString; // Return original if not valid ISO
+    } catch (e) {
+      return dateString; // Return original on error
+    }
   };
 
   return (
@@ -59,31 +87,55 @@ export function LeadsTable({ initialLeads, onEditLead, onDeleteLead }: LeadsTabl
                   <Checkbox id="selectAllLeads" aria-label="Select all leads" />
                 </TableHead>
                 <TableHead className="text-muted-foreground">
-                  <Button variant="ghost" size="sm" className="px-1 py-0 h-auto text-xs">Name <ArrowUpDown className="ml-1 h-3 w-3" /></Button>
+                  <Button variant="ghost" size="sm" className="px-1 py-0 h-auto text-xs" onClick={() => requestSort('name')}>
+                    Name {getSortIndicator('name')}
+                  </Button>
                 </TableHead>
                 <TableHead className="text-muted-foreground">
-                  <Button variant="ghost" size="sm" className="px-1 py-0 h-auto text-xs">Mobile no. <ArrowUpDown className="ml-1 h-3 w-3" /></Button>
+                  <Button variant="ghost" size="sm" className="px-1 py-0 h-auto text-xs" onClick={() => requestSort('phone')}>
+                    Mobile no. {getSortIndicator('phone')}
+                  </Button>
                 </TableHead>
                 <TableHead className="text-muted-foreground">
-                  <Button variant="ghost" size="sm" className="px-1 py-0 h-auto text-xs">Stage <ArrowUpDown className="ml-1 h-3 w-3" /></Button>
+                  <Button variant="ghost" size="sm" className="px-1 py-0 h-auto text-xs" onClick={() => requestSort('status')}>
+                    Stage {getSortIndicator('status')}
+                  </Button>
                 </TableHead>
                 <TableHead className="text-muted-foreground">
-                  <Button variant="ghost" size="sm" className="px-1 py-0 h-auto text-xs">Last comment <ArrowUpDown className="ml-1 h-3 w-3" /></Button>
+                  <Button variant="ghost" size="sm" className="px-1 py-0 h-auto text-xs" onClick={() => requestSort('lastCommentText')}>
+                    Last comment {getSortIndicator('lastCommentText')}
+                  </Button>
                 </TableHead>
                 <TableHead className="text-muted-foreground">
-                  <Button variant="ghost" size="sm" className="px-1 py-0 h-auto text-xs">Next follow-up <ArrowUpDown className="ml-1 h-3 w-3" /></Button>
+                  <Button variant="ghost" size="sm" className="px-1 py-0 h-auto text-xs" onClick={() => requestSort('nextFollowUpDate')}>
+                    Next follow-up {getSortIndicator('nextFollowUpDate')}
+                  </Button>
                 </TableHead>
                 <TableHead className="text-muted-foreground">
-                  <Button variant="ghost" size="sm" className="px-1 py-0 h-auto text-xs">Kilowatt <ArrowUpDown className="ml-1 h-3 w-3" /></Button>
+                  <Button variant="ghost" size="sm" className="px-1 py-0 h-auto text-xs" onClick={() => requestSort('kilowatt')}>
+                    Kilowatt {getSortIndicator('kilowatt')}
+                  </Button>
                 </TableHead>
                 <TableHead className="text-muted-foreground">
-                  <Button variant="ghost" size="sm" className="px-1 py-0 h-auto text-xs">Source <ArrowUpDown className="ml-1 h-3 w-3" /></Button>
+                  <Button variant="ghost" size="sm" className="px-1 py-0 h-auto text-xs" onClick={() => requestSort('source')}>
+                    Source {getSortIndicator('source')}
+                  </Button>
+                </TableHead>
+                 <TableHead className="text-muted-foreground">
+                  <Button variant="ghost" size="sm" className="px-1 py-0 h-auto text-xs" onClick={() => requestSort('priority')}>
+                    Priority {getSortIndicator('priority')}
+                  </Button>
+                </TableHead>
+                <TableHead className="text-muted-foreground">
+                  <Button variant="ghost" size="sm" className="px-1 py-0 h-auto text-xs" onClick={() => requestSort('assignedTo')}>
+                    Assigned To {getSortIndicator('assignedTo')}
+                  </Button>
                 </TableHead>
                 <TableHead className="text-right text-muted-foreground">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {initialLeads.map((lead) => (
+              {leads.map((lead) => (
                 <TableRow key={lead.id} className="hover:bg-muted/20">
                   <TableCell>
                     <Checkbox id={`select-lead-${lead.id}`} aria-label={`Select lead ${lead.name}`} />
@@ -97,11 +149,17 @@ export function LeadsTable({ initialLeads, onEditLead, onDeleteLead }: LeadsTabl
                     <div>{lead.lastCommentText || '-'}</div>
                     {lead.lastCommentDate && <div className="text-muted-foreground">{lead.lastCommentDate}</div>}
                   </TableCell>
-                  <TableCell className="py-3 text-xs">{lead.nextFollowUpDate || '-'}</TableCell>
-                  <TableCell className="py-3">{lead.kilowatt !== undefined ? lead.kilowatt : '-'}</TableCell>
+                  <TableCell className="py-3 text-xs">
+                    {lead.nextFollowUpDate ? `${formatDate(lead.nextFollowUpDate)} ${lead.nextFollowUpTime || ''}`.trim() : '-'}
+                  </TableCell>
+                  <TableCell className="py-3">{lead.kilowatt !== undefined ? `${lead.kilowatt} kW` : '-'}</TableCell>
                   <TableCell className="py-3">
                     {lead.source ? <Badge variant={getSourceBadgeVariant(lead.source)}>{lead.source}</Badge> : '-'}
                   </TableCell>
+                  <TableCell className="py-3">
+                    {lead.priority ? <Badge variant={lead.priority === 'High' ? 'destructive' : lead.priority === 'Medium' ? 'secondary' : 'outline'} className="capitalize">{lead.priority}</Badge> : '-'}
+                  </TableCell>
+                  <TableCell className="py-3">{lead.assignedTo || '-'}</TableCell>
                   <TableCell className="text-right py-3">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -144,7 +202,7 @@ export function LeadsTable({ initialLeads, onEditLead, onDeleteLead }: LeadsTabl
           </Table>
         </CardContent>
       </Card>
-      {initialLeads.length === 0 && (
+      {leads.length === 0 && (
         <div className="text-center text-muted-foreground py-12">
             <UsersRound className="mx-auto h-12 w-12 text-gray-400 mb-3" />
             <h3 className="text-lg font-medium">No leads found.</h3>

@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Lead, LeadStatusType } from '@/types';
+import type { Lead, LeadStatusType, LeadPriorityType, LeadSourceOptionType, UserOptionType } from '@/types';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -32,19 +32,22 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import React, { useEffect } from 'react';
-import { LEAD_STATUS_OPTIONS } from '@/lib/constants';
+import { LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, LEAD_SOURCE_OPTIONS, USER_OPTIONS } from '@/lib/constants';
+import { format, parseISO, isValid } from 'date-fns';
 
 const leadSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
-  email: z.string().email({ message: 'Invalid email address.' }).optional().or(z.literal('')), // Optional for form
-  phone: z.string().optional(),
+  email: z.string().email({ message: 'Invalid email address.' }).optional().or(z.literal('')),
+  phone: z.string().min(10, { message: 'Phone number must be at least 10 digits.' }).optional().or(z.literal('')),
   status: z.enum(LEAD_STATUS_OPTIONS), 
-  source: z.string().optional(),
-  assignedTo: z.string().optional(),
+  source: z.enum(LEAD_SOURCE_OPTIONS).optional(),
+  assignedTo: z.enum(USER_OPTIONS).optional(),
   lastCommentText: z.string().optional(),
-  // lastCommentDate is usually auto-set or handled internally
-  nextFollowUpDate: z.string().optional().refine(val => !val || !isNaN(Date.parse(val)), { message: "Invalid date" }),
+  nextFollowUpDate: z.string().optional().refine(val => !val || (isValid(parseISO(val))), { message: "Invalid date" }),
+  nextFollowUpTime: z.string().optional().refine(val => !val || /^([01]\d|2[0-3]):([0-5]\d)$/.test(val), { message: "Invalid time (HH:MM)"}),
   kilowatt: z.coerce.number().min(0).optional(),
+  address: z.string().optional(),
+  priority: z.enum(LEAD_PRIORITY_OPTIONS).optional(),
 });
 
 type LeadFormValues = z.infer<typeof leadSchema>;
@@ -63,12 +66,15 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead }: LeadFormProps) {
       name: '',
       email: '',
       phone: '',
-      status: LEAD_STATUS_OPTIONS[0], // Default to the first status
-      source: '',
-      assignedTo: '',
+      status: LEAD_STATUS_OPTIONS[0],
+      source: undefined,
+      assignedTo: undefined,
       lastCommentText: '',
       nextFollowUpDate: '',
+      nextFollowUpTime: '',
       kilowatt: 0,
+      address: '',
+      priority: undefined,
     },
   });
 
@@ -77,8 +83,15 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead }: LeadFormProps) {
       if (lead) {
         form.reset({
           ...lead,
+          email: lead.email || '', // Ensure email is empty string if undefined
+          phone: lead.phone || '',
           kilowatt: lead.kilowatt ?? 0,
-          nextFollowUpDate: lead.nextFollowUpDate ? new Date(lead.nextFollowUpDate).toISOString().split('T')[0] : '', // Format for date input
+          nextFollowUpDate: lead.nextFollowUpDate ? format(parseISO(lead.nextFollowUpDate), 'yyyy-MM-dd') : '',
+          nextFollowUpTime: lead.nextFollowUpTime || '',
+          address: lead.address || '',
+          priority: lead.priority || undefined,
+          source: lead.source || undefined,
+          assignedTo: lead.assignedTo || undefined,
         });
       } else {
         form.reset({
@@ -86,11 +99,14 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead }: LeadFormProps) {
           email: '',
           phone: '',
           status: LEAD_STATUS_OPTIONS[0],
-          source: '',
-          assignedTo: '',
+          source: undefined,
+          assignedTo: undefined,
           lastCommentText: '',
           nextFollowUpDate: '',
+          nextFollowUpTime: '',
           kilowatt: 0,
+          address: '',
+          priority: undefined,
         });
       }
     }
@@ -100,8 +116,10 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead }: LeadFormProps) {
   const handleSubmit = (values: LeadFormValues) => {
     const submissionData = {
       ...values,
-      kilowatt: values.kilowatt ?? undefined, // Ensure it's number or undefined
-      lastCommentDate: values.lastCommentText ? new Date().toISOString().split('T')[0] : undefined, // Set current date if comment exists
+      kilowatt: values.kilowatt ?? undefined,
+      lastCommentDate: values.lastCommentText ? format(new Date(), 'dd-MM-yyyy') : undefined,
+      nextFollowUpDate: values.nextFollowUpDate || undefined,
+      nextFollowUpTime: values.nextFollowUpTime || undefined,
     };
     if (lead) {
       onSubmit({ ...lead, ...submissionData, status: values.status as LeadStatusType });
@@ -112,7 +130,7 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead }: LeadFormProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[620px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{lead ? 'Edit Lead' : 'Add New Lead'}</DialogTitle>
           <DialogDescription>
@@ -126,7 +144,7 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead }: LeadFormProps) {
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Name</FormLabel>
+                  <FormLabel>Name *</FormLabel>
                   <FormControl>
                     <Input placeholder="John Doe" {...field} />
                   </FormControl>
@@ -140,7 +158,7 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead }: LeadFormProps) {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email (Optional)</FormLabel>
+                    <FormLabel>Email</FormLabel>
                     <FormControl>
                       <Input type="email" placeholder="john.doe@example.com" {...field} />
                     </FormControl>
@@ -153,7 +171,7 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead }: LeadFormProps) {
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Mobile No. (Optional)</FormLabel>
+                    <FormLabel>Mobile No.</FormLabel>
                     <FormControl>
                       <Input type="tel" placeholder="6263537508" {...field} />
                     </FormControl>
@@ -163,14 +181,28 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead }: LeadFormProps) {
               />
             </div>
             
+            <FormField
+              control={form.control}
+              name="address"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Address</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Enter full address" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="status" // This is 'Stage'
+                name="status" 
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Stage</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormLabel>Stage *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select lead stage" />
@@ -188,13 +220,69 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead }: LeadFormProps) {
               />
               <FormField
                 control={form.control}
+                name="priority"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Priority</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select priority" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {LEAD_PRIORITY_OPTIONS.map(priorityValue => (
+                          <SelectItem key={priorityValue} value={priorityValue}>{priorityValue}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
                 name="source"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Source (Optional)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Facebook, Website, etc." {...field} />
-                    </FormControl>
+                    <FormLabel>Source</FormLabel>
+                     <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select source" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {LEAD_SOURCE_OPTIONS.map(sourceValue => (
+                          <SelectItem key={sourceValue} value={sourceValue}>{sourceValue}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="assignedTo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Assigned To</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select user" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {USER_OPTIONS.map(userValue => (
+                          <SelectItem key={userValue} value={userValue}>{userValue}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -206,7 +294,7 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead }: LeadFormProps) {
               name="lastCommentText"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Last Comment (Optional)</FormLabel>
+                  <FormLabel>Last Comment</FormLabel>
                   <FormControl>
                     <Textarea placeholder="Enter last comment..." {...field} />
                   </FormControl>
@@ -215,13 +303,13 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead }: LeadFormProps) {
               )}
             />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                 <FormField
                 control={form.control}
                 name="nextFollowUpDate"
                 render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Next Follow-up Date (Optional)</FormLabel>
+                    <FormItem className="md:col-span-2">
+                    <FormLabel>Next Follow-up Date</FormLabel>
                     <FormControl>
                         <Input type="date" {...field} />
                     </FormControl>
@@ -229,14 +317,14 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead }: LeadFormProps) {
                     </FormItem>
                 )}
                 />
-                <FormField
+                 <FormField
                 control={form.control}
-                name="kilowatt"
+                name="nextFollowUpTime"
                 render={({ field }) => (
                     <FormItem>
-                    <FormLabel>Kilowatt (Optional)</FormLabel>
+                    <FormLabel>Time</FormLabel>
                     <FormControl>
-                        <Input type="number" placeholder="0" {...field} />
+                        <Input type="time" {...field} />
                     </FormControl>
                     <FormMessage />
                     </FormItem>
@@ -245,18 +333,19 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead }: LeadFormProps) {
             </div>
             
             <FormField
-              control={form.control}
-              name="assignedTo"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Assigned To (Optional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Sales Rep Name" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+                control={form.control}
+                name="kilowatt"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Kilowatt (kW)</FormLabel>
+                    <FormControl>
+                        <Input type="number" placeholder="0" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
             />
+            
             <DialogFooter className="pt-4">
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancel

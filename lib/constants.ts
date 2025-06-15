@@ -1,5 +1,5 @@
 
-import type { NavItem, Lead, Proposal, Document, Communication, DocumentType, ClientType, ModuleType, DCRStatus, ModuleWattage, LeadStatusType } from '@/types';
+import type { NavItem, Lead, Proposal, Document, Communication, DocumentType, ClientType, ModuleType, DCRStatus, ModuleWattage, LeadStatusType, LeadPriorityType, LeadSourceOptionType, UserOptionType } from '@/types';
 import {
   LayoutDashboard,
   UsersRound,
@@ -16,6 +16,7 @@ import {
   Briefcase, // For Clients
   UserX,     // For Dropped Leads
   Rows,      // For Batch Proposals
+  CalendarDays, // For Calendar
 } from 'lucide-react';
 import { format, parseISO, addDays, subDays } from 'date-fns';
 
@@ -27,6 +28,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/leads', label: 'Leads', icon: UsersRound },
   { href: '/proposals', label: 'Clients', icon: Briefcase },
   { href: '/communications', label: 'Communications', icon: MessageSquareText },
+  { href: '/calendar', label: 'Calendar', icon: CalendarDays },
   { href: '/leads/dropped', label: 'Dropped Leads', icon: UserX },
 ];
 
@@ -40,56 +42,66 @@ export const TOOLS_NAV_ITEMS: NavItem[] = [
 
 // Customizable Lead Statuses - reflects stages in the image
 export const LEAD_STATUS_OPTIONS = ['fresher', 'Requirement', 'site visit', 'Quotation send', 'Followup', 'Deal Done', 'installer', 'ON HOLD', 'Lost', 'New'] as const;
-// Note: 'Lost' is used for Dropped Leads, 'New' as a sensible default. Others match the image.
+
+export const LEAD_PRIORITY_OPTIONS = ['High', 'Medium', 'Low'] as const;
+export const LEAD_SOURCE_OPTIONS = ['Facebook', 'Website', 'Referral', 'Cold Call', 'Walk-in', 'Other'] as const;
+export const USER_OPTIONS = ['Mayur', 'Sales Rep A', 'Sales Rep B', 'Admin', 'System'] as const;
+
 
 export const MOCK_LEADS: Lead[] = [
   { 
     id: 'lead1', name: 'Pramod Agrawal', email: 'pramod.agrawal@example.com', phone: '6263537508', 
     status: 'fresher', source: 'Facebook', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     lastCommentText: 'lb 8000/-', lastCommentDate: format(subDays(new Date(), 2), 'dd-MM-yyyy'), 
-    kilowatt: 0, nextFollowUpDate: format(addDays(new Date(), 5), 'dd-MM-yyyy')
+    kilowatt: 0, nextFollowUpDate: format(addDays(new Date(), 5), 'yyyy-MM-dd'), nextFollowUpTime: '10:00',
+    address: '123 Main St, Nagpur', priority: 'High', assignedTo: 'Mayur'
   },
   { 
     id: 'lead2', name: 'sir (Jane Smith)', email: 'jane.smith.lead@example.com', phone: '7001173134', 
-    status: 'fresher', source: 'Facebook', assignedTo: 'Alice', 
+    status: 'fresher', source: 'Facebook', assignedTo: 'Sales Rep A', 
     createdAt: new Date(Date.now() - 86400000).toISOString(), updatedAt: new Date().toISOString(),
     lastCommentText: 'Not answering', lastCommentDate: format(subDays(new Date(), 1), 'dd-MM-yyyy'), 
-    kilowatt: 0, nextFollowUpDate: format(addDays(new Date(), 7), 'dd-MM-yyyy')
+    kilowatt: 0, nextFollowUpDate: format(addDays(new Date(), 7), 'yyyy-MM-dd'), nextFollowUpTime: '14:30',
+    address: '456 Oak Ave, Mumbai', priority: 'Medium'
   },
   { 
-    id: 'lead3', name: 'Namdeorao Dhote', email: 'namdeorao.dhote@example.com', phone: '7498437694', 
+    id: 'lead3', name: 'Namdeorao Dhote', phone: '7498437694', 
     status: 'fresher', source: 'Facebook', 
     createdAt: new Date(Date.now() - 172800000).toISOString(), updatedAt: new Date().toISOString(),
     lastCommentText: 'kusum solar ka lagana hai...', lastCommentDate: format(new Date(), 'dd-MM-yyyy'), 
-    kilowatt: 0, nextFollowUpDate: format(addDays(new Date(), 3), 'dd-MM-yyyy')
+    kilowatt: 0, nextFollowUpDate: format(addDays(new Date(), 3), 'yyyy-MM-dd'),
+    address: '789 Pine Rd, Pune', priority: 'Low', assignedTo: 'Sales Rep B'
   },
   { 
     id: 'lead4', name: 'Lost Cause Ltd', email: 'lost.cause@example.com', phone: '555-0000', 
-    status: 'Lost', source: 'Old Database', 
+    status: 'Lost', source: 'Other', 
     createdAt: new Date(Date.now() - 259200000).toISOString(), updatedAt: new Date(Date.now() - 86400000).toISOString(),
     lastCommentText: 'No interest.', lastCommentDate: format(subDays(new Date(), 30), 'dd-MM-yyyy'),
-    kilowatt: 0
+    kilowatt: 0, assignedTo: 'System'
   },
   { 
     id: 'lead5', name: 'Sunshine Apartments', email: 'sunshine@example.com', phone: '555-1111', 
-    status: 'Requirement', source: 'Referral', assignedTo: 'Bob', 
+    status: 'Requirement', source: 'Referral', assignedTo: 'Mayur', 
     createdAt: new Date(Date.now() - 86400000 * 5).toISOString(), updatedAt: new Date().toISOString(),
     lastCommentText: 'Needs 50kW system. Site visit scheduled.', lastCommentDate: format(subDays(new Date(), 3), 'dd-MM-yyyy'),
-    kilowatt: 50, nextFollowUpDate: format(addDays(new Date(), 2), 'dd-MM-yyyy')
+    kilowatt: 50, nextFollowUpDate: format(addDays(new Date(), 2), 'yyyy-MM-dd'), nextFollowUpTime: '11:00',
+    address: 'Apt 101, Sunshine Complex, Nagpur', priority: 'High'
   },
   {
     id: 'lead6', name: 'Tech Solutions Inc.', email: 'tech@example.com', phone: '555-2222',
-    status: 'Quotation send', source: 'Website', assignedTo: 'Carol',
+    status: 'Quotation send', source: 'Website', assignedTo: 'Sales Rep A',
     createdAt: new Date(Date.now() - 86400000 * 10).toISOString(), updatedAt: new Date().toISOString(),
     lastCommentText: 'Quotation sent for 25kW.', lastCommentDate: format(subDays(new Date(), 1), 'dd-MM-yyyy'),
-    kilowatt: 25, nextFollowUpDate: format(addDays(new Date(), 10), 'dd-MM-yyyy')
+    kilowatt: 25, nextFollowUpDate: format(addDays(new Date(), 10), 'yyyy-MM-dd'),
+    address: 'Plot 42, Industrial Area, Hingna', priority: 'Medium'
   },
    {
-    id: 'lead7', name: 'Green Pastures Farm', email: 'green@example.com', phone: '555-3333',
+    id: 'lead7', name: 'Green Pastures Farm', phone: '555-3333',
     status: 'site visit', source: 'Walk-in',
     createdAt: new Date(Date.now() - 86400000 * 2).toISOString(), updatedAt: new Date().toISOString(),
     lastCommentText: 'Site visit completed. Positive feedback.', lastCommentDate: format(new Date(), 'dd-MM-yyyy'),
-    kilowatt: 15, nextFollowUpDate: format(addDays(new Date(), 4), 'dd-MM-yyyy')
+    kilowatt: 15, nextFollowUpDate: format(addDays(new Date(), 4), 'yyyy-MM-dd'),
+    address: 'Rural Route 5, Near Village X', priority: 'Medium', assignedTo: 'Sales Rep B'
   }
 ];
 
