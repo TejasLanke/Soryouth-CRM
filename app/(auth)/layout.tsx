@@ -7,7 +7,7 @@ import { Toaster } from '@/components/ui/toaster';
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-[hsl(var(--background))] to-[hsl(var(--primary)/0.1)] dark:from-[hsl(var(--background))] dark:to-[hsl(var(--primary)/0.2)] p-4">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-background via-primary/5 to-secondary/5 dark:from-background dark:via-primary/10 dark:to-secondary/10 p-4">
       <div className="mb-6">
         <Link href="/" className="flex flex-col items-center gap-2 text-2xl font-bold text-primary">
           <AppLogoIcon className="h-12 w-12" />
@@ -21,3 +21,4 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
