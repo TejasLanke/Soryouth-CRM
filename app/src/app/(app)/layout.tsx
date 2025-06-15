@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { NAV_ITEMS, TOOLS_NAV_ITEMS, APP_NAME } from '@/lib/constants'; // Added TOOLS_NAV_ITEMS
+import { NAV_ITEMS, TOOLS_NAV_ITEMS, APP_NAME } from '@/lib/constants';
 import { Logo } from '@/components/logo';
 import { SunMedium, Moon, Settings, LogOut } from 'lucide-react';
 import { Toaster } from '@/components/ui/toaster';
@@ -28,7 +28,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 export default function AppLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
-  // A simple theme toggle example (not fully functional without theme provider logic)
   const toggleTheme = () => {
     document.documentElement.classList.toggle('dark');
   };
@@ -63,7 +62,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="w-full justify-start gap-2 px-2">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src="https://placehold.co/40x40.png" alt="User" />
+                  <AvatarImage src="https://placehold.co/40x40.png" data-ai-hint="user avatar" alt="User" />
                   <AvatarFallback>U</AvatarFallback>
                 </Avatar>
                 <span className="truncate group-data-[collapsible=icon]:hidden">User Name</span>
@@ -117,3 +116,4 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     </SidebarProvider>
   );
 }
+    
