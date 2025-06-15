@@ -1,5 +1,5 @@
 
-import type { NavItem, Lead, Proposal, Document, Communication, DocumentType, ClientType, ModuleType, DCRStatus, ModuleWattage, LeadStatusType, LeadPriorityType, LeadSourceOptionType, UserOptionType } from '@/types';
+import type { NavItem, Lead, Proposal, Document, Communication, DocumentType, ClientType, ModuleType, DCRStatus, ModuleWattage, LeadStatusType, LeadPriorityType, LeadSourceOptionType, UserOptionType, DropReasonType } from '@/types';
 import {
   LayoutDashboard,
   UsersRound,
@@ -45,7 +45,13 @@ export const LEAD_STATUS_OPTIONS = ['fresher', 'Requirement', 'site visit', 'Quo
 
 export const LEAD_PRIORITY_OPTIONS = ['High', 'Medium', 'Low'] as const;
 export const LEAD_SOURCE_OPTIONS = ['Facebook', 'Website', 'Referral', 'Cold Call', 'Walk-in', 'Other'] as const;
-export const USER_OPTIONS = ['Mayur', 'Sales Rep A', 'Sales Rep B', 'Admin', 'System'] as const;
+export const USER_OPTIONS = ['Mayur', 'Sales Rep A', 'Sales Rep B', 'Admin', 'System', 'Kanchan Nikam'] as const; // Added Kanchan Nikam as per image
+
+export const DROP_REASON_OPTIONS = [
+    'Duplicate lead', 'Fake Lead', 'Not Feasible', 'Not Interested', 
+    'Requirement fullfilled', 'below 3kw', 'out of coverage area', 
+    'out of maharashtra', 'price issue', 'want in balcony', 'Other'
+] as const;
 
 
 export const MOCK_LEADS: Lead[] = [
@@ -74,7 +80,7 @@ export const MOCK_LEADS: Lead[] = [
   },
   { 
     id: 'lead4', name: 'Lost Cause Ltd', email: 'lost.cause@example.com', phone: '555-0000', 
-    status: 'Lost', source: 'Other', 
+    status: 'Lost', source: 'Other', dropReason: 'Not Interested',
     createdAt: new Date(Date.now() - 259200000).toISOString(), updatedAt: new Date(Date.now() - 86400000).toISOString(),
     lastCommentText: 'No interest.', lastCommentDate: format(subDays(new Date(), 30), 'dd-MM-yyyy'),
     kilowatt: 0, assignedTo: 'System'
@@ -102,6 +108,30 @@ export const MOCK_LEADS: Lead[] = [
     lastCommentText: 'Site visit completed. Positive feedback.', lastCommentDate: format(new Date(), 'dd-MM-yyyy'),
     kilowatt: 15, nextFollowUpDate: format(addDays(new Date(), 4), 'yyyy-MM-dd'),
     address: 'Rural Route 5, Near Village X', priority: 'Medium', assignedTo: 'Sales Rep B'
+  },
+  { 
+    id: 'lead8', name: 'sir (Dropped Example)', phone: '7796226623', 
+    status: 'Lost', source: 'Facebook', dropReason: 'Not Feasible', assignedTo: 'Kanchan Nikam', 
+    createdAt: '2025-06-12T05:53:00.000Z', // Example past date
+    updatedAt: '2025-06-12T05:53:00.000Z', // Drop date
+    lastCommentText: 'Client found cheaper alternative.', lastCommentDate: format(parseISO('2025-06-12T05:53:00.000Z'), 'dd-MM-yyyy'), 
+    kilowatt: 0, address: '1 Info Park, Test City', priority: 'Medium'
+  },
+   { 
+    id: 'lead9', name: 'Ajaz Ahmad', phone: '8400005785', 
+    status: 'Lost', source: 'Referral', dropReason: 'out of maharashtra', assignedTo: 'Kanchan Nikam', 
+    createdAt: '2025-06-11T06:44:00.000Z', // Example past date
+    updatedAt: '2025-06-11T06:44:00.000Z', // Drop date
+    lastCommentText: 'Client relocating.', lastCommentDate: format(parseISO('2025-06-11T06:44:00.000Z'), 'dd-MM-yyyy'), 
+    kilowatt: 0, address: '2 Tech Towers, Test City', priority: 'Low'
+  },
+  { 
+    id: 'lead10', name: 'Fake Client Co.', phone: '9930637381', 
+    status: 'Lost', source: 'Other', dropReason: 'Fake Lead', assignedTo: 'Kanchan Nikam', 
+    createdAt: '2025-06-12T05:35:00.000Z', // Example past date
+    updatedAt: '2025-06-12T05:35:00.000Z', // Drop date
+    lastCommentText: 'Invalid contact details provided.', lastCommentDate: format(parseISO('2025-06-12T05:35:00.000Z'), 'dd-MM-yyyy'), 
+    kilowatt: 0, address: 'N/A', priority: 'Low'
   }
 ];
 
@@ -149,3 +179,4 @@ export const MOCK_DOCUMENTS: Document[] = [
 export const MOCK_COMMUNICATIONS: Communication[] = [
     { id: 'c1', leadId: 'lead1', type: 'Email', subject: 'Introductory Email', content: 'Sent initial contact email.', direction: 'Outgoing', timestamp: new Date(Date.now() - 86400000 * 2).toISOString(), recordedBy: 'System' }, { id: 'c2', leadId: 'lead1', type: 'Call', content: 'Follow-up call regarding their solar needs. They are interested.', direction: 'Outgoing', timestamp: new Date(Date.now() - 86400000).toISOString(), recordedBy: 'Sales Rep A' },
 ];
+

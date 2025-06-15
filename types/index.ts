@@ -1,11 +1,12 @@
 
-import type { LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, LEAD_SOURCE_OPTIONS, USER_OPTIONS } from '@/lib/constants';
+import type { LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, LEAD_SOURCE_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS } from '@/lib/constants';
 
 // Deriving LeadStatusType from the LEAD_STATUS_OPTIONS const array
 export type LeadStatusType = typeof LEAD_STATUS_OPTIONS[number];
 export type LeadPriorityType = typeof LEAD_PRIORITY_OPTIONS[number];
 export type LeadSourceOptionType = typeof LEAD_SOURCE_OPTIONS[number];
 export type UserOptionType = typeof USER_OPTIONS[number];
+export type DropReasonType = typeof DROP_REASON_OPTIONS[number];
 
 
 export interface Lead {
@@ -25,6 +26,7 @@ export interface Lead {
   kilowatt?: number;
   address?: string;
   priority?: LeadPriorityType;
+  dropReason?: DropReasonType; // New field for drop reason
 }
 
 export type ClientType = 'Individual/Bungalow' | 'Housing Society' | 'Commercial' | 'Industrial';
@@ -100,15 +102,24 @@ export interface NavItem {
   children?: NavItem[];
 }
 
-// For the new status filter bar
+// For the status filter bar on leads page
 export interface StatusFilterItem {
   label: LeadStatusType | 'Show all';
   count: number;
   value: LeadStatusType | 'all';
 }
 
+// For the drop reason filter bar on dropped leads page
+export interface DropReasonFilterItem {
+  label: DropReasonType | 'Show all';
+  count: number;
+  value: DropReasonType | 'all';
+}
+
+
 // For table sorting
 export interface SortConfig {
   key: keyof Lead;
   direction: 'ascending' | 'descending';
 }
+

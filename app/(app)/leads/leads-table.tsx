@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Lead, LeadStatusType, SortConfig } from '@/types';
+import type { Lead, SortConfig, DropReasonType } from '@/types';
 import React from 'react';
 import {
   Table,
@@ -14,7 +14,7 @@ import {
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Edit2, Trash2, MoreVertical, ArrowUpDown, UsersRound } from 'lucide-react';
+import { Edit2, Trash2, MoreVertical, ArrowUpDown, UsersRound, UserCircle2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,6 +34,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Card, CardContent } from '@/components/ui/card';
 import { format, parseISO, isValid } from 'date-fns';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+
 
 interface LeadsTableProps {
   leads: Lead[];
@@ -41,9 +43,10 @@ interface LeadsTableProps {
   onDeleteLead?: (leadId: string) => void;
   sortConfig?: SortConfig | null;
   requestSort?: (key: keyof Lead) => void;
+  viewType?: 'active' | 'dropped'; // To differentiate between active and dropped leads view
 }
 
-export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, requestSort }: LeadsTableProps) {
+export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, requestSort, viewType = 'active' }: LeadsTableProps) {
   
   const getSourceBadgeVariant = (source?: string) => {
     if (!source) return 'outline';
@@ -63,12 +66,12 @@ export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, reques
       <ArrowUpDown className="ml-1 h-3 w-3 transform rotate-180 text-primary" />;
   };
   
-  const formatDate = (dateString?: string) => {
+  const formatDate = (dateString?: string, includeTime: boolean = false) => {
     if (!dateString) return '-';
     try {
       const date = parseISO(dateString);
       if (isValid(date)) {
-        return format(date, 'dd/MM/yyyy');
+        return includeTime ? format(date, 'dd-MM-yyyy HH:mm') : format(date, 'dd-MM-yyyy');
       }
       return dateString; 
     } catch (e) {
@@ -77,7 +80,7 @@ export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, reques
   };
 
   const renderHeaderCell = (label: string, sortKey: keyof Lead) => (
-    <TableHead className="text-muted-foreground">
+    <TableHead className="text-muted-foreground whitespace-nowrap">
       {requestSort ? (
         <Button variant="ghost" size="sm" className="px-1 py-0 h-auto text-xs" onClick={() => requestSort(sortKey)}>
           {label} {getSortIndicator(sortKey)}
@@ -88,6 +91,94 @@ export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, reques
     </TableHead>
   );
 
+  const renderActiveViewRow = (lead: Lead, index: number) => (
+     <TableRow key={lead.id} className="hover:bg-muted/20">
+      <TableCell>
+        <Checkbox id={`select-lead-${lead.id}`} aria-label={`Select lead ${lead.name}`} />
+      </TableCell>
+      <TableCell className="font-medium py-3">{lead.name}</TableCell>
+      <TableCell className="py-3">{lead.phone || '-'}</TableCell>
+      <TableCell className="py-3">
+        <Badge variant="secondary" className="capitalize">{lead.status}</Badge>
+      </TableCell>
+      <TableCell className="py-3 text-xs">
+        <div>{lead.lastCommentText || '-'}</div>
+        {lead.lastCommentDate && <div className="text-muted-foreground">{lead.lastCommentDate}</div>}
+      </TableCell>
+      <TableCell className="py-3 text-xs">
+        {lead.nextFollowUpDate ? `${formatDate(lead.nextFollowUpDate)} ${lead.nextFollowUpTime || ''}`.trim() : '-'}
+      </TableCell>
+      <TableCell className="py-3">{lead.kilowatt !== undefined ? `${lead.kilowatt} kW` : '-'}</TableCell>
+      <TableCell className="py-3">
+        {lead.source ? <Badge variant={getSourceBadgeVariant(lead.source)}>{lead.source}</Badge> : '-'}
+      </TableCell>
+      <TableCell className="py-3">
+        {lead.priority ? <Badge variant={lead.priority === 'High' ? 'destructive' : lead.priority === 'Medium' ? 'secondary' : 'outline'} className="capitalize">{lead.priority}</Badge> : '-'}
+      </TableCell>
+      <TableCell className="py-3">{lead.assignedTo || '-'}</TableCell>
+      {onEditLead && onDeleteLead && (
+        <TableCell className="text-right py-3">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onEditLead(lead)}>
+                <Edit2 className="mr-2 h-4 w-4" /> Edit
+              </DropdownMenuItem>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-900/50">
+                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                  </DropdownMenuItem>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete the lead "{lead.name}".
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => onDeleteLead(lead.id)} className={buttonVariants({ variant: "destructive" })}>
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </TableCell>
+      )}
+    </TableRow>
+  );
+
+  const renderDroppedViewRow = (lead: Lead, index: number) => (
+    <TableRow key={lead.id} className="hover:bg-muted/20">
+      <TableCell>
+        <Checkbox id={`select-lead-${lead.id}`} aria-label={`Select lead ${lead.name}`} />
+      </TableCell>
+      <TableCell className="py-3 text-center">{index + 1}</TableCell>
+      <TableCell className="py-3 text-xs whitespace-nowrap">{formatDate(lead.createdAt, true)}</TableCell>
+      <TableCell className="font-medium py-3">{lead.name}</TableCell>
+      <TableCell className="py-3">{lead.phone || '-'}</TableCell>
+      <TableCell className="py-3">{lead.dropReason || '-'}</TableCell>
+      <TableCell className="py-3 text-xs whitespace-nowrap">{formatDate(lead.updatedAt)}</TableCell>
+      <TableCell className="py-3">
+        <div className="flex items-center gap-2">
+          <Avatar className="h-6 w-6">
+            <AvatarImage src={`https://placehold.co/40x40.png`} data-ai-hint="user avatar" alt={lead.assignedTo || 'User'} />
+            <AvatarFallback>{lead.assignedTo ? lead.assignedTo.charAt(0).toUpperCase() : 'U'}</AvatarFallback>
+          </Avatar>
+          <span className="text-xs">{lead.assignedTo || '-'}</span>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
 
   return (
     <div className="space-y-4">
@@ -99,84 +190,35 @@ export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, reques
                 <TableHead className="w-[50px] text-muted-foreground">
                   <Checkbox id="selectAllLeads" aria-label="Select all leads" />
                 </TableHead>
-                {renderHeaderCell('Name', 'name')}
-                {renderHeaderCell('Mobile no.', 'phone')}
-                {renderHeaderCell('Stage', 'status')}
-                {renderHeaderCell('Last comment', 'lastCommentText')}
-                {renderHeaderCell('Next follow-up', 'nextFollowUpDate')}
-                {renderHeaderCell('Kilowatt', 'kilowatt')}
-                {renderHeaderCell('Source', 'source')}
-                {renderHeaderCell('Priority', 'priority')}
-                {renderHeaderCell('Assigned To', 'assignedTo')}
-                {onEditLead && onDeleteLead && <TableHead className="text-right text-muted-foreground">Actions</TableHead>}
+                {viewType === 'dropped' && (
+                  <>
+                    {renderHeaderCell('#', 'id')} 
+                    {renderHeaderCell('Created on', 'createdAt')}
+                    {renderHeaderCell('Info', 'name')}
+                    {renderHeaderCell('Mobile no.', 'phone')}
+                    {renderHeaderCell('Drop reason', 'dropReason')}
+                    {renderHeaderCell('Drop date', 'updatedAt')}
+                    {renderHeaderCell('User', 'assignedTo')}
+                  </>
+                )}
+                {viewType === 'active' && (
+                  <>
+                    {renderHeaderCell('Name', 'name')}
+                    {renderHeaderCell('Mobile no.', 'phone')}
+                    {renderHeaderCell('Stage', 'status')}
+                    {renderHeaderCell('Last comment', 'lastCommentText')}
+                    {renderHeaderCell('Next follow-up', 'nextFollowUpDate')}
+                    {renderHeaderCell('Kilowatt', 'kilowatt')}
+                    {renderHeaderCell('Source', 'source')}
+                    {renderHeaderCell('Priority', 'priority')}
+                    {renderHeaderCell('Assigned To', 'assignedTo')}
+                    {onEditLead && onDeleteLead && <TableHead className="text-right text-muted-foreground">Actions</TableHead>}
+                  </>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {leads.map((lead) => (
-                <TableRow key={lead.id} className="hover:bg-muted/20">
-                  <TableCell>
-                    <Checkbox id={`select-lead-${lead.id}`} aria-label={`Select lead ${lead.name}`} />
-                  </TableCell>
-                  <TableCell className="font-medium py-3">{lead.name}</TableCell>
-                  <TableCell className="py-3">{lead.phone || '-'}</TableCell>
-                  <TableCell className="py-3">
-                    <Badge variant="secondary" className="capitalize">{lead.status}</Badge>
-                  </TableCell>
-                  <TableCell className="py-3 text-xs">
-                    <div>{lead.lastCommentText || '-'}</div>
-                    {lead.lastCommentDate && <div className="text-muted-foreground">{lead.lastCommentDate}</div>}
-                  </TableCell>
-                  <TableCell className="py-3 text-xs">
-                    {lead.nextFollowUpDate ? `${formatDate(lead.nextFollowUpDate)} ${lead.nextFollowUpTime || ''}`.trim() : '-'}
-                  </TableCell>
-                  <TableCell className="py-3">{lead.kilowatt !== undefined ? `${lead.kilowatt} kW` : '-'}</TableCell>
-                  <TableCell className="py-3">
-                    {lead.source ? <Badge variant={getSourceBadgeVariant(lead.source)}>{lead.source}</Badge> : '-'}
-                  </TableCell>
-                  <TableCell className="py-3">
-                    {lead.priority ? <Badge variant={lead.priority === 'High' ? 'destructive' : lead.priority === 'Medium' ? 'secondary' : 'outline'} className="capitalize">{lead.priority}</Badge> : '-'}
-                  </TableCell>
-                  <TableCell className="py-3">{lead.assignedTo || '-'}</TableCell>
-                  {onEditLead && onDeleteLead && (
-                    <TableCell className="text-right py-3">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">Open menu</span>
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => onEditLead(lead)}>
-                            <Edit2 className="mr-2 h-4 w-4" /> Edit
-                          </DropdownMenuItem>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-900/50">
-                                <Trash2 className="mr-2 h-4 w-4" /> Delete
-                              </DropdownMenuItem>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This action cannot be undone. This will permanently delete the lead "{lead.name}".
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => onDeleteLead(lead.id)} className={buttonVariants({ variant: "destructive" })}>
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))}
+              {leads.map((lead, index) => viewType === 'dropped' ? renderDroppedViewRow(lead, index) : renderActiveViewRow(lead, index))}
             </TableBody>
           </Table>
         </CardContent>
