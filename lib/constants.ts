@@ -44,8 +44,11 @@ export const TOOLS_NAV_ITEMS: NavItem[] = [
 export const LEAD_STATUS_OPTIONS = ['fresher', 'Requirement', 'site visit', 'Quotation send', 'Followup', 'Deal Done', 'installer', 'ON HOLD', 'Lost', 'New'] as const;
 
 export const LEAD_PRIORITY_OPTIONS = ['High', 'Medium', 'Low'] as const;
+
+// Made LEAD_SOURCE_OPTIONS an array of strings for easier management via settings dialog
 export const LEAD_SOURCE_OPTIONS = ['Facebook', 'Website', 'Referral', 'Cold Call', 'Walk-in', 'Other'] as const;
-export const USER_OPTIONS = ['Mayur', 'Sales Rep A', 'Sales Rep B', 'Admin', 'System', 'Kanchan Nikam'] as const; // Added Kanchan Nikam as per image
+
+export const USER_OPTIONS = ['Mayur', 'Sales Rep A', 'Sales Rep B', 'Admin', 'System', 'Kanchan Nikam'] as const;
 
 export const DROP_REASON_OPTIONS = [
     'Duplicate lead', 'Fake Lead', 'Not Feasible', 'Not Interested', 
@@ -179,4 +182,3 @@ export const MOCK_DOCUMENTS: Document[] = [
 export const MOCK_COMMUNICATIONS: Communication[] = [
     { id: 'c1', leadId: 'lead1', type: 'Email', subject: 'Introductory Email', content: 'Sent initial contact email.', direction: 'Outgoing', timestamp: new Date(Date.now() - 86400000 * 2).toISOString(), recordedBy: 'System' }, { id: 'c2', leadId: 'lead1', type: 'Call', content: 'Follow-up call regarding their solar needs. They are interested.', direction: 'Outgoing', timestamp: new Date(Date.now() - 86400000).toISOString(), recordedBy: 'Sales Rep A' },
 ];
-

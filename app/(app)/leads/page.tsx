@@ -3,10 +3,11 @@
 import React, { useState, useMemo } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { LeadsTable } from './leads-table';
-import { MOCK_LEADS, LEAD_STATUS_OPTIONS } from '@/lib/constants';
+import { MOCK_LEADS, LEAD_STATUS_OPTIONS, LEAD_SOURCE_OPTIONS } from '@/lib/constants'; // Added LEAD_SOURCE_OPTIONS
 import { UsersRound, Filter, Search, Upload, PlusCircle, Settings2, ListFilter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LeadForm } from './lead-form';
+import { LeadSettingsDialog } from './lead-settings-dialog'; // Import the new dialog
 import { useToast } from "@/hooks/use-toast";
 import type { Lead, LeadStatusType, StatusFilterItem, SortConfig } from '@/types';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +16,7 @@ import { format, parseISO } from 'date-fns';
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>(MOCK_LEADS);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false); // State for settings dialog
   const [selectedLeadForEdit, setSelectedLeadForEdit] = useState<Lead | null>(null);
   const { toast } = useToast();
   const [activeFilter, setActiveFilter] = useState<LeadStatusType | 'all'>('all');
@@ -76,7 +78,6 @@ export default function LeadsPage() {
         if (aValue === undefined) return sortConfig.direction === 'ascending' ? 1 : -1;
         if (bValue === undefined) return sortConfig.direction === 'ascending' ? -1 : 1;
         
-        // Handle date sorting for nextFollowUpDate
         if (sortConfig.key === 'nextFollowUpDate') {
           const dateA = aValue ? parseISO(aValue as string).getTime() : 0;
           const dateB = bValue ? parseISO(bValue as string).getTime() : 0;
@@ -85,14 +86,12 @@ export default function LeadsPage() {
           return 0;
         }
         
-        // Handle numeric sorting for kilowatt
         if (sortConfig.key === 'kilowatt') {
            if (Number(aValue) < Number(bValue)) return sortConfig.direction === 'ascending' ? -1 : 1;
            if (Number(aValue) > Number(bValue)) return sortConfig.direction === 'ascending' ? 1 : -1;
            return 0;
         }
 
-        // Default string/generic comparison
         if (String(aValue).toLowerCase() < String(bValue).toLowerCase()) {
           return sortConfig.direction === 'ascending' ? -1 : 1;
         }
@@ -133,7 +132,7 @@ export default function LeadsPage() {
             <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={handleAddLead}>
               <PlusCircle className="mr-2 h-4 w-4" /> Add Lead
             </Button>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" onClick={() => setIsSettingsDialogOpen(true)}> {/* Updated onClick */}
               <Settings2 className="h-5 w-5" />
             </Button>
           </div>
@@ -165,6 +164,7 @@ export default function LeadsPage() {
         }}
         sortConfig={sortConfig}
         requestSort={requestSort}
+        viewType="active"
       />
 
       {isFormOpen && (
@@ -173,6 +173,14 @@ export default function LeadsPage() {
           onClose={() => setIsFormOpen(false)}
           onSubmit={handleFormSubmit}
           lead={selectedLeadForEdit}
+        />
+      )}
+      {isSettingsDialogOpen && (
+        <LeadSettingsDialog
+          isOpen={isSettingsDialogOpen}
+          onClose={() => setIsSettingsDialogOpen(false)}
+          initialStatuses={[...LEAD_STATUS_OPTIONS]} // Pass a copy to avoid direct mutation
+          initialSources={[...LEAD_SOURCE_OPTIONS]} // Pass a copy
         />
       )}
     </>

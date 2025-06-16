@@ -1,10 +1,10 @@
 
 import type { LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, LEAD_SOURCE_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS } from '@/lib/constants';
 
-// Deriving LeadStatusType from the LEAD_STATUS_OPTIONS const array
+// Deriving types from the const arrays ensures type safety and single source of truth
 export type LeadStatusType = typeof LEAD_STATUS_OPTIONS[number];
 export type LeadPriorityType = typeof LEAD_PRIORITY_OPTIONS[number];
-export type LeadSourceOptionType = typeof LEAD_SOURCE_OPTIONS[number];
+export type LeadSourceOptionType = typeof LEAD_SOURCE_OPTIONS[number]; // Updated to derive from const
 export type UserOptionType = typeof USER_OPTIONS[number];
 export type DropReasonType = typeof DROP_REASON_OPTIONS[number];
 
@@ -12,21 +12,21 @@ export type DropReasonType = typeof DROP_REASON_OPTIONS[number];
 export interface Lead {
   id: string;
   name: string;
-  email?: string; // Optional
+  email?: string; 
   phone?: string;
-  status: LeadStatusType; // This will represent "Stage"
-  source?: LeadSourceOptionType;
+  status: LeadStatusType; 
+  source?: LeadSourceOptionType; // Now uses the derived type
   assignedTo?: UserOptionType;
   createdAt: string;
   updatedAt: string;
   lastCommentText?: string;
-  lastCommentDate?: string; // Format: dd-MM-yyyy
-  nextFollowUpDate?: string; // Format: yyyy-MM-dd
-  nextFollowUpTime?: string; // Format: HH:mm
+  lastCommentDate?: string; 
+  nextFollowUpDate?: string; 
+  nextFollowUpTime?: string; 
   kilowatt?: number;
   address?: string;
   priority?: LeadPriorityType;
-  dropReason?: DropReasonType; // New field for drop reason
+  dropReason?: DropReasonType; 
 }
 
 export type ClientType = 'Individual/Bungalow' | 'Housing Society' | 'Commercial' | 'Industrial';
@@ -39,26 +39,25 @@ export interface Proposal {
   proposalNumber: string;
   clientId: string;
 
-  name: string; // Client/Company Name
+  name: string; 
   clientType: ClientType;
   contactPerson: string;
   location: string;
-  capacity: number; // kW
+  capacity: number; 
   moduleType: ModuleType;
   moduleWattage: ModuleWattage;
   dcrStatus: DCRStatus;
-  inverterRating: number; // kW
+  inverterRating: number; 
   inverterQty: number;
-  ratePerWatt: number; // ₹
-  proposalDate: string; // ISO date string
+  ratePerWatt: number; 
+  proposalDate: string; 
 
-  // Financials
-  baseAmount: number; // ratePerWatt * capacity * 1000
-  cgstAmount: number; // baseAmount * 0.069
-  sgstAmount: number; // baseAmount * 0.069
-  subtotalAmount: number; // baseAmount + cgstAmount + sgstAmount (This is the total before subsidy)
-  finalAmount: number; // This will be the same as subtotalAmount. Represents amount before subsidy.
-  subsidyAmount: number; // Stored separately.
+  baseAmount: number; 
+  cgstAmount: number; 
+  sgstAmount: number; 
+  subtotalAmount: number; 
+  finalAmount: number; 
+  subsidyAmount: number; 
 
   createdAt: string;
   updatedAt?: string;
@@ -102,24 +101,19 @@ export interface NavItem {
   children?: NavItem[];
 }
 
-// For the status filter bar on leads page
 export interface StatusFilterItem {
   label: LeadStatusType | 'Show all';
   count: number;
   value: LeadStatusType | 'all';
 }
 
-// For the drop reason filter bar on dropped leads page
 export interface DropReasonFilterItem {
   label: DropReasonType | 'Show all';
   count: number;
   value: DropReasonType | 'all';
 }
 
-
-// For table sorting
 export interface SortConfig {
   key: keyof Lead;
   direction: 'ascending' | 'descending';
 }
-
