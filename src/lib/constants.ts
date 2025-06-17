@@ -2,7 +2,7 @@
 import type { NavItem, Lead, Proposal, Document, Communication, DocumentType, ClientType, ModuleType, DCRStatus, ModuleWattage, LeadStatusType, LeadPriorityType, LeadSourceOptionType, UserOptionType, DropReasonType, Expense, ExpenseCategory } from '@/types';
 import {
   LayoutDashboard,
-  UsersRound, 
+  UsersRound,
   FileText,
   Files,
   MessageSquareText,
@@ -13,13 +13,13 @@ import {
   Edit,
   Eye,
   FileSignature,
-  Briefcase, 
-  UserX,     
-  Rows,      
-  CalendarDays, 
-  ListChecks, 
-  UserCheck, 
-  Receipt, // Added Receipt icon
+  Briefcase,
+  UserX,
+  Rows,
+  CalendarDays,
+  ListChecks,
+  UserCheck,
+  Receipt, // Receipt icon is already imported
 } from 'lucide-react';
 import { format, parseISO, addDays, subDays } from 'date-fns';
 
@@ -28,11 +28,11 @@ export const APP_NAME = "Soryouth";
 // Primary CRM Navigation for the main sidebar
 export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/leads/current', label: 'Summary', icon: UsersRound }, 
+  { href: '/leads/current', label: 'Summary', icon: UsersRound },
   { href: '/proposals', label: 'Clients', icon: Briefcase },
   { href: '/communications', label: 'Communications', icon: MessageSquareText },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays },
-  { href: '/expenses', label: 'Expenses', icon: Receipt }, // Added Expenses Nav Item
+  // Removed Expenses from here
 ];
 
 // Secondary Navigation for tools/other sections, in user profile dropdown
@@ -41,16 +41,17 @@ export const TOOLS_NAV_ITEMS: NavItem[] = [
   { href: '/documents', label: 'Documents', icon: Files },
   { href: '/document-customizer', label: 'AI Document Customizer', icon: WandSparkles },
   { href: '/automation', label: 'Automation Scripts', icon: TerminalSquare },
+  { href: '/expenses', label: 'Expenses', icon: Receipt }, // Added Expenses Nav Item here
 ];
 
 export const CLIENT_TYPES = ['Individual/Bungalow', 'Housing Society', 'Commercial', 'Industrial'] as const;
 export const LEAD_STATUS_OPTIONS = ['fresher', 'Requirement', 'site visit', 'Quotation send', 'Followup', 'Deal Done', 'installer', 'ON HOLD', 'Lost', 'New'] as const;
-export const LEAD_PRIORITY_OPTIONS = ['High', 'Medium', 'Low', 'Average'] as const; 
-export const LEAD_SOURCE_OPTIONS = ['Facebook', 'Website', 'Referral', 'Cold Call', 'Walk-in', 'Other', 'OWN Reference'] as const; 
+export const LEAD_PRIORITY_OPTIONS = ['High', 'Medium', 'Low', 'Average'] as const;
+export const LEAD_SOURCE_OPTIONS = ['Facebook', 'Website', 'Referral', 'Cold Call', 'Walk-in', 'Other', 'OWN Reference'] as const;
 export const USER_OPTIONS = ['Mayur', 'Sales Rep A', 'Sales Rep B', 'Admin', 'System', 'Kanchan Nikam', 'tejas', 'MAYUR', 'Prasad mudholkar', 'Ritesh'] as const;
 export const DROP_REASON_OPTIONS = [
-    'Duplicate lead', 'Fake Lead', 'Not Feasible', 'Not Interested', 
-    'Requirement fullfilled', 'below 3kw', 'out of coverage area', 
+    'Duplicate lead', 'Fake Lead', 'Not Feasible', 'Not Interested',
+    'Requirement fullfilled', 'below 3kw', 'out of coverage area',
     'out of maharashtra', 'price issue', 'want in balcony', 'Other'
 ] as const;
 
@@ -60,43 +61,43 @@ export const FOLLOW_UP_STATUSES = ['Answered', 'No reply', 'Rejected', 'Not conn
 
 
 export const MOCK_LEADS: Lead[] = [
-  { 
-    id: 'lead1', name: 'Pramod Agrawal', email: 'pramod.agrawal@example.com', phone: '6263537508', 
+  {
+    id: 'lead1', name: 'Pramod Agrawal', email: 'pramod.agrawal@example.com', phone: '6263537508',
     status: 'fresher', source: 'Facebook', createdAt: subDays(new Date(),5).toISOString(), updatedAt: new Date().toISOString(),
-    lastCommentText: 'lb 8000/-', lastCommentDate: format(subDays(new Date(), 2), 'dd-MM-yyyy'), 
+    lastCommentText: 'lb 8000/-', lastCommentDate: format(subDays(new Date(), 2), 'dd-MM-yyyy'),
     kilowatt: 10, clientType: 'Commercial', nextFollowUpDate: format(addDays(new Date(), 5), 'yyyy-MM-dd'), nextFollowUpTime: '10:00',
     address: '123 Main St, Nagpur', priority: 'High', assignedTo: 'Mayur', createdBy: 'Admin'
   },
-  { 
-    id: 'lead2', name: 'sir (Jane Smith)', email: 'jane.smith.lead@example.com', phone: '7001173134', 
+  {
+    id: 'lead2', name: 'sir (Jane Smith)', email: 'jane.smith.lead@example.com', phone: '7001173134',
     status: 'fresher', source: 'Facebook', assignedTo: 'Sales Rep A', createdBy: 'Mayur',
     createdAt: new Date(Date.now() - 86400000).toISOString(), updatedAt: new Date().toISOString(),
-    lastCommentText: 'Not answering', lastCommentDate: format(subDays(new Date(), 1), 'dd-MM-yyyy'), 
+    lastCommentText: 'Not answering', lastCommentDate: format(subDays(new Date(), 1), 'dd-MM-yyyy'),
     kilowatt: 5, clientType: 'Individual/Bungalow', nextFollowUpDate: format(addDays(new Date(), 7), 'yyyy-MM-dd'), nextFollowUpTime: '14:30',
     address: '456 Oak Ave, Mumbai', priority: 'Medium'
   },
-  { 
-    id: 'lead_sky_avenue', name: 'Sky avenue Manu Bhai', phone: '8355979653', 
-    status: 'ON HOLD', source: 'OWN Reference', 
-    createdAt: '2025-05-28T12:32:00.000Z', 
+  {
+    id: 'lead_sky_avenue', name: 'Sky avenue Manu Bhai', phone: '8355979653',
+    status: 'ON HOLD', source: 'OWN Reference',
+    createdAt: '2025-05-28T12:32:00.000Z',
     updatedAt: new Date().toISOString(),
-    lastCommentText: 'Initial entry.', lastCommentDate: format(parseISO('2025-05-28T12:32:00.000Z'), 'dd-MM-yyyy'), 
-    kilowatt: 25, clientType: 'Housing Society', 
-    nextFollowUpDate: undefined, 
+    lastCommentText: 'Initial entry.', lastCommentDate: format(parseISO('2025-05-28T12:32:00.000Z'), 'dd-MM-yyyy'),
+    kilowatt: 25, clientType: 'Housing Society',
+    nextFollowUpDate: undefined,
     nextFollowUpTime: undefined,
     address: 'kalyan', priority: 'Average', assignedTo: 'Ritesh', createdBy: 'Ritesh'
   },
-  { 
-    id: 'lead3', name: 'Namdeorao Dhote', phone: '7498437694', 
+  {
+    id: 'lead3', name: 'Namdeorao Dhote', phone: '7498437694',
     status: 'fresher', source: 'Facebook', createdBy: 'Kanchan Nikam',
     createdAt: new Date(Date.now() - 172800000).toISOString(), updatedAt: new Date().toISOString(),
-    lastCommentText: 'kusum solar ka lagana hai...', lastCommentDate: format(new Date(), 'dd-MM-yyyy'), 
+    lastCommentText: 'kusum solar ka lagana hai...', lastCommentDate: format(new Date(), 'dd-MM-yyyy'),
     kilowatt: 3, clientType: 'Individual/Bungalow', nextFollowUpDate: format(addDays(new Date(), 3), 'yyyy-MM-dd'),
     address: '789 Pine Rd, Pune', priority: 'Low', assignedTo: 'Sales Rep B'
   },
-  { 
-    id: 'lead4', name: 'Lost Cause Ltd', email: 'lost.cause@example.com', phone: '555-0000', 
-    status: 'Lost', source: 'Old Database', dropReason: 'Not Interested', 
+  {
+    id: 'lead4', name: 'Lost Cause Ltd', email: 'lost.cause@example.com', phone: '555-0000',
+    status: 'Lost', source: 'Old Database', dropReason: 'Not Interested',
     createdAt: new Date(Date.now() - 259200000).toISOString(), updatedAt: new Date(Date.now() - 86400000).toISOString(),
     kilowatt: 0, clientType: 'Other', priority: 'Low', assignedTo: 'System', createdBy: 'System'
   },
