@@ -1,65 +1,64 @@
 
-import type { LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, LEAD_SOURCE_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES, EXPENSE_CATEGORIES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES } from '@/lib/constants'; // Added EXPENSE_CATEGORIES
+import type { LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, LEAD_SOURCE_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES, EXPENSE_CATEGORIES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS } from '@/lib/constants';
 
 // Deriving types from the const arrays ensures type safety and single source of truth
 export type LeadStatusType = typeof LEAD_STATUS_OPTIONS[number];
 export type LeadPriorityType = typeof LEAD_PRIORITY_OPTIONS[number];
-export type LeadSourceOptionType = typeof LEAD_SOURCE_OPTIONS[number]; 
+export type LeadSourceOptionType = typeof LEAD_SOURCE_OPTIONS[number];
 export type UserOptionType = typeof USER_OPTIONS[number];
 export type DropReasonType = typeof DROP_REASON_OPTIONS[number];
 export type ClientType = typeof CLIENT_TYPES[number];
+export type ModuleType = typeof MODULE_TYPES[number];
+export type DCRStatus = typeof DCR_STATUSES[number];
+export type ModuleWattage = typeof MODULE_WATTAGE_OPTIONS[number];
 
 
 export interface Lead {
   id: string;
   name: string;
-  email?: string; 
+  email?: string;
   phone?: string;
-  status: LeadStatusType; 
-  source?: LeadSourceOptionType; 
+  status: LeadStatusType;
+  source?: LeadSourceOptionType;
   assignedTo?: UserOptionType;
-  createdBy?: UserOptionType; 
+  createdBy?: UserOptionType;
   createdAt: string;
   updatedAt: string;
   lastCommentText?: string;
-  lastCommentDate?: string; 
-  nextFollowUpDate?: string; 
-  nextFollowUpTime?: string; 
+  lastCommentDate?: string;
+  nextFollowUpDate?: string;
+  nextFollowUpTime?: string;
   kilowatt?: number;
   address?: string;
   priority?: LeadPriorityType;
-  dropReason?: DropReasonType; 
-  clientType?: ClientType; 
+  dropReason?: DropReasonType;
+  clientType?: ClientType;
 }
-
-export type ModuleType = 'Mono PERC' | 'TOPCon';
-export type DCRStatus = 'DCR' | 'Non-DCR';
-export type ModuleWattage = "540" | "545" | "550" | "585" | "590";
 
 export interface Proposal {
   id: string;
   proposalNumber: string;
   clientId: string;
 
-  name: string; 
+  name: string;
   clientType: ClientType;
   contactPerson: string;
   location: string;
-  capacity: number; 
+  capacity: number;
   moduleType: ModuleType;
   moduleWattage: ModuleWattage;
   dcrStatus: DCRStatus;
-  inverterRating: number; 
+  inverterRating: number;
   inverterQty: number;
-  ratePerWatt: number; 
-  proposalDate: string; 
+  ratePerWatt: number;
+  proposalDate: string;
 
-  baseAmount: number; 
-  cgstAmount: number; 
-  sgstAmount: number; 
-  subtotalAmount: number; 
-  finalAmount: number; 
-  subsidyAmount: number; 
+  baseAmount: number;
+  cgstAmount: number;
+  sgstAmount: number;
+  subtotalAmount: number;
+  finalAmount: number;
+  subsidyAmount: number;
 
   createdAt: string;
   updatedAt?: string;
@@ -127,25 +126,25 @@ export interface FollowUp {
   id: string;
   leadId: string;
   type: FollowUpType;
-  date: string; 
-  time: string; 
+  date: string;
+  time: string;
   status: FollowUpStatus;
   priority: LeadPriorityType;
   leadStage: LeadStatusType;
   comment: string;
   createdBy: UserOptionType;
-  createdAt: string; 
+  createdAt: string;
 }
 
 export interface Task {
   id: string;
   leadId: string;
   assignedTo: UserOptionType;
-  dueDate: string; 
-  dueTime: string; 
-  description: string; 
+  dueDate: string;
+  dueTime: string;
+  description: string;
   status: 'Pending' | 'Completed' | 'Overdue';
-  createdAt: string; 
+  createdAt: string;
 }
 
 export type ExpenseCategory = typeof EXPENSE_CATEGORIES[number];
@@ -153,15 +152,15 @@ export type ExpenseStatus = 'Pending' | 'Approved' | 'Rejected';
 
 export interface Expense {
   id: string;
-  userId: string; 
-  userName?: string; 
-  date: string; 
+  userId: string;
+  userName?: string;
+  date: string;
   category: ExpenseCategory;
   amount: number;
   description: string;
-  receiptUrl?: string; 
+  receiptUrl?: string;
   status: ExpenseStatus;
-  submittedAt: string; 
+  submittedAt: string;
   reviewedBy?: UserOptionType;
-  reviewedAt?: string; 
+  reviewedAt?: string;
 }

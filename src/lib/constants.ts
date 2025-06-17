@@ -3,7 +3,7 @@ import type { NavItem, Lead, Proposal, Document, Communication, DocumentType, Cl
 import {
   LayoutDashboard,
   UsersRound,
-  FileText,
+  FileText, // Used for new Proposals link
   Files,
   MessageSquareText,
   WandSparkles,
@@ -13,13 +13,13 @@ import {
   Edit,
   Eye,
   FileSignature,
-  Briefcase,
+  Briefcase, // Used for Clients link
   UserX,
   Rows,
   CalendarDays,
   ListChecks,
   UserCheck,
-  Receipt, // Receipt icon is already imported
+  Receipt,
 } from 'lucide-react';
 import { format, parseISO, addDays, subDays } from 'date-fns';
 
@@ -29,10 +29,10 @@ export const APP_NAME = "Soryouth";
 export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/leads/current', label: 'Summary', icon: UsersRound },
-  { href: '/proposals', label: 'Clients', icon: Briefcase },
+  { href: '/proposals', label: 'Proposals', icon: FileText }, // New: Points to client-grouped proposals page
+  { href: '/clients', label: 'Clients', icon: Briefcase },   // Repurposed: Points to new client list page
   { href: '/communications', label: 'Communications', icon: MessageSquareText },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays },
-  // Removed Expenses from here
 ];
 
 // Secondary Navigation for tools/other sections, in user profile dropdown
@@ -41,10 +41,10 @@ export const TOOLS_NAV_ITEMS: NavItem[] = [
   { href: '/documents', label: 'Documents', icon: Files },
   { href: '/document-customizer', label: 'AI Document Customizer', icon: WandSparkles },
   { href: '/automation', label: 'Automation Scripts', icon: TerminalSquare },
-  { href: '/expenses', label: 'Expenses', icon: Receipt }, // Added Expenses Nav Item here
+  { href: '/expenses', label: 'Expenses', icon: Receipt },
 ];
 
-export const CLIENT_TYPES = ['Individual/Bungalow', 'Housing Society', 'Commercial', 'Industrial'] as const;
+export const CLIENT_TYPES = ['Individual/Bungalow', 'Housing Society', 'Commercial', 'Industrial', 'Other'] as const;
 export const LEAD_STATUS_OPTIONS = ['fresher', 'Requirement', 'site visit', 'Quotation send', 'Followup', 'Deal Done', 'installer', 'ON HOLD', 'Lost', 'New'] as const;
 export const LEAD_PRIORITY_OPTIONS = ['High', 'Medium', 'Low', 'Average'] as const;
 export const LEAD_SOURCE_OPTIONS = ['Facebook', 'Website', 'Referral', 'Cold Call', 'Walk-in', 'Other', 'OWN Reference'] as const;
@@ -70,7 +70,7 @@ export const MOCK_LEADS: Lead[] = [
   },
   {
     id: 'lead2', name: 'sir (Jane Smith)', email: 'jane.smith.lead@example.com', phone: '7001173134',
-    status: 'fresher', source: 'Facebook', assignedTo: 'Sales Rep A', createdBy: 'Mayur',
+    status: 'Deal Done', source: 'Facebook', assignedTo: 'Sales Rep A', createdBy: 'Mayur',
     createdAt: new Date(Date.now() - 86400000).toISOString(), updatedAt: new Date().toISOString(),
     lastCommentText: 'Not answering', lastCommentDate: format(subDays(new Date(), 1), 'dd-MM-yyyy'),
     kilowatt: 5, clientType: 'Individual/Bungalow', nextFollowUpDate: format(addDays(new Date(), 7), 'yyyy-MM-dd'), nextFollowUpTime: '14:30',
@@ -100,6 +100,21 @@ export const MOCK_LEADS: Lead[] = [
     status: 'Lost', source: 'Old Database', dropReason: 'Not Interested',
     createdAt: new Date(Date.now() - 259200000).toISOString(), updatedAt: new Date(Date.now() - 86400000).toISOString(),
     kilowatt: 0, clientType: 'Other', priority: 'Low', assignedTo: 'System', createdBy: 'System'
+  },
+   {
+    id: 'client1', name: 'Green Valley Society', // Corresponds to proposal client
+    status: 'Deal Done', clientType: 'Housing Society',
+    createdAt: subDays(new Date(), 100).toISOString(), updatedAt: subDays(new Date(), 10).toISOString(),
+  },
+  {
+    id: 'client2', name: 'Mr. Anil Patel (Bungalow)', // Corresponds to proposal client
+    status: 'Deal Done', clientType: 'Individual/Bungalow',
+    createdAt: subDays(new Date(), 120).toISOString(), updatedAt: subDays(new Date(), 5).toISOString(),
+  },
+  {
+    id: 'client3', name: 'FutureTech Industries', // Corresponds to proposal client
+    status: 'Deal Done', clientType: 'Commercial',
+    createdAt: subDays(new Date(), 80).toISOString(), updatedAt: subDays(new Date(), 1).toISOString(),
   },
 ];
 
@@ -138,6 +153,9 @@ export const MOCK_PROPOSALS: Proposal[] = [
   },
   {
     id: 'prop_lead12', proposalNumber: 'P-2024-012', clientId: 'lead12', name: 'Rooftop Renewables Ltd.', clientType: 'Commercial', contactPerson: 'Ms. Anita Desai', location: '25 Green Avenue, Mumbai', capacity: 75, moduleType: 'Mono PERC', moduleWattage: '550', dcrStatus: 'Non-DCR', inverterRating: 75, inverterQty: 1, ratePerWatt: 39, proposalDate: format(subDays(new Date(), 45), 'yyyy-MM-dd'), ...calculateFinancialsAndSubsidy(39, 75, 'Commercial'), createdAt: subDays(new Date(), 45).toISOString(), updatedAt: subDays(new Date(), 6).toISOString(),
+  },
+  {
+    id: 'prop_client3_new', proposalNumber: 'P-2024-015', clientId: 'client3', name: 'FutureTech Industries', clientType: 'Commercial', contactPerson: 'Ms. Priya Singh', location: 'Nagpur, MH', capacity: 150, moduleType: 'TOPCon', moduleWattage: '585', dcrStatus: 'Non-DCR', inverterRating: 150, inverterQty: 3, ratePerWatt: 36, proposalDate: format(subDays(new Date(), 2), 'yyyy-MM-dd'), ...calculateFinancialsAndSubsidy(36, 150, 'Commercial'), createdAt: subDays(new Date(), 2).toISOString(), updatedAt: new Date().toISOString(),
   },
 ];
 
@@ -194,3 +212,4 @@ export const MOCK_EXPENSES: Expense[] = [
     reviewedAt: subDays(new Date(), 9).toISOString(),
   },
 ];
+
