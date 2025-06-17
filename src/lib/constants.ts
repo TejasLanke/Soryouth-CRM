@@ -3,7 +3,7 @@ import type { NavItem, Lead, Proposal, Document, Communication, DocumentType, Cl
 import {
   LayoutDashboard,
   UsersRound,
-  FileText, // Used for new Proposals link
+  FileText, // Used for Proposals link
   Files,
   MessageSquareText,
   WandSparkles,
@@ -29,8 +29,8 @@ export const APP_NAME = "Soryouth";
 export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/leads/current', label: 'Summary', icon: UsersRound },
-  { href: '/proposals', label: 'Proposals', icon: FileText }, // New: Points to client-grouped proposals page
-  { href: '/clients', label: 'Clients', icon: Briefcase },   // Repurposed: Points to new client list page
+  { href: '/proposals', label: 'Proposals', icon: FileText },
+  { href: '/clients', label: 'Clients', icon: Briefcase },
   { href: '/communications', label: 'Communications', icon: MessageSquareText },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays },
 ];
@@ -212,6 +212,3 @@ export const MOCK_EXPENSES: Expense[] = [
     reviewedAt: subDays(new Date(), 9).toISOString(),
   },
 ];
-
-
-    
