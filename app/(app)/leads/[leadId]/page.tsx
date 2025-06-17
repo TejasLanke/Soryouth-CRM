@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { PageHeader } from '@/components/page-header';
+// PageHeader is not used here as the layout for /leads/[leadId] handles its own header structure
 import { MOCK_LEADS, USER_OPTIONS, LEAD_SOURCE_OPTIONS, LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, CLIENT_TYPES } from '@/lib/constants';
 import type { Lead, UserOptionType, LeadSourceOptionType, LeadStatusType, LeadPriorityType, ClientType } from '@/types';
 import { format, parseISO, isValid } from 'date-fns';
@@ -23,10 +23,9 @@ import { DocumentCreationDialog } from '@/app/(app)/documents/document-creation-
 import { useToast } from '@/hooks/use-toast';
 
 export default function LeadDetailsPage() {
-  const params = useParams();
+  const { leadId } = useParams() as { leadId: string };
   const router = useRouter();
   const { toast } = useToast();
-  const leadId = params.leadId as string;
   const [lead, setLead] = useState<Lead | null | undefined>(undefined); 
 
   const [isProposalFormOpen, setIsProposalFormOpen] = useState(false);
@@ -103,11 +102,13 @@ export default function LeadDetailsPage() {
 
 
   if (lead === undefined) {
-    return <PageHeader title="Loading Lead Details..." />;
+    // Basic loading state, replace with PageHeader if it fits layout better
+    return <div className="flex justify-center items-center h-full"><p>Loading Lead Details...</p></div>;
   }
 
   if (lead === null) {
-    return <PageHeader title="Lead Not Found" description="The lead you are looking for does not exist or could not be loaded." />;
+    // Basic not found state
+    return <div className="flex flex-col justify-center items-center h-full"><UserCircle2 className="h-12 w-12 mb-4 text-muted-foreground"/><p className="text-xl">Lead Not Found</p><p className="text-muted-foreground">The lead you are looking for does not exist or could not be loaded.</p></div>;
   }
 
   const creationDateTime = lead.createdAt && isValid(parseISO(lead.createdAt)) ? format(parseISO(lead.createdAt), 'dd-MM-yyyy HH:mm') : 'N/A';

@@ -26,9 +26,8 @@ const ClientTypeIcon = ({ type }: { type: Proposal['clientType'] }) => {
 
 
 export default function ClientProposalsPage() {
-  const params = useParams();
+  const { clientId } = useParams() as { clientId: string };
   const router = useRouter();
-  const clientId = params.clientId as string;
 
   const [allProposals, setAllProposals] = useState<Proposal[]>(MOCK_PROPOSALS); 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -40,9 +39,6 @@ export default function ClientProposalsPage() {
   }, [allProposals, clientId]);
 
   const currentClient = useMemo(() => {
-    // Find the first proposal for this client to get their details
-    // This assumes client details (name, type, contactPerson, location) are consistent across their proposals
-    // Or, in a real app, you'd fetch client details separately based on clientId
     return clientProposals.length > 0 ? clientProposals[0] : MOCK_PROPOSALS.find(p => p.clientId === clientId);
   }, [clientProposals, clientId]);
 
