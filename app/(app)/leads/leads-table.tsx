@@ -1,8 +1,8 @@
 
 'use client';
 
-import type { Lead, SortConfig, DropReasonType }_from_ '@/types';
-import React, { useState, useEffect }_from_ 'react'; // Added useState, useEffect
+import type { Lead, SortConfig, DropReasonType } from '@/types';
+import React, { useState, useEffect } from 'react'; // Added useState, useEffect
 import Link from 'next/link'; // Added Link
 import {
   Table,
@@ -11,11 +11,11 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-}_from_ '@/components/ui/table';
-import { Button, buttonVariants }_from_ '@/components/ui/button';
-import { Badge }_from_ '@/components/ui/badge';
-import { Checkbox }_from_ '@/components/ui/checkbox';
-import { Edit2, Trash2, MoreVertical, ArrowUpDown, UsersRound, UserCircle2 }_from_ 'lucide-react';
+} from '@/components/ui/table';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Edit2, Trash2, MoreVertical, ArrowUpDown, UsersRound, UserCircle2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,16 +26,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-}_from_ "@/components/ui/alert-dialog";
+} from "@/components/ui/alert-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-}_from_ '@/components/ui/dropdown-menu';
-import { Card, CardContent }_from_ '@/components/ui/card';
-import { format, parseISO, isValid }_from_ 'date-fns';
-import { Avatar, AvatarFallback, AvatarImage }_from_ '@/components/ui/avatar';
+} from '@/components/ui/dropdown-menu';
+import { Card, CardContent } from '@/components/ui/card';
+import { format, parseISO, isValid } from 'date-fns';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 
 interface LeadsTableProps {
@@ -268,4 +268,3 @@ export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, reques
     </div>
   );
 }
-
