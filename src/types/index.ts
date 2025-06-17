@@ -1,10 +1,10 @@
 
-import type { LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, LEAD_SOURCE_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES } from '@/lib/constants';
+import type { LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, LEAD_SOURCE_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES, EXPENSE_CATEGORIES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES } from '@/lib/constants'; // Added EXPENSE_CATEGORIES
 
 // Deriving types from the const arrays ensures type safety and single source of truth
 export type LeadStatusType = typeof LEAD_STATUS_OPTIONS[number];
 export type LeadPriorityType = typeof LEAD_PRIORITY_OPTIONS[number];
-export type LeadSourceOptionType = typeof LEAD_SOURCE_OPTIONS[number]; // Updated to derive from const
+export type LeadSourceOptionType = typeof LEAD_SOURCE_OPTIONS[number]; 
 export type UserOptionType = typeof USER_OPTIONS[number];
 export type DropReasonType = typeof DROP_REASON_OPTIONS[number];
 export type ClientType = typeof CLIENT_TYPES[number];
@@ -29,10 +29,9 @@ export interface Lead {
   address?: string;
   priority?: LeadPriorityType;
   dropReason?: DropReasonType; 
-  clientType?: ClientType; // Added clientType
+  clientType?: ClientType; 
 }
 
-// export type ClientType = 'Individual/Bungalow' | 'Housing Society' | 'Commercial' | 'Industrial'; // Defined above from constants
 export type ModuleType = 'Mono PERC' | 'TOPCon';
 export type DCRStatus = 'DCR' | 'Non-DCR';
 export type ModuleWattage = "540" | "545" | "550" | "585" | "590";
@@ -128,27 +127,41 @@ export interface FollowUp {
   id: string;
   leadId: string;
   type: FollowUpType;
-  date: string; // yyyy-MM-dd
-  time: string; // HH:mm
+  date: string; 
+  time: string; 
   status: FollowUpStatus;
   priority: LeadPriorityType;
   leadStage: LeadStatusType;
   comment: string;
   createdBy: UserOptionType;
-  createdAt: string; // ISO timestamp
+  createdAt: string; 
 }
 
 export interface Task {
   id: string;
   leadId: string;
   assignedTo: UserOptionType;
-  dueDate: string; // yyyy-MM-dd
-  dueTime: string; // HH:mm
+  dueDate: string; 
+  dueTime: string; 
   description: string; 
   status: 'Pending' | 'Completed' | 'Overdue';
-  createdAt: string; // ISO timestamp
+  createdAt: string; 
 }
 
-// Constants for Follow-up types and statuses (already in lib/constants.ts but good for type reference)
-export const FOLLOW_UP_TYPES = ['Call', 'SMS', 'Email', 'Meeting', 'Visit'] as const;
-export const FOLLOW_UP_STATUSES = ['Answered', 'No reply', 'Rejected', 'Not connected'] as const;
+export type ExpenseCategory = typeof EXPENSE_CATEGORIES[number];
+export type ExpenseStatus = 'Pending' | 'Approved' | 'Rejected';
+
+export interface Expense {
+  id: string;
+  userId: string; 
+  userName?: string; 
+  date: string; 
+  category: ExpenseCategory;
+  amount: number;
+  description: string;
+  receiptUrl?: string; 
+  status: ExpenseStatus;
+  submittedAt: string; 
+  reviewedBy?: UserOptionType;
+  reviewedAt?: string; 
+}

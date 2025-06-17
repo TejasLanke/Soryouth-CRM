@@ -1,5 +1,5 @@
 
-import type { NavItem, Lead, Proposal, Document, Communication, DocumentType, ClientType, ModuleType, DCRStatus, ModuleWattage, LeadStatusType, LeadPriorityType, LeadSourceOptionType, UserOptionType, DropReasonType } from '@/types';
+import type { NavItem, Lead, Proposal, Document, Communication, DocumentType, ClientType, ModuleType, DCRStatus, ModuleWattage, LeadStatusType, LeadPriorityType, LeadSourceOptionType, UserOptionType, DropReasonType, Expense, ExpenseCategory } from '@/types';
 import {
   LayoutDashboard,
   UsersRound, 
@@ -19,6 +19,7 @@ import {
   CalendarDays, 
   ListChecks, 
   UserCheck, 
+  Receipt, // Added Receipt icon
 } from 'lucide-react';
 import { format, parseISO, addDays, subDays } from 'date-fns';
 
@@ -31,6 +32,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/proposals', label: 'Clients', icon: Briefcase },
   { href: '/communications', label: 'Communications', icon: MessageSquareText },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays },
+  { href: '/expenses', label: 'Expenses', icon: Receipt }, // Added Expenses Nav Item
 ];
 
 // Secondary Navigation for tools/other sections, in user profile dropdown
@@ -100,7 +102,6 @@ export const MOCK_LEADS: Lead[] = [
   },
 ];
 
-// export const CLIENT_TYPES: ClientType[] = ['Individual/Bungalow', 'Housing Society', 'Commercial', 'Industrial']; // Defined above as const
 export const MODULE_TYPES: ModuleType[] = ['Mono PERC', 'TOPCon'];
 export const DCR_STATUSES: DCRStatus[] = ['DCR', 'Non-DCR'];
 export const MODULE_WATTAGE_OPTIONS: ModuleWattage[] = ["540", "545", "550", "585", "590"];
@@ -151,3 +152,44 @@ export const MOCK_COMMUNICATIONS: Communication[] = [
     { id: 'c1', leadId: 'lead1', type: 'Email', subject: 'Introductory Email', content: 'Sent initial contact email.', direction: 'Outgoing', timestamp: new Date(Date.now() - 86400000 * 2).toISOString(), recordedBy: 'System' }, { id: 'c2', leadId: 'lead1', type: 'Call', content: 'Follow-up call regarding their solar needs. They are interested.', direction: 'Outgoing', timestamp: new Date(Date.now() - 86400000).toISOString(), recordedBy: 'Sales Rep A' },
 ];
 
+export const EXPENSE_CATEGORIES = ['Travel', 'Food', 'Supplies', 'Utilities', 'Software', 'Training', 'Marketing', 'Other'] as const;
+
+export const MOCK_EXPENSES: Expense[] = [
+  {
+    id: 'exp1',
+    userId: 'user123',
+    userName: 'Mayur',
+    date: format(subDays(new Date(), 5), 'yyyy-MM-dd'),
+    category: 'Travel',
+    amount: 1500,
+    description: 'Client meeting in Pune - Fuel & Tolls',
+    status: 'Approved',
+    submittedAt: subDays(new Date(), 5).toISOString(),
+    reviewedBy: 'Admin',
+    reviewedAt: subDays(new Date(), 4).toISOString(),
+  },
+  {
+    id: 'exp2',
+    userId: 'user456',
+    userName: 'Kanchan Nikam',
+    date: format(subDays(new Date(), 2), 'yyyy-MM-dd'),
+    category: 'Food',
+    amount: 350,
+    description: 'Lunch with potential client',
+    status: 'Pending',
+    submittedAt: subDays(new Date(), 2).toISOString(),
+  },
+  {
+    id: 'exp3',
+    userId: 'user123',
+    userName: 'Mayur',
+    date: format(subDays(new Date(), 10), 'yyyy-MM-dd'),
+    category: 'Supplies',
+    amount: 800,
+    description: 'Stationery and office supplies',
+    status: 'Rejected',
+    submittedAt: subDays(new Date(), 10).toISOString(),
+    reviewedBy: 'Admin',
+    reviewedAt: subDays(new Date(), 9).toISOString(),
+  },
+];
