@@ -12,41 +12,64 @@ import {
   Clock, 
   BarChart3, 
   TrendingUp, 
-  PieChart, 
+  PieChart as PieChartIcon, // Renamed to avoid conflict with Recharts' PieChart
   Users, 
   CalendarRange, 
   Sigma,
   ListChecks
 } from 'lucide-react';
-import { MOCK_LEADS, MOCK_PROPOSALS } from '@/lib/constants'; // Assuming these are available client-side or fetched
-import { useState, useEffect } from 'react';
+import { MOCK_LEADS, MOCK_PROPOSALS, USER_OPTIONS } from '@/lib/constants'; 
+import { useState, useEffect, useMemo } from 'react';
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from '@/components/ui/chart';
+import type { Lead, Proposal } from '@/types';
 
 // Helper function to count unique clients from proposals
-const countUniqueClients = (proposals: typeof MOCK_PROPOSALS) => {
+const countUniqueClients = (proposals: Proposal[]) => {
   if (!proposals || proposals.length === 0) return 0;
   const clientIds = new Set(proposals.map(p => p.clientId));
   return clientIds.size;
 };
 
-export default function DashboardPage() {
+const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+
+export default function DashboardOverviewPage() {
   const [dashboardData, setDashboardData] = useState({
     totalLeads: 0,
     totalClients: 0,
     dealsWon: 0,
     leadsDropped: 0,
+    dealsByUser: [] as { name: string; value: number; fill: string }[],
+    leadsByUser: [] as { name: string; value: number; fill: string }[],
   });
 
   useEffect(() => {
-    // Simulating data fetching and processing for a real app
-    // In a real app, this data would come from API calls
     const leads = MOCK_LEADS;
     const proposals = MOCK_PROPOSALS;
+
+    const dealsWonCount = leads.filter(lead => lead.status === 'Deal Done').length;
+    const leadsDroppedCount = leads.filter(lead => lead.status === 'Lost').length;
+
+    const dealsByUserData = USER_OPTIONS.map((user, index) => ({
+      name: user,
+      value: leads.filter(lead => lead.assignedTo === user && lead.status === 'Deal Done').length,
+      fill: COLORS[index % COLORS.length],
+    })).filter(item => item.value > 0);
+
+    const leadsByUserData = USER_OPTIONS.map((user, index) => ({
+      name: user,
+      value: leads.filter(lead => lead.assignedTo === user).length,
+      fill: COLORS[index % COLORS.length],
+    })).filter(item => item.value > 0);
+
 
     setDashboardData({
       totalLeads: leads.length,
       totalClients: countUniqueClients(proposals),
-      dealsWon: leads.filter(lead => lead.status === 'Deal Done').length,
-      leadsDropped: leads.filter(lead => lead.status === 'Lost').length,
+      dealsWon: dealsWonCount,
+      leadsDropped: leadsDroppedCount,
+      dealsByUser: dealsByUserData,
+      leadsByUser: leadsByUserData,
     });
   }, []);
 
@@ -63,17 +86,27 @@ export default function DashboardPage() {
   const handlePunchInOut = () => {
     setIsPunchedIn(!isPunchedIn);
     setAttendanceStatus(isPunchedIn ? 'Not Punched In' : 'Punched In');
-    // In a real app, you'd also record the timestamp and send to backend
   };
 
+  const dealsByUserChartConfig = useMemo(() => {
+    const config: ChartConfig = {};
+    dashboardData.dealsByUser.forEach(item => {
+      config[item.name] = { label: item.name, color: item.fill };
+    });
+    return config;
+  }, [dashboardData.dealsByUser]);
+
+  const leadsByUserChartConfig = useMemo(() => {
+    const config: ChartConfig = {};
+    dashboardData.leadsByUser.forEach(item => {
+      config[item.name] = { label: item.name, color: item.fill };
+    });
+    return config;
+  }, [dashboardData.leadsByUser]);
 
   return (
     <>
-      <PageHeader 
-        title="Dashboard Overview" 
-        description="Key metrics and performance indicators for Soryouth."
-      />
-      
+      {/* PageHeader is now in layout */}
       {/* Top Stats Row */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
         {topStats.map((stat) => (
@@ -84,7 +117,6 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">{stat.value}</div>
-              {/* <p className="text-xs text-muted-foreground">Placeholder change</p> */}
             </CardContent>
           </Card>
         ))}
@@ -105,7 +137,6 @@ export default function DashboardPage() {
             <Button onClick={handlePunchInOut} className="w-full">
               {isPunchedIn ? 'Punch Out' : 'Punch In'}
             </Button>
-             <img src="https://placehold.co/300x150.png" data-ai-hint="attendance tracker" alt="Attendance Tracker" className="w-full mt-4 rounded-md object-cover"/>
           </CardContent>
         </Card>
 
@@ -123,7 +154,6 @@ export default function DashboardPage() {
               <li className="flex justify-between"><span>2. Kanchan N.</span> <span className="font-semibold">12 Deals</span></li>
               <li className="flex justify-between"><span>3. Sales Rep A</span> <span className="font-semibold">10 Deals</span></li>
             </ul>
-            <img src="https://placehold.co/300x200.png" data-ai-hint="sales count leaderboard" alt="Sales Leaderboard by Count" className="w-full mt-4 rounded-md object-cover"/>
           </CardContent>
         </Card>
         
@@ -141,7 +171,6 @@ export default function DashboardPage() {
               <li className="flex justify-between"><span>2. Kanchan N.</span> <span className="font-semibold">₹4,20,000</span></li>
               <li className="flex justify-between"><span>3. Sales Rep B</span> <span className="font-semibold">₹3,80,000</span></li>
             </ul>
-            <img src="https://placehold.co/300x200.png" data-ai-hint="sales value leaderboard" alt="Sales Leaderboard by Value" className="w-full mt-4 rounded-md object-cover"/>
           </CardContent>
         </Card>
       </div>
@@ -151,15 +180,29 @@ export default function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <PieChart className="h-5 w-5 text-primary" />
+              <PieChartIcon className="h-5 w-5 text-primary" />
               Deals by User
             </CardTitle>
             <CardDescription>Distribution of deals closed by each user.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-center h-60 bg-muted rounded-md">
-               <img src="https://placehold.co/500x300.png" data-ai-hint="deals by user chart" alt="Deals by User Chart" className="w-full h-full object-contain"/>
-            </div>
+          <CardContent className="h-[300px]">
+            {dashboardData.dealsByUser.length > 0 ? (
+              <ChartContainer config={dealsByUserChartConfig} className="h-full w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Tooltip content={<ChartTooltipContent hideLabel />} />
+                    <Pie data={dashboardData.dealsByUser} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+                      {dashboardData.dealsByUser.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <ChartLegend content={<ChartLegendContent />} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground">No deal data to display.</div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -170,10 +213,24 @@ export default function DashboardPage() {
             </CardTitle>
             <CardDescription>Distribution of leads assigned to each user.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-center h-60 bg-muted rounded-md">
-              <img src="https://placehold.co/500x300.png" data-ai-hint="leads by user chart" alt="Leads by User Chart" className="w-full h-full object-contain"/>
-            </div>
+          <CardContent className="h-[300px]">
+             {dashboardData.leadsByUser.length > 0 ? (
+              <ChartContainer config={leadsByUserChartConfig} className="h-full w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Tooltip content={<ChartTooltipContent hideLabel />} />
+                    <Pie data={dashboardData.leadsByUser} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+                      {dashboardData.leadsByUser.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <ChartLegend content={<ChartLegendContent />} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            ) : (
+               <div className="flex items-center justify-center h-full text-muted-foreground">No lead assignment data to display.</div>
+            )}
           </CardContent>
         </Card>
       </div>
