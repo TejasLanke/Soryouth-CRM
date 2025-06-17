@@ -19,7 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form'; // Import Form components for error display
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form'; // Import Form components for error display
 
 // Schema for the entire batch form using the imported proposalSchema
 const batchProposalsSchema = z.object({
