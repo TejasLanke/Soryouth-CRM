@@ -27,7 +27,7 @@ import { Textarea } from '@/components/ui/textarea';
 import type { DocumentType } from '@/types';
 import { createDocumentInDrive } from './actions';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, IndianRupee } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -328,7 +328,10 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
 
             <div className="space-y-1">
                 <FormLabel>Total Amount (Calculated)</FormLabel>
-                <Input readOnly value={`₹${calculatedTotal.toFixed(2)}`} className="bg-muted font-medium" />
+                <div className="flex items-center rounded-md border border-input bg-muted px-3 py-2">
+                    <IndianRupee className="h-4 w-4 mr-1 text-muted-foreground" />
+                    <span className="font-medium">{calculatedTotal.toFixed(2)}</span>
+                </div>
             </div>
 
             <Separator className="my-4" />
@@ -336,11 +339,11 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
             <div className="space-y-2">
                 <div className="flex justify-between">
                     <FormLabel>GST (13.8%)</FormLabel>
-                    <span className="font-medium">₹{calculatedGST.toFixed(2)}</span>
+                    <span className="font-medium flex items-center"><IndianRupee className="h-4 w-4 mr-0.5 text-muted-foreground"/>{calculatedGST.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                     <FormLabel>Grand Total</FormLabel>
-                    <span className="font-semibold text-lg">₹{calculatedGrandTotal.toFixed(2)}</span>
+                    <span className="font-semibold text-lg flex items-center"><IndianRupee className="h-5 w-5 mr-0.5"/>{calculatedGrandTotal.toFixed(2)}</span>
                 </div>
             </div>
 
