@@ -11,10 +11,13 @@ import { MOCK_LEADS, MOCK_PROPOSALS, MOCK_COMMUNICATIONS, USER_OPTIONS } from '@
 import type { Lead, Proposal, Communication } from '@/types';
 import { format, parseISO, isWithinInterval, startOfDay, endOfDay, subDays } from 'date-fns';
 import type { DateRange } from 'react-day-picker';
-import { CalendarIcon, Users, UserX, FileText, Award, Phone, BellRing, TrendingDown, TrendingUp, LineChart as LineChartIcon, Filter } from 'lucide-react';
+import { CalendarIcon, Users, UserX, FileText, Award, Phone, BellRing, TrendingDown, TrendingUp, LineChart as LineChartIcon, Filter, UserCircle2 } from 'lucide-react';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from '@/components/ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend as RechartsLegend, ResponsiveContainer } from 'recharts';
 import { cn } from '@/lib/utils';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 
 const initialDateRange: DateRange = {
@@ -22,58 +25,76 @@ const initialDateRange: DateRange = {
   to: new Date(),
 };
 
+interface UserReportRow {
+  userId: string;
+  userName: string;
+  avatarUrl?: string; // Placeholder for avatar
+  leadsCreated: number;
+  leadsDropped: number;
+  dealsCreated: number; // proposals created
+  dealsWon: number;
+  dealsLost: number;
+  followUps: number;
+  calls: number;
+  callDuration: string; // e.g., "0h 0m"
+  reminders: number;
+}
+
 interface DayReportStats {
   leadsCreated: number;
   leadsDropped: number;
   proposalsCreated: number;
   dealsWon: number;
-  dealsLost: number; // Same as leadsDropped for this context
+  dealsLost: number;
   followUps: number;
-  calls: number; // Placeholder
-  reminders: number; // Placeholder
+  calls: number;
+  reminders: number;
   chartData: { date: string; created: number; dropped: number }[];
   droppedLeadsDetails: Lead[];
   wonDealsDetails: Lead[];
+  userWiseSummary: UserReportRow[];
 }
 
 export default function DayReportPage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(initialDateRange);
-  const [selectedUser, setSelectedUser] = useState<string>('all');
+  const [selectedUserFilter, setSelectedUserFilter] = useState<string>('all'); // For top-level filter
   const [reportStats, setReportStats] = useState<DayReportStats | null>(null);
 
   const handleApplyFilters = () => {
     const fromDate = dateRange?.from ? startOfDay(dateRange.from) : undefined;
     const toDate = dateRange?.to ? endOfDay(dateRange.to) : undefined;
 
-    const filteredLeads = MOCK_LEADS.filter(lead => {
+    // Filter leads based on main page filters (date and selectedUserFilter)
+    const pageFilteredLeads = MOCK_LEADS.filter(lead => {
       const leadDate = parseISO(lead.createdAt);
-      const userMatch = selectedUser === 'all' || lead.assignedTo === selectedUser;
+      const userMatch = selectedUserFilter === 'all' || lead.assignedTo === selectedUserFilter;
       const dateMatch = fromDate && toDate ? isWithinInterval(leadDate, { start: fromDate, end: toDate }) : true;
       return userMatch && dateMatch;
     });
     
-    const filteredProposals = MOCK_PROPOSALS.filter(proposal => {
+    const pageFilteredProposals = MOCK_PROPOSALS.filter(proposal => {
       const proposalDate = parseISO(proposal.createdAt);
-       // Assuming proposals might not have assignedTo directly, or we filter by client's leads' assignee.
-       // For simplicity, if a user is selected, we might need to cross-reference or apply user filter differently for proposals.
-       // Here, I'm just filtering by date for proposals.
       const dateMatch = fromDate && toDate ? isWithinInterval(proposalDate, { start: fromDate, end: toDate }) : true;
-      return dateMatch; 
+      // Further filter proposals if a specific user is selected for the main report
+      if (selectedUserFilter !== 'all') {
+        const clientLead = MOCK_LEADS.find(l => l.id === proposal.clientId);
+        return dateMatch && clientLead?.assignedTo === selectedUserFilter;
+      }
+      return dateMatch;
     });
 
-    const leadsCreated = filteredLeads.length;
-    const leadsDroppedList = filteredLeads.filter(lead => lead.status === 'Lost');
+    const leadsCreated = pageFilteredLeads.length;
+    const leadsDroppedList = pageFilteredLeads.filter(lead => lead.status === 'Lost' && fromDate && toDate && isWithinInterval(parseISO(lead.updatedAt), {start: fromDate, end: toDate}));
     const leadsDropped = leadsDroppedList.length;
-    const dealsWonList = filteredLeads.filter(lead => lead.status === 'Deal Done');
+    const dealsWonList = pageFilteredLeads.filter(lead => lead.status === 'Deal Done' && fromDate && toDate && isWithinInterval(parseISO(lead.updatedAt), {start: fromDate, end: toDate}));
     const dealsWon = dealsWonList.length;
     
-    const followUps = filteredLeads.filter(lead => {
+    const followUps = pageFilteredLeads.filter(lead => {
         if (!lead.nextFollowUpDate) return false;
         const followupDate = parseISO(lead.nextFollowUpDate);
         return fromDate && toDate ? isWithinInterval(followupDate, { start: fromDate, end: toDate }) : true;
     }).length;
 
-    // Chart Data - simplified daily aggregation for Leads Created vs Dropped
     const dailyChartData: { [date: string]: { created: number; dropped: number } } = {};
     if(fromDate && toDate) {
         for (let d = new Date(fromDate); d <= toDate; d.setDate(d.getDate() + 1)) {
@@ -82,12 +103,12 @@ export default function DayReportPage() {
         }
     }
 
-    filteredLeads.forEach(lead => {
+    pageFilteredLeads.forEach(lead => {
         const createdDateStr = format(parseISO(lead.createdAt), 'MMM dd');
         if (dailyChartData[createdDateStr]) {
             dailyChartData[createdDateStr].created++;
         }
-        if (lead.status === 'Lost') {
+        if (lead.status === 'Lost' && fromDate && toDate && isWithinInterval(parseISO(lead.updatedAt), {start: fromDate, end: toDate})) {
             const droppedDateStr = format(parseISO(lead.updatedAt), 'MMM dd');
             if (dailyChartData[droppedDateStr]) {
                 dailyChartData[droppedDateStr].dropped++;
@@ -95,28 +116,69 @@ export default function DayReportPage() {
         }
     });
     
-    const chartDataFinal = Object.entries(dailyChartData).map(([date, counts]) => ({ date, ...counts }));
+    const chartDataFinal = Object.entries(dailyChartData).map(([date, counts]) => ({ date, ...counts })).sort((a, b) => parseISO(a.date + ' ' + new Date().getFullYear()).getTime() - parseISO(b.date + ' ' + new Date().getFullYear()).getTime());
+
+    // User-wise summary calculation
+    const userWiseSummaryData: UserReportRow[] = USER_OPTIONS.map(user => {
+        const userLeads = MOCK_LEADS.filter(lead => lead.assignedTo === user);
+        
+        const userLeadsCreatedInRange = userLeads.filter(lead => 
+            fromDate && toDate && isWithinInterval(parseISO(lead.createdAt), { start: fromDate, end: toDate })
+        ).length;
+
+        const userLeadsDroppedInRange = userLeads.filter(lead => 
+            lead.status === 'Lost' && fromDate && toDate && isWithinInterval(parseISO(lead.updatedAt), { start: fromDate, end: toDate })
+        ).length;
+
+        const userDealsWonInRange = userLeads.filter(lead =>
+            lead.status === 'Deal Done' && fromDate && toDate && isWithinInterval(parseISO(lead.updatedAt), { start: fromDate, end: toDate })
+        ).length;
+        
+        const userProposalsCreatedInRange = MOCK_PROPOSALS.filter(proposal => {
+            const clientLead = MOCK_LEADS.find(l => l.id === proposal.clientId);
+            return clientLead?.assignedTo === user && fromDate && toDate && isWithinInterval(parseISO(proposal.createdAt), { start: fromDate, end: toDate });
+        }).length;
+
+        const userFollowUpsInRange = userLeads.filter(lead => 
+            lead.nextFollowUpDate && fromDate && toDate && isWithinInterval(parseISO(lead.nextFollowUpDate), { start: fromDate, end: toDate })
+        ).length;
+
+        return {
+            userId: user,
+            userName: user,
+            avatarUrl: `https://placehold.co/32x32.png?text=${user.charAt(0)}`, // Simple placeholder
+            leadsCreated: userLeadsCreatedInRange,
+            leadsDropped: userLeadsDroppedInRange,
+            dealsCreated: userProposalsCreatedInRange, // Proposals created
+            dealsWon: userDealsWonInRange,
+            dealsLost: userLeadsDroppedInRange, // Same as leads dropped
+            followUps: userFollowUpsInRange,
+            calls: 0, // Placeholder
+            callDuration: "0h 0m", // Placeholder
+            reminders: 0, // Placeholder
+        };
+    });
     
     setReportStats({
       leadsCreated,
       leadsDropped,
-      proposalsCreated: filteredProposals.length, // Based on proposals created in range
+      proposalsCreated: pageFilteredProposals.length,
       dealsWon,
       dealsLost: leadsDropped,
       followUps,
-      calls: 0, // Placeholder
-      reminders: 0, // Placeholder
-      chartData: chartDataFinal.sort((a,b) => parseISO(a.date).getTime() - parseISO(b.date).getTime()), // Ensure chronological for chart
-      droppedLeadsDetails: leadsDroppedList.slice(0, 5), // Show top 5 recent
-      wonDealsDetails: dealsWonList.slice(0, 5), // Show top 5 recent
+      calls: 0, 
+      reminders: 0, 
+      chartData: chartDataFinal,
+      droppedLeadsDetails: leadsDroppedList.slice(0, 5),
+      wonDealsDetails: dealsWonList.slice(0, 5),
+      userWiseSummary: userWiseSummaryData,
     });
   };
 
   useEffect(() => {
-    // Initial report generation
     handleApplyFilters();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run once on mount
+  }, []);
 
   const statCards = reportStats ? [
     { title: 'Leads Created', value: reportStats.leadsCreated, icon: Users, trend: 'neutral' },
@@ -128,8 +190,8 @@ export default function DayReportPage() {
   ] : [];
 
   const lineChartConfig: ChartConfig = {
-    created: { label: 'Leads Created', color: 'hsl(var(--chart-2))' },
-    dropped: { label: 'Leads Dropped', color: 'hsl(var(--chart-5))' },
+    created: { label: 'Leads Created', color: 'hsl(var(--secondary))' }, // Changed to secondary color (green)
+    dropped: { label: 'Leads Dropped', color: 'hsl(var(--chart-5))' }, // Kept as red-ish
   };
 
 
@@ -182,7 +244,7 @@ export default function DayReportPage() {
           </div>
           <div className="grid gap-2">
             <label htmlFor="user-select" className="text-sm font-medium">User</label>
-            <Select value={selectedUser} onValueChange={setSelectedUser}>
+            <Select value={selectedUserFilter} onValueChange={setSelectedUserFilter}>
               <SelectTrigger id="user-select" className="w-[180px]">
                 <SelectValue placeholder="Select User" />
               </SelectTrigger>
@@ -288,6 +350,79 @@ export default function DayReportPage() {
             </Card>
           </div>
 
+          <Card>
+            <CardHeader>
+              <CardTitle>User-wise report</CardTitle>
+              <CardDescription>Performance summary for each user in the selected period.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead className="text-center">Leads Created</TableHead>
+                    <TableHead className="text-center">Leads Dropped</TableHead>
+                    <TableHead className="text-center">Proposals Created</TableHead>
+                    <TableHead className="text-center">Deals Won</TableHead>
+                    <TableHead className="text-center">Deals Lost</TableHead>
+                    <TableHead className="text-center">Follow-ups</TableHead>
+                    <TableHead className="text-center">Calls</TableHead>
+                    <TableHead className="text-center">Call Duration</TableHead>
+                    <TableHead className="text-center">Reminders</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {reportStats.userWiseSummary.length > 0 ? reportStats.userWiseSummary.map(userStat => (
+                    <TableRow key={userStat.userId}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={userStat.avatarUrl} data-ai-hint="user avatar" alt={userStat.userName} />
+                            <AvatarFallback>{userStat.userName.charAt(0).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium">{userStat.userName}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {userStat.leadsCreated > 0 ? <Badge variant="default">{userStat.leadsCreated}</Badge> : userStat.leadsCreated}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {userStat.leadsDropped > 0 ? <Badge variant="destructive">{userStat.leadsDropped}</Badge> : userStat.leadsDropped}
+                      </TableCell>
+                       <TableCell className="text-center">
+                        {userStat.dealsCreated > 0 ? <Badge variant="default">{userStat.dealsCreated}</Badge> : userStat.dealsCreated}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {userStat.dealsWon > 0 ? <Badge variant="default">{userStat.dealsWon}</Badge> : userStat.dealsWon}
+                      </TableCell>
+                      <TableCell className="text-center">
+                         {userStat.dealsLost > 0 ? <Badge variant="destructive">{userStat.dealsLost}</Badge> : userStat.dealsLost}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {userStat.followUps > 0 ? <Badge variant="default">{userStat.followUps}</Badge> : userStat.followUps}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {userStat.calls > 0 ? <Badge variant="default">{userStat.calls}</Badge> : userStat.calls}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {userStat.callDuration !== "0h 0m" ? <Badge variant="default">{userStat.callDuration}</Badge> : userStat.callDuration}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {userStat.reminders > 0 ? <Badge variant="default">{userStat.reminders}</Badge> : userStat.reminders}
+                      </TableCell>
+                    </TableRow>
+                  )) : (
+                    <TableRow>
+                        <TableCell colSpan={10} className="text-center text-muted-foreground">
+                            No user data to display for the selected filters.
+                        </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
         </>
       ) : (
         <Card>
@@ -299,3 +434,4 @@ export default function DayReportPage() {
     </div>
   );
 }
+
