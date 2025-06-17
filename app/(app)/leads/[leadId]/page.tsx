@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -14,23 +14,31 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from '@/components/page-header';
-import { MOCK_LEADS, USER_OPTIONS, LEAD_SOURCE_OPTIONS, LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES } from '@/lib/constants';
-import type { Lead, UserOptionType, LeadSourceOptionType, LeadStatusType, LeadPriorityType } from '@/types';
+import { MOCK_LEADS, USER_OPTIONS, LEAD_SOURCE_OPTIONS, LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, CLIENT_TYPES } from '@/lib/constants';
+import type { Lead, UserOptionType, LeadSourceOptionType, LeadStatusType, LeadPriorityType, ClientType } from '@/types';
 import { format, parseISO, isValid } from 'date-fns';
-import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, Clock, UserCircle2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, Clock, UserCircle2, FileText, ShoppingCart } from 'lucide-react';
+import { ProposalForm } from '@/app/(app)/proposals/proposal-form';
+import { DocumentCreationDialog } from '@/app/(app)/documents/document-creation-dialog';
+import { useToast } from '@/hooks/use-toast';
 
 export default function LeadDetailsPage() {
   const params = useParams();
   const router = useRouter();
+  const { toast } = useToast();
   const leadId = params.leadId as string;
-  const [lead, setLead] = useState<Lead | null | undefined>(undefined); // undefined for loading state
+  const [lead, setLead] = useState<Lead | null | undefined>(undefined); 
 
-  // Form states (placeholders for now)
+  const [isProposalFormOpen, setIsProposalFormOpen] = useState(false);
+  const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
+  const [documentTypeToCreate, setDocumentTypeToCreate] = useState<'Purchase Order' | null>(null);
+
+
   const [followUpType, setFollowUpType] = useState<string>(FOLLOW_UP_TYPES[0]);
   const [followUpDate, setFollowUpDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [followUpTime, setFollowUpTime] = useState<string>(format(new Date(), 'HH:mm'));
   const [followUpStatus, setFollowUpStatus] = useState<string>(FOLLOW_UP_STATUSES[0]);
-  const [followUpPriority, setFollowUpPriority] = useState<LeadPriorityType | undefined>(LEAD_PRIORITY_OPTIONS[1]); // Default to 'Average'
+  const [followUpPriority, setFollowUpPriority] = useState<LeadPriorityType | undefined>(LEAD_PRIORITY_OPTIONS[1]); 
   const [followUpLeadStage, setFollowUpLeadStage] = useState<LeadStatusType | undefined>();
   const [followUpComment, setFollowUpComment] = useState('');
 
@@ -61,7 +69,7 @@ export default function LeadDetailsPage() {
       followUpLeadStage,
       followUpComment
     });
-    // Logic to save follow-up
+    toast({title: "Follow-up Saved", description: "Follow-up details logged to console."})
   };
 
   const handleSaveTask = () => {
@@ -71,7 +79,26 @@ export default function LeadDetailsPage() {
       taskDate,
       taskTime,
     });
-    // Logic to save task
+    toast({title: "Task Saved", description: "Task details logged to console."})
+  };
+
+  const handleOpenProposalForm = () => setIsProposalFormOpen(true);
+  const handleProposalFormSubmit = (proposalData: any) => {
+    console.log("Proposal Data Submitted from Lead Detail:", proposalData);
+    toast({ title: "Proposal Creation Initiated", description: `Proposal for ${lead?.name} (Lead ID: ${lead?.id}) is being processed.`});
+    setIsProposalFormOpen(false);
+    // Here you would typically call an action to save the proposal
+    // For now, we just log and show a toast
+  };
+
+  const handleOpenPurchaseOrderDialog = () => {
+    setDocumentTypeToCreate('Purchase Order');
+    setIsDocumentDialogOpen(true);
+  };
+  
+  const handleCloseDocumentDialog = () => {
+    setIsDocumentDialogOpen(false);
+    setDocumentTypeToCreate(null);
   };
 
 
@@ -90,7 +117,6 @@ export default function LeadDetailsPage() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Top Bar */}
       <div className="flex justify-between items-center p-4 border-b bg-card sticky top-0 z-10">
         <h1 className="text-xl font-semibold font-headline">{lead.name}</h1>
         <div className="flex gap-2">
@@ -102,15 +128,13 @@ export default function LeadDetailsPage() {
         </div>
       </div>
 
-      {/* Main Content Area */}
       <div className="flex-grow p-4 overflow-y-auto">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Column (lg:col-span-3) */}
           <div className="lg:col-span-3 space-y-6">
             <Card>
               <CardHeader className="flex flex-row justify-between items-center pb-2">
                 <CardTitle className="text-lg font-semibold">Lead Information</CardTitle>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => router.push(`/leads/edit/${lead.id}`)} disabled> {/* Placeholder for edit */}
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => router.push(`/leads/edit/${lead.id}`)} disabled> 
                   <Edit className="h-4 w-4" />
                 </Button>
               </CardHeader>
@@ -163,9 +187,58 @@ export default function LeadDetailsPage() {
                 </div>
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-md">Lead Attributes</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <Label htmlFor="kilowatt" className="text-xs">Kilowatt</Label>
+                  <Input id="kilowatt" value={lead.kilowatt || 0} readOnly className="h-8 text-xs bg-muted"/>
+                </div>
+                <div>
+                  <Label htmlFor="customerType" className="text-xs">Customer Type</Label>
+                  <Select value={lead.clientType || undefined} disabled>
+                    <SelectTrigger id="customerType" className="h-8 text-xs bg-muted">
+                      <SelectValue placeholder="N/A" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CLIENT_TYPES.map(type => <SelectItem key={type} value={type} className="text-xs">{type}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                 <div>
+                  <Label htmlFor="entityType" className="text-xs">Type</Label>
+                  <Select value="Lead" disabled>
+                    <SelectTrigger id="entityType" className="h-8 text-xs bg-muted">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Lead" className="text-xs">Lead</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-md">Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Button onClick={handleOpenProposalForm} className="w-full" size="sm">
+                  <FileText className="mr-2 h-4 w-4" /> Create Proposal
+                </Button>
+                <Button onClick={handleOpenPurchaseOrderDialog} className="w-full" variant="outline" size="sm">
+                  <ShoppingCart className="mr-2 h-4 w-4" /> Create Purchase Order
+                </Button>
+              </CardContent>
+            </Card>
+
+
           </div>
 
-          {/* Middle Column (lg:col-span-6) */}
           <div className="lg:col-span-6 space-y-6">
             <Card>
               <CardHeader>
@@ -217,6 +290,7 @@ export default function LeadDetailsPage() {
                   <Label htmlFor="followUpComment">Follow-up Comment</Label>
                   <Textarea id="followUpComment" placeholder="Enter comment..." value={followUpComment} onChange={e => setFollowUpComment(e.target.value)} />
                 </div>
+                 <Button onClick={handleSaveFollowUp} className="w-full">Save Follow-up</Button>
               </CardContent>
             </Card>
 
@@ -242,22 +316,20 @@ export default function LeadDetailsPage() {
                         <Input type="time" id="taskTime" value={taskTime} onChange={e => setTaskTime(e.target.value)}/>
                     </div>
                  </div>
-                 <Button onClick={handleSaveTask} className="bg-green-600 hover:bg-green-700">Save Task</Button>
+                 <Button onClick={handleSaveTask} className="w-full">Save Task</Button>
               </CardContent>
             </Card>
             
             <Card>
               <CardHeader>
-                <CardTitle>All Follow-ups (0)</CardTitle> {/* Placeholder count */}
+                <CardTitle>All Follow-ups (0)</CardTitle> 
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">No follow-up history yet.</p>
-                {/* Placeholder for list of follow-ups */}
               </CardContent>
             </Card>
           </div>
 
-          {/* Right Column (lg:col-span-3) */}
           <div className="lg:col-span-3 space-y-6">
             <Card>
               <CardContent className="pt-6 space-y-1">
@@ -305,8 +377,25 @@ export default function LeadDetailsPage() {
           </div>
         </div>
       </div>
-      {/* Floating Chat Icon Placeholder - can be positioned if needed */}
-      {/* <Button variant="outline" size="icon" className="fixed bottom-6 right-6 rounded-full h-14 w-14 shadow-lg bg-primary text-primary-foreground hover:bg-primary/90"><MessageCircle className="h-7 w-7"/></Button> */}
+      {isProposalFormOpen && lead && (
+        <ProposalForm
+          isOpen={isProposalFormOpen}
+          onClose={() => setIsProposalFormOpen(false)}
+          onSubmit={handleProposalFormSubmit}
+          initialData={{
+            clientId: lead.id,
+            name: lead.name,
+            clientType: lead.clientType || CLIENT_TYPES[0] 
+          }}
+        />
+      )}
+      {isDocumentDialogOpen && documentTypeToCreate === 'Purchase Order' && lead && (
+        <DocumentCreationDialog
+          isOpen={isDocumentDialogOpen}
+          onClose={handleCloseDocumentDialog}
+          documentType="Purchase Order" 
+        />
+      )}
     </div>
   );
 }
