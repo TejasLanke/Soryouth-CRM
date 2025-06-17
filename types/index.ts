@@ -1,5 +1,6 @@
 
-import type { LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, LEAD_SOURCE_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS } from '@/lib/constants';
+
+import type { LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, LEAD_SOURCE_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS }_from_ '@/lib/constants';
 
 // Deriving types from the const arrays ensures type safety and single source of truth
 export type LeadStatusType = typeof LEAD_STATUS_OPTIONS[number];
@@ -17,6 +18,7 @@ export interface Lead {
   status: LeadStatusType; 
   source?: LeadSourceOptionType; // Now uses the derived type
   assignedTo?: UserOptionType;
+  createdBy?: UserOptionType; // Added createdBy
   createdAt: string;
   updatedAt: string;
   lastCommentText?: string;
@@ -117,3 +119,35 @@ export interface SortConfig {
   key: keyof Lead;
   direction: 'ascending' | 'descending';
 }
+
+export type FollowUpType = typeof FOLLOW_UP_TYPES[number];
+export type FollowUpStatus = typeof FOLLOW_UP_STATUSES[number];
+
+export interface FollowUp {
+  id: string;
+  leadId: string;
+  type: FollowUpType;
+  date: string; // yyyy-MM-dd
+  time: string; // HH:mm
+  status: FollowUpStatus;
+  priority: LeadPriorityType;
+  leadStage: LeadStatusType;
+  comment: string;
+  createdBy: UserOptionType;
+  createdAt: string; // ISO timestamp
+}
+
+export interface Task {
+  id: string;
+  leadId: string;
+  assignedTo: UserOptionType;
+  dueDate: string; // yyyy-MM-dd
+  dueTime: string; // HH:mm
+  description: string; // This would be derived from follow-up comment or a new field
+  status: 'Pending' | 'Completed' | 'Overdue';
+  createdAt: string; // ISO timestamp
+}
+
+// Constants for Follow-up types and statuses (already in lib/constants.ts but good for type reference)
+export const FOLLOW_UP_TYPES = ['Call', 'SMS', 'Email', 'Meeting', 'Visit'] as const;
+export const FOLLOW_UP_STATUSES = ['Answered', 'No reply', 'Rejected', 'Not connected'] as const;

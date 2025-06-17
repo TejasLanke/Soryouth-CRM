@@ -1,8 +1,9 @@
 
 'use client';
 
-import type { Lead, SortConfig, DropReasonType } from '@/types';
-import React, { useState, useEffect } from 'react'; // Added useState, useEffect
+import type { Lead, SortConfig, DropReasonType }_from_ '@/types';
+import React, { useState, useEffect }_from_ 'react'; // Added useState, useEffect
+import Link from 'next/link'; // Added Link
 import {
   Table,
   TableBody,
@@ -10,11 +11,11 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Button, buttonVariants } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Edit2, Trash2, MoreVertical, ArrowUpDown, UsersRound, UserCircle2 } from 'lucide-react';
+}_from_ '@/components/ui/table';
+import { Button, buttonVariants }_from_ '@/components/ui/button';
+import { Badge }_from_ '@/components/ui/badge';
+import { Checkbox }_from_ '@/components/ui/checkbox';
+import { Edit2, Trash2, MoreVertical, ArrowUpDown, UsersRound, UserCircle2 }_from_ 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,16 +26,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+}_from_ "@/components/ui/alert-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Card, CardContent } from '@/components/ui/card';
-import { format, parseISO, isValid } from 'date-fns';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+}_from_ '@/components/ui/dropdown-menu';
+import { Card, CardContent }_from_ '@/components/ui/card';
+import { format, parseISO, isValid }_from_ 'date-fns';
+import { Avatar, AvatarFallback, AvatarImage }_from_ '@/components/ui/avatar';
 
 
 interface LeadsTableProps {
@@ -46,7 +47,7 @@ interface LeadsTableProps {
   viewType?: 'active' | 'dropped';
 }
 
-// Helper function for date formatting (kept here for use by ClientFormattedDateTime)
+// Helper function for date formatting
 const formatDateInternal = (dateString?: string, includeTime: boolean = false) => {
   if (!dateString) return '-';
   try {
@@ -60,7 +61,6 @@ const formatDateInternal = (dateString?: string, includeTime: boolean = false) =
   }
 };
 
-// New component to handle client-side date/time formatting
 const ClientFormattedDateTime: React.FC<{ dateString?: string }> = ({ dateString }) => {
   const [formattedDate, setFormattedDate] = useState<string | null>(null);
 
@@ -73,7 +73,6 @@ const ClientFormattedDateTime: React.FC<{ dateString?: string }> = ({ dateString
   }, [dateString]);
 
   if (formattedDate === null) {
-    // Render a placeholder or nothing until client-side rendering
     return <span className="text-muted-foreground">Loading time...</span>;
   }
   return <>{formattedDate}</>;
@@ -100,9 +99,8 @@ export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, reques
       <ArrowUpDown className="ml-1 h-3 w-3 transform rotate-180 text-primary" />;
   };
   
-  // formatDate function for general use (mostly without time now)
   const formatDate = (dateString?: string) => {
-    return formatDateInternal(dateString, false); // Default to no time
+    return formatDateInternal(dateString, false);
   };
 
 
@@ -123,7 +121,11 @@ export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, reques
       <TableCell>
         <Checkbox id={`select-lead-${lead.id}`} aria-label={`Select lead ${lead.name}`} />
       </TableCell>
-      <TableCell className="font-medium py-3">{lead.name}</TableCell>
+      <TableCell className="font-medium py-3">
+        <Link href={`/leads/${lead.id}`} className="hover:underline text-primary">
+          {lead.name}
+        </Link>
+      </TableCell>
       <TableCell className="py-3">{lead.phone || '-'}</TableCell>
       <TableCell className="py-3">
         <Badge variant="secondary" className="capitalize">{lead.status}</Badge>
@@ -193,14 +195,18 @@ export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, reques
       <TableCell className="py-3 text-xs whitespace-nowrap">
         <ClientFormattedDateTime dateString={lead.createdAt} />
       </TableCell>
-      <TableCell className="font-medium py-3">{lead.name}</TableCell>
+      <TableCell className="font-medium py-3">
+         <Link href={`/leads/${lead.id}`} className="hover:underline text-primary">
+          {lead.name}
+        </Link>
+      </TableCell>
       <TableCell className="py-3">{lead.phone || '-'}</TableCell>
       <TableCell className="py-3">{lead.dropReason || '-'}</TableCell>
       <TableCell className="py-3 text-xs whitespace-nowrap">{formatDate(lead.updatedAt)}</TableCell>
       <TableCell className="py-3">
         <div className="flex items-center gap-2">
           <Avatar className="h-6 w-6">
-            <AvatarImage src={`https://placehold.co/40x40.png`} data-ai-hint="user avatar" alt={lead.assignedTo || 'User'} />
+            <AvatarImage src={`https://placehold.co/40x40.png?text=${lead.assignedTo?.charAt(0) || 'U'}`} data-ai-hint="user avatar" alt={lead.assignedTo || 'User'} />
             <AvatarFallback>{lead.assignedTo ? lead.assignedTo.charAt(0).toUpperCase() : 'U'}</AvatarFallback>
           </Avatar>
           <span className="text-xs">{lead.assignedTo || '-'}</span>

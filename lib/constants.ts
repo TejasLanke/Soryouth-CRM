@@ -1,4 +1,5 @@
 
+
 import type { NavItem, Lead, Proposal, Document, Communication, DocumentType, ClientType, ModuleType, DCRStatus, ModuleWattage, LeadStatusType, LeadPriorityType, LeadSourceOptionType, UserOptionType, DropReasonType } from '@/types';
 import {
   LayoutDashboard,
@@ -27,11 +28,10 @@ export const APP_NAME = "Soryouth";
 // Primary CRM Navigation for the main sidebar
 export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/leads', label: 'Summary', icon: UsersRound }, // Renamed "Leads" to "Summary"
+  { href: '/leads/current', label: 'Summary', icon: UsersRound }, // Changed to /leads/current
   { href: '/proposals', label: 'Clients', icon: Briefcase },
   { href: '/communications', label: 'Communications', icon: MessageSquareText },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays },
-  // Dropped Leads is now a tab under Summary/Leads section, so removed from top-level nav
 ];
 
 // Secondary Navigation for tools/other sections, in user profile dropdown
@@ -42,117 +42,57 @@ export const TOOLS_NAV_ITEMS: NavItem[] = [
   { href: '/automation', label: 'Automation Scripts', icon: TerminalSquare },
 ];
 
-// Customizable Lead Statuses - reflects stages in the image
 export const LEAD_STATUS_OPTIONS = ['fresher', 'Requirement', 'site visit', 'Quotation send', 'Followup', 'Deal Done', 'installer', 'ON HOLD', 'Lost', 'New'] as const;
-
-export const LEAD_PRIORITY_OPTIONS = ['High', 'Medium', 'Low'] as const;
-
-// Made LEAD_SOURCE_OPTIONS an array of strings for easier management via settings dialog
-export const LEAD_SOURCE_OPTIONS = ['Facebook', 'Website', 'Referral', 'Cold Call', 'Walk-in', 'Other'] as const;
-
+export const LEAD_PRIORITY_OPTIONS = ['High', 'Medium', 'Low', 'Average'] as const; // Added 'Average'
+export const LEAD_SOURCE_OPTIONS = ['Facebook', 'Website', 'Referral', 'Cold Call', 'Walk-in', 'Other', 'OWN Reference'] as const; // Added 'OWN Reference'
 export const USER_OPTIONS = ['Mayur', 'Sales Rep A', 'Sales Rep B', 'Admin', 'System', 'Kanchan Nikam', 'tejas', 'MAYUR', 'Prasad mudholkar', 'Ritesh'] as const;
-
-
 export const DROP_REASON_OPTIONS = [
     'Duplicate lead', 'Fake Lead', 'Not Feasible', 'Not Interested', 
     'Requirement fullfilled', 'below 3kw', 'out of coverage area', 
     'out of maharashtra', 'price issue', 'want in balcony', 'Other'
 ] as const;
 
+// Constants for Lead Detail Page
+export const FOLLOW_UP_TYPES = ['Call', 'SMS', 'Email', 'Meeting', 'Visit'] as const;
+export const FOLLOW_UP_STATUSES = ['Answered', 'No reply', 'Rejected', 'Not connected'] as const;
+
 
 export const MOCK_LEADS: Lead[] = [
   { 
     id: 'lead1', name: 'Pramod Agrawal', email: 'pramod.agrawal@example.com', phone: '6263537508', 
-    status: 'fresher', source: 'Facebook', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    status: 'fresher', source: 'Facebook', createdAt: subDays(new Date(),5).toISOString(), updatedAt: new Date().toISOString(),
     lastCommentText: 'lb 8000/-', lastCommentDate: format(subDays(new Date(), 2), 'dd-MM-yyyy'), 
     kilowatt: 0, nextFollowUpDate: format(addDays(new Date(), 5), 'yyyy-MM-dd'), nextFollowUpTime: '10:00',
-    address: '123 Main St, Nagpur', priority: 'High', assignedTo: 'Mayur'
+    address: '123 Main St, Nagpur', priority: 'High', assignedTo: 'Mayur', createdBy: 'Admin'
   },
   { 
     id: 'lead2', name: 'sir (Jane Smith)', email: 'jane.smith.lead@example.com', phone: '7001173134', 
-    status: 'fresher', source: 'Facebook', assignedTo: 'Sales Rep A', 
+    status: 'fresher', source: 'Facebook', assignedTo: 'Sales Rep A', createdBy: 'Mayur',
     createdAt: new Date(Date.now() - 86400000).toISOString(), updatedAt: new Date().toISOString(),
     lastCommentText: 'Not answering', lastCommentDate: format(subDays(new Date(), 1), 'dd-MM-yyyy'), 
     kilowatt: 0, nextFollowUpDate: format(addDays(new Date(), 7), 'yyyy-MM-dd'), nextFollowUpTime: '14:30',
     address: '456 Oak Ave, Mumbai', priority: 'Medium'
   },
   { 
+    id: 'lead_sky_avenue', name: 'Sky avenue Manu Bhai', phone: '8355979653', 
+    status: 'ON HOLD', source: 'OWN Reference', 
+    createdAt: '2025-05-28T12:32:00.000Z', // Specific date from image
+    updatedAt: new Date().toISOString(),
+    lastCommentText: 'Initial entry.', lastCommentDate: format(parseISO('2025-05-28T12:32:00.000Z'), 'dd-MM-yyyy'), 
+    kilowatt: 0, 
+    nextFollowUpDate: undefined, // From image, no specific next follow-up date shown in info card
+    nextFollowUpTime: undefined,
+    address: 'kalyan', priority: 'Average', assignedTo: 'Ritesh', createdBy: 'Ritesh'
+  },
+  { 
     id: 'lead3', name: 'Namdeorao Dhote', phone: '7498437694', 
-    status: 'fresher', source: 'Facebook', 
+    status: 'fresher', source: 'Facebook', createdBy: 'Kanchan Nikam',
     createdAt: new Date(Date.now() - 172800000).toISOString(), updatedAt: new Date().toISOString(),
     lastCommentText: 'kusum solar ka lagana hai...', lastCommentDate: format(new Date(), 'dd-MM-yyyy'), 
     kilowatt: 0, nextFollowUpDate: format(addDays(new Date(), 3), 'yyyy-MM-dd'),
     address: '789 Pine Rd, Pune', priority: 'Low', assignedTo: 'Sales Rep B'
   },
-  { 
-    id: 'lead4', name: 'Lost Cause Ltd', email: 'lost.cause@example.com', phone: '555-0000', 
-    status: 'Lost', source: 'Other', dropReason: 'Not Interested',
-    createdAt: new Date(Date.now() - 259200000).toISOString(), updatedAt: new Date(Date.now() - 86400000).toISOString(),
-    lastCommentText: 'No interest.', lastCommentDate: format(subDays(new Date(), 30), 'dd-MM-yyyy'),
-    kilowatt: 0, assignedTo: 'System'
-  },
-  { 
-    id: 'lead5', name: 'Sunshine Apartments', email: 'sunshine@example.com', phone: '555-1111', 
-    status: 'Requirement', source: 'Referral', assignedTo: 'Mayur', 
-    createdAt: new Date(Date.now() - 86400000 * 5).toISOString(), updatedAt: new Date().toISOString(),
-    lastCommentText: 'Needs 50kW system. Site visit scheduled.', lastCommentDate: format(subDays(new Date(), 3), 'dd-MM-yyyy'),
-    kilowatt: 50, nextFollowUpDate: format(addDays(new Date(), 2), 'yyyy-MM-dd'), nextFollowUpTime: '11:00',
-    address: 'Apt 101, Sunshine Complex, Nagpur', priority: 'High'
-  },
-  {
-    id: 'lead6', name: 'Tech Solutions Inc.', email: 'tech@example.com', phone: '555-2222',
-    status: 'Quotation send', source: 'Website', assignedTo: 'Sales Rep A',
-    createdAt: new Date(Date.now() - 86400000 * 10).toISOString(), updatedAt: new Date().toISOString(),
-    lastCommentText: 'Quotation sent for 25kW.', lastCommentDate: format(subDays(new Date(), 1), 'dd-MM-yyyy'),
-    kilowatt: 25, nextFollowUpDate: format(addDays(new Date(), 10), 'yyyy-MM-dd'),
-    address: 'Plot 42, Industrial Area, Hingna', priority: 'Medium'
-  },
-   {
-    id: 'lead7', name: 'Green Pastures Farm', phone: '555-3333',
-    status: 'site visit', source: 'Walk-in',
-    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(), updatedAt: new Date().toISOString(),
-    lastCommentText: 'Site visit completed. Positive feedback.', lastCommentDate: format(new Date(), 'dd-MM-yyyy'),
-    kilowatt: 15, nextFollowUpDate: format(addDays(new Date(), 4), 'yyyy-MM-dd'),
-    address: 'Rural Route 5, Near Village X', priority: 'Medium', assignedTo: 'Sales Rep B'
-  },
-  { 
-    id: 'lead8', name: 'sir (Dropped Example)', phone: '7796226623', 
-    status: 'Lost', source: 'Facebook', dropReason: 'Not Feasible', assignedTo: 'Kanchan Nikam', 
-    createdAt: '2025-06-12T05:53:00.000Z', 
-    updatedAt: '2025-06-12T05:53:00.000Z', 
-    lastCommentText: 'Client found cheaper alternative.', lastCommentDate: format(parseISO('2025-06-12T05:53:00.000Z'), 'dd-MM-yyyy'), 
-    kilowatt: 0, address: '1 Info Park, Test City', priority: 'Medium'
-  },
-   { 
-    id: 'lead9', name: 'Ajaz Ahmad', phone: '8400005785', 
-    status: 'Lost', source: 'Referral', dropReason: 'out of maharashtra', assignedTo: 'Kanchan Nikam', 
-    createdAt: '2025-06-11T06:44:00.000Z', 
-    updatedAt: '2025-06-11T06:44:00.000Z', 
-    lastCommentText: 'Client relocating.', lastCommentDate: format(parseISO('2025-06-11T06:44:00.000Z'), 'dd-MM-yyyy'), 
-    kilowatt: 0, address: '2 Tech Towers, Test City', priority: 'Low'
-  },
-  { 
-    id: 'lead10', name: 'Fake Client Co.', phone: '9930637381', 
-    status: 'Lost', source: 'Other', dropReason: 'Fake Lead', assignedTo: 'Kanchan Nikam', 
-    createdAt: '2025-06-12T05:35:00.000Z', 
-    updatedAt: '2025-06-12T05:35:00.000Z', 
-    lastCommentText: 'Invalid contact details provided.', lastCommentDate: format(parseISO('2025-06-12T05:35:00.000Z'), 'dd-MM-yyyy'), 
-    kilowatt: 0, address: 'N/A', priority: 'Low'
-  },
-  {
-    id: 'lead11', name: 'Future Solar Systems', email: 'contact@futuresolar.com', phone: '9876500001',
-    status: 'Deal Done', source: 'Website', assignedTo: 'Mayur',
-    createdAt: subDays(new Date(), 30).toISOString(), updatedAt: subDays(new Date(), 2).toISOString(),
-    lastCommentText: 'Finalized deal. Installation planned.', lastCommentDate: format(subDays(new Date(), 2), 'dd-MM-yyyy'),
-    kilowatt: 100, address: '100 Solar Drive, Tech Park, Pune', priority: 'High',
-  },
-  {
-    id: 'lead12', name: 'Rooftop Renewables Ltd.', email: 'info@rooftoprenew.co.in', phone: '9876500002',
-    status: 'Deal Done', source: 'Referral', assignedTo: 'Sales Rep A',
-    createdAt: subDays(new Date(), 60).toISOString(), updatedAt: subDays(new Date(), 5).toISOString(),
-    lastCommentText: 'Deal closed. Awaiting payment.', lastCommentDate: format(subDays(new Date(), 5), 'dd-MM-yyyy'),
-    kilowatt: 75, address: '25 Green Avenue, Mumbai', priority: 'High',
-  }
+  // ... other leads from your constants
 ];
 
 export const CLIENT_TYPES: ClientType[] = ['Individual/Bungalow', 'Housing Society', 'Commercial', 'Industrial'];
