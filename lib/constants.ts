@@ -2,7 +2,7 @@
 import type { NavItem, Lead, Proposal, Document, Communication, DocumentType, ClientType, ModuleType, DCRStatus, ModuleWattage, LeadStatusType, LeadPriorityType, LeadSourceOptionType, UserOptionType, DropReasonType } from '@/types';
 import {
   LayoutDashboard,
-  UsersRound,
+  UsersRound, // Icon for Leads/Summary section
   FileText,
   Files,
   MessageSquareText,
@@ -13,10 +13,12 @@ import {
   Edit,
   Eye,
   FileSignature,
-  Briefcase, // For Clients
-  UserX,     // For Dropped Leads
+  Briefcase, // For Top-level Clients/Proposals
+  UserX,     // For Dropped Leads tab/page
   Rows,      // For Batch Proposals
   CalendarDays, // For Calendar
+  ListChecks, // For "Leads" tab under Summary
+  UserCheck, // For "Prospects" tab
 } from 'lucide-react';
 import { format, parseISO, addDays, subDays } from 'date-fns';
 
@@ -25,11 +27,11 @@ export const APP_NAME = "Soryouth";
 // Primary CRM Navigation for the main sidebar
 export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/leads', label: 'Leads', icon: UsersRound },
+  { href: '/leads', label: 'Summary', icon: UsersRound }, // Renamed "Leads" to "Summary"
   { href: '/proposals', label: 'Clients', icon: Briefcase },
   { href: '/communications', label: 'Communications', icon: MessageSquareText },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays },
-  { href: '/leads/dropped', label: 'Dropped Leads', icon: UserX },
+  // Dropped Leads is now a tab under Summary/Leads section, so removed from top-level nav
 ];
 
 // Secondary Navigation for tools/other sections, in user profile dropdown
@@ -48,7 +50,8 @@ export const LEAD_PRIORITY_OPTIONS = ['High', 'Medium', 'Low'] as const;
 // Made LEAD_SOURCE_OPTIONS an array of strings for easier management via settings dialog
 export const LEAD_SOURCE_OPTIONS = ['Facebook', 'Website', 'Referral', 'Cold Call', 'Walk-in', 'Other'] as const;
 
-export const USER_OPTIONS = ['Mayur', 'Sales Rep A', 'Sales Rep B', 'Admin', 'System', 'Kanchan Nikam'] as const;
+export const USER_OPTIONS = ['Mayur', 'Sales Rep A', 'Sales Rep B', 'Admin', 'System', 'Kanchan Nikam', 'tejas', 'MAYUR', 'Prasad mudholkar', 'Ritesh'] as const;
+
 
 export const DROP_REASON_OPTIONS = [
     'Duplicate lead', 'Fake Lead', 'Not Feasible', 'Not Interested', 
@@ -115,26 +118,40 @@ export const MOCK_LEADS: Lead[] = [
   { 
     id: 'lead8', name: 'sir (Dropped Example)', phone: '7796226623', 
     status: 'Lost', source: 'Facebook', dropReason: 'Not Feasible', assignedTo: 'Kanchan Nikam', 
-    createdAt: '2025-06-12T05:53:00.000Z', // Example past date
-    updatedAt: '2025-06-12T05:53:00.000Z', // Drop date
+    createdAt: '2025-06-12T05:53:00.000Z', 
+    updatedAt: '2025-06-12T05:53:00.000Z', 
     lastCommentText: 'Client found cheaper alternative.', lastCommentDate: format(parseISO('2025-06-12T05:53:00.000Z'), 'dd-MM-yyyy'), 
     kilowatt: 0, address: '1 Info Park, Test City', priority: 'Medium'
   },
    { 
     id: 'lead9', name: 'Ajaz Ahmad', phone: '8400005785', 
     status: 'Lost', source: 'Referral', dropReason: 'out of maharashtra', assignedTo: 'Kanchan Nikam', 
-    createdAt: '2025-06-11T06:44:00.000Z', // Example past date
-    updatedAt: '2025-06-11T06:44:00.000Z', // Drop date
+    createdAt: '2025-06-11T06:44:00.000Z', 
+    updatedAt: '2025-06-11T06:44:00.000Z', 
     lastCommentText: 'Client relocating.', lastCommentDate: format(parseISO('2025-06-11T06:44:00.000Z'), 'dd-MM-yyyy'), 
     kilowatt: 0, address: '2 Tech Towers, Test City', priority: 'Low'
   },
   { 
     id: 'lead10', name: 'Fake Client Co.', phone: '9930637381', 
     status: 'Lost', source: 'Other', dropReason: 'Fake Lead', assignedTo: 'Kanchan Nikam', 
-    createdAt: '2025-06-12T05:35:00.000Z', // Example past date
-    updatedAt: '2025-06-12T05:35:00.000Z', // Drop date
+    createdAt: '2025-06-12T05:35:00.000Z', 
+    updatedAt: '2025-06-12T05:35:00.000Z', 
     lastCommentText: 'Invalid contact details provided.', lastCommentDate: format(parseISO('2025-06-12T05:35:00.000Z'), 'dd-MM-yyyy'), 
     kilowatt: 0, address: 'N/A', priority: 'Low'
+  },
+  {
+    id: 'lead11', name: 'Future Solar Systems', email: 'contact@futuresolar.com', phone: '9876500001',
+    status: 'Deal Done', source: 'Website', assignedTo: 'Mayur',
+    createdAt: subDays(new Date(), 30).toISOString(), updatedAt: subDays(new Date(), 2).toISOString(),
+    lastCommentText: 'Finalized deal. Installation planned.', lastCommentDate: format(subDays(new Date(), 2), 'dd-MM-yyyy'),
+    kilowatt: 100, address: '100 Solar Drive, Tech Park, Pune', priority: 'High',
+  },
+  {
+    id: 'lead12', name: 'Rooftop Renewables Ltd.', email: 'info@rooftoprenew.co.in', phone: '9876500002',
+    status: 'Deal Done', source: 'Referral', assignedTo: 'Sales Rep A',
+    createdAt: subDays(new Date(), 60).toISOString(), updatedAt: subDays(new Date(), 5).toISOString(),
+    lastCommentText: 'Deal closed. Awaiting payment.', lastCommentDate: format(subDays(new Date(), 5), 'dd-MM-yyyy'),
+    kilowatt: 75, address: '25 Green Avenue, Mumbai', priority: 'High',
   }
 ];
 
@@ -168,6 +185,12 @@ export const MOCK_PROPOSALS: Proposal[] = [
   },
   {
     id: 'prop2', proposalNumber: 'P-2024-002', clientId: 'client2', name: 'Mr. Anil Patel (Bungalow)', clientType: 'Individual/Bungalow', contactPerson: 'Mr. Anil Patel', location: 'Mumbai, MH', capacity: 10, moduleType: 'TOPCon', moduleWattage: '585', dcrStatus: 'Non-DCR', inverterRating: 10, inverterQty: 1, ratePerWatt: 45, proposalDate: format(new Date(Date.now() - 86400000 * 12), 'yyyy-MM-dd'), ...calculateFinancialsAndSubsidy(45, 10, 'Individual/Bungalow'), createdAt: new Date(Date.now() - 86400000 * 12).toISOString(), updatedAt: new Date(Date.now() - 86400000 * 1).toISOString(),
+  },
+   {
+    id: 'prop_lead11', proposalNumber: 'P-2024-011', clientId: 'lead11', name: 'Future Solar Systems', clientType: 'Commercial', contactPerson: 'Mr. Raj Verma', location: '100 Solar Drive, Tech Park, Pune', capacity: 100, moduleType: 'TOPCon', moduleWattage: '590', dcrStatus: 'Non-DCR', inverterRating: 100, inverterQty: 2, ratePerWatt: 37, proposalDate: format(subDays(new Date(), 20), 'yyyy-MM-dd'), ...calculateFinancialsAndSubsidy(37, 100, 'Commercial'), createdAt: subDays(new Date(), 20).toISOString(), updatedAt: subDays(new Date(), 3).toISOString(),
+  },
+  {
+    id: 'prop_lead12', proposalNumber: 'P-2024-012', clientId: 'lead12', name: 'Rooftop Renewables Ltd.', clientType: 'Commercial', contactPerson: 'Ms. Anita Desai', location: '25 Green Avenue, Mumbai', capacity: 75, moduleType: 'Mono PERC', moduleWattage: '550', dcrStatus: 'Non-DCR', inverterRating: 75, inverterQty: 1, ratePerWatt: 39, proposalDate: format(subDays(new Date(), 45), 'yyyy-MM-dd'), ...calculateFinancialsAndSubsidy(39, 75, 'Commercial'), createdAt: subDays(new Date(), 45).toISOString(), updatedAt: subDays(new Date(), 6).toISOString(),
   },
 ];
 

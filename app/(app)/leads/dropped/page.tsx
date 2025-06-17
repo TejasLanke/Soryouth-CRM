@@ -1,10 +1,10 @@
 
 'use client';
 import React, { useState, useMemo } from 'react';
-import { PageHeader } from '@/components/page-header';
-import { LeadsTable } from '@/app/(app)/leads/leads-table';
+// Removed PageHeader import as it's handled by the layout
+import { LeadsTable } from '../leads-table'; // Adjusted path
 import { MOCK_LEADS, DROP_REASON_OPTIONS } from '@/lib/constants';
-import { UserX, Filter, Search, Settings2, ListFilter } from 'lucide-react';
+import { Filter, Search, Settings2, ListFilter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Lead, DropReasonType, DropReasonFilterItem, SortConfig } from '@/types';
 import { Badge } from '@/components/ui/badge';
@@ -30,7 +30,7 @@ export default function DroppedLeadsPage() {
 
     const filters: DropReasonFilterItem[] = [{ label: 'Show all', count: initialDroppedLeads.length, value: 'all' }];
     DROP_REASON_OPTIONS.forEach(reason => {
-      if (counts[reason] > 0 || initialDroppedLeads.some(l => l.dropReason === reason)) { // Ensure all defined reasons are shown if they exist in data
+      if (counts[reason] > 0 || initialDroppedLeads.some(l => l.dropReason === reason)) {
         filters.push({ label: reason, count: counts[reason] || 0, value: reason });
       }
     });
@@ -39,11 +39,11 @@ export default function DroppedLeadsPage() {
 
   const sortedAndFilteredLeads = useMemo(() => {
     let leadsToDisplay = activeFilter === 'all' 
-      ? droppedLeads 
-      : droppedLeads.filter(lead => lead.dropReason === activeFilter);
+      ? initialDroppedLeads // Use initialDroppedLeads for consistent filtering base
+      : initialDroppedLeads.filter(lead => lead.dropReason === activeFilter);
 
     if (sortConfig !== null) {
-      leadsToDisplay.sort((a, b) => {
+      leadsToDisplay = [...leadsToDisplay].sort((a, b) => { // Sort a copy
         const aValue = a[sortConfig.key];
         const bValue = b[sortConfig.key];
 
@@ -69,7 +69,7 @@ export default function DroppedLeadsPage() {
       });
     }
     return leadsToDisplay;
-  }, [droppedLeads, activeFilter, sortConfig]);
+  }, [initialDroppedLeads, activeFilter, sortConfig]);
 
   const requestSort = (key: keyof Lead) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -81,20 +81,16 @@ export default function DroppedLeadsPage() {
 
   return (
     <>
+      {/* PageHeader is now in layout.tsx */}
       <div className="mb-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
-           <div className="flex items-center gap-2">
-            <UserX className="h-7 w-7 text-primary" />
-            <h1 className="text-2xl font-bold text-foreground">
-                Dropped ({initialDroppedLeads.length})
-            </h1>
-          </div>
-          <div className="flex items-center gap-2 mt-2 sm:mt-0">
+           {/* Title & Count now in PageHeader via layout */}
+          <div className="flex items-center gap-2 mt-2 sm:mt-0 ml-auto"> {/* Buttons to the right */}
             <Button variant="outline" size="sm" className="h-8 px-3">
               <Search className="mr-1.5 h-3.5 w-3.5" /> Search
             </Button>
-             <Button variant="outline" size="sm" className="h-8 px-3 bg-green-500 hover:bg-green-600 text-white">
-                <CheckboxIcon className="mr-1.5 h-3.5 w-3.5" /> {/* Placeholder for checkbox icon */}
+             <Button variant="outline" size="sm" className="h-8 px-3"> {/* Removed green color */}
+                <CheckboxIcon className="mr-1.5 h-3.5 w-3.5" /> 
                 <ListFilter className="ml-1 h-3.5 w-3.5" />
             </Button>
             <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -133,7 +129,7 @@ export default function DroppedLeadsPage() {
   );
 }
 
-// Placeholder for checkbox icon as lucide doesn't have one directly combining checkbox and filter
+// Placeholder for checkbox icon
 const CheckboxIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
