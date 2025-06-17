@@ -1,8 +1,8 @@
 
 'use client';
 
-import { useEffect, useState }_from_ 'react';
-import { useParams, useRouter }_from_ 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,10 +14,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from '@/components/page-header';
-import { MOCK_LEADS, USER_OPTIONS, LEAD_SOURCE_OPTIONS, LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES }_from_ '@/lib/constants';
-import type { Lead, UserOptionType, LeadSourceOptionType, LeadStatusType, LeadPriorityType }_from_ '@/types';
-import { format, parseISO, isValid }_from_ 'date-fns';
-import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, Clock, UserCircle2 }_from_ 'lucide-react';
+import { MOCK_LEADS, USER_OPTIONS, LEAD_SOURCE_OPTIONS, LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES } from '@/lib/constants';
+import type { Lead, UserOptionType, LeadSourceOptionType, LeadStatusType, LeadPriorityType } from '@/types';
+import { format, parseISO, isValid } from 'date-fns';
+import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, Clock, UserCircle2 } from 'lucide-react';
 
 export default function LeadDetailsPage() {
   const params = useParams();
