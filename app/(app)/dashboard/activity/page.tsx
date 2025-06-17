@@ -7,13 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from '@/components/ui/chart';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip } from 'recharts';
-import { CalendarIcon, Phone, MessageSquare, Mail, Users, UserCircle, MessageCircle as MessageCircleIcon } from 'lucide-react';
-import { format } from 'date-fns';
+import { CalendarIcon, Phone, MessageSquare, Mail, Users, UserCircle, ListChecks, Briefcase, FileText } from 'lucide-react';
+import { format, formatDistanceToNow } from 'date-fns';
 import { USER_OPTIONS } from '@/lib/constants';
-import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 
 // Mock data based on the image for UI representation
 const activityStatsData = [
@@ -48,14 +48,33 @@ const teamMembers = USER_OPTIONS.map(user => {
     else if (user === 'Kanchan Nikam') role = 'User';
     else if (user === 'Prasad mudholkar') role = 'User';
     else if (user === 'Ritesh') role = 'User';
-    // Surbhi panday is in image but not USER_OPTIONS, will use existing users.
     return {
         name: user,
         role: role,
         avatar: `https://placehold.co/40x40.png?text=${user.charAt(0)}`,
         avatarHint: "user avatar"
     }
-}).slice(0, 6); // Display a few for the UI example
+}).slice(0, 6);
+
+const mockActivities = [
+  { id: 'act1', user: 'Kanchan Nikam', leadName: 'Anil Kumar', action: 'called', type: 'Call' as const, timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), details: "Had a discussion about 3KW On-Grid Solar system." },
+  { id: 'act2', user: 'tejas', leadName: 'Priya Sharma', action: 'sent email to', type: 'Email' as const, timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000), details: "Quotation for 5KW system sent." },
+  { id: 'act3', user: 'MAYUR', leadName: 'Green Valley Society', action: 'had meeting with', type: 'Meeting' as const, timestamp: new Date(Date.now() - 20 * 60 * 60 * 1000), details: "Finalized proposal details for society rooftop." },
+  { id: 'act4', user: 'Kanchan Nikam', leadName: 'Rajesh Singh', action: 'updated lead', type: 'LeadUpdate' as const, timestamp: new Date(Date.now() - 25 * 60 * 60 * 1000), details: "Changed status to 'Followup'." },
+  { id: 'act5', user: 'tejas', leadName: 'Sunil Agro Farms', action: 'created proposal for', type: 'Proposal' as const, timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), details: "Proposal P-2024-078 for 100kW solar pump." },
+];
+
+const ActivityIcon = ({ type }: { type: 'Call' | 'Email' | 'Meeting' | 'LeadUpdate' | 'Proposal' | string }) => {
+  switch (type) {
+    case 'Call': return <Phone className="h-4 w-4 text-blue-500" />;
+    case 'Email': return <Mail className="h-4 w-4 text-red-500" />;
+    case 'Meeting': return <Users className="h-4 w-4 text-purple-500" />;
+    case 'LeadUpdate': return <ListChecks className="h-4 w-4 text-orange-500" />;
+    case 'Proposal': return <FileText className="h-4 w-4 text-green-500" />;
+    default: return <Briefcase className="h-4 w-4 text-gray-500" />;
+  }
+};
+
 
 export default function ActivityPage() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date('2025-06-10')); // Matching image
@@ -82,7 +101,6 @@ export default function ActivityPage() {
       {/* Main Content Area */}
       <div className="flex-grow lg:w-2/3 space-y-6">
         <div className="flex justify-between items-center">
-          {/* Title is handled by DashboardLayout */}
           <div></div> {/* Spacer */}
           <Popover>
             <PopoverTrigger asChild>
@@ -137,7 +155,6 @@ export default function ActivityPage() {
                       <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
                   </Pie>
-                  {/* <ChartLegend content={<ChartLegendContent />} /> */}
                 </PieChart>
               </ChartContainer>
             </CardContent>
@@ -155,12 +172,45 @@ export default function ActivityPage() {
                       <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
                   </Pie>
-                   {/* <ChartLegend content={<ChartLegendContent nameKey="name" />} /> */}
                 </PieChart>
               </ChartContainer>
             </CardContent>
           </Card>
         </div>
+
+        {/* Activity List */}
+        <Card className="shadow-md">
+          <CardHeader>
+            <CardTitle>Activity list</CardTitle>
+            <CardDescription>Recent activities performed by users.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ScrollArea className="h-[400px]">
+              <div className="divide-y divide-border">
+                {mockActivities.map(activity => (
+                  <div key={activity.id} className="p-4 flex items-start gap-4 hover:bg-muted/50">
+                    <div className="mt-1">
+                      <ActivityIcon type={activity.type} />
+                    </div>
+                    <div className="flex-grow">
+                      <p className="text-sm">
+                        <span className="font-semibold">{activity.user}</span> {activity.action} <span className="font-medium text-primary">{activity.leadName}</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">{activity.details}</p>
+                    </div>
+                    <p className="text-xs text-muted-foreground whitespace-nowrap">
+                      {formatDistanceToNow(activity.timestamp, { addSuffix: true })}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              {mockActivities.length === 0 && (
+                <div className="p-6 text-center text-muted-foreground">No activities to display.</div>
+              )}
+            </ScrollArea>
+          </CardContent>
+        </Card>
+
       </div>
 
       {/* Team Sidebar Area */}
@@ -168,12 +218,13 @@ export default function ActivityPage() {
         <Card className="shadow-md h-full flex flex-col">
           <CardHeader>
             <CardTitle>Team</CardTitle>
+            <CardDescription>Select users to filter activities.</CardDescription>
           </CardHeader>
           <CardContent className="flex-grow overflow-hidden p-0">
             <ScrollArea className="h-full">
               <div className="p-4 space-y-4">
                 {teamMembers.map(member => (
-                  <div key={member.name} className="flex items-center gap-3">
+                  <div key={member.name} className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 cursor-pointer">
                     <Avatar className="h-9 w-9">
                       <AvatarImage src={member.avatar} data-ai-hint={member.avatarHint} alt={member.name} />
                       <AvatarFallback>{member.name.charAt(0).toUpperCase()}</AvatarFallback>
@@ -187,14 +238,11 @@ export default function ActivityPage() {
               </div>
             </ScrollArea>
           </CardContent>
-          <div className="p-4 border-t mt-auto">
-            <Button variant="ghost" className="w-full justify-center relative">
-              <MessageCircleIcon className="h-8 w-8 text-primary" />
-              <Badge variant="destructive" className="absolute top-0 right-1/3 -translate-y-1/2 px-1.5 py-0.5 text-xs rounded-full">1</Badge>
-            </Button>
-          </div>
+          {/* Removed chat icon footer */}
         </Card>
       </div>
     </div>
   );
 }
+
+    
