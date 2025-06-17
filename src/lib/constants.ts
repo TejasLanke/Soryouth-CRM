@@ -2,8 +2,8 @@
 import type { NavItem, Lead, Proposal, Document, Communication, DocumentType, ClientType, ModuleType, DCRStatus, ModuleWattage, LeadStatusType, LeadPriorityType, LeadSourceOptionType, UserOptionType, DropReasonType, Expense, ExpenseCategory } from '@/types';
 import {
   LayoutDashboard,
-  UsersRound,
-  FileText, // Used for Proposals link
+  UsersRound, // Icon for Leads/Summary section
+  FileText,   // Used for Proposals link
   Files,
   MessageSquareText,
   WandSparkles,
@@ -212,3 +212,5 @@ export const MOCK_EXPENSES: Expense[] = [
     reviewedAt: subDays(new Date(), 9).toISOString(),
   },
 ];
+
+    
