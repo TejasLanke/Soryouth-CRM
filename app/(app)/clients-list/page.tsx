@@ -62,7 +62,7 @@ export default function ClientsListPage() {
     { label: 'Deal Done', value: 'Deal Done' }, // Primary filter for this page
     // Add other relevant client-specific statuses if they exist
   ];
-  
+
   const [activeFilter, setActiveFilter] = useState<LeadStatusType | 'all'>('all');
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
   const [selectedRows, setSelectedRows] = useState<Record<string, boolean>>({});
@@ -87,7 +87,7 @@ export default function ClientsListPage() {
         id: `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        email: clientData.email || '', 
+        email: clientData.email || '',
         ...clientData, // Contains status: 'Deal Done'
       };
       setClients(prevClients => [newClient, ...prevClients]);
@@ -127,7 +127,7 @@ export default function ClientsListPage() {
         if (aValue === undefined && bValue === undefined) return 0;
         if (aValue === undefined) return sortConfig.direction === 'ascending' ? 1 : -1;
         if (bValue === undefined) return sortConfig.direction === 'ascending' ? -1 : 1;
-        
+
         if (sortConfig.key === 'createdAt' || sortConfig.key === 'updatedAt' || sortConfig.key === 'nextFollowUpDate') {
           const dateA = aValue ? parseISO(aValue as string).getTime() : 0;
           const dateB = bValue ? parseISO(bValue as string).getTime() : 0;
@@ -141,7 +141,7 @@ export default function ClientsListPage() {
           if (aValue > bValue) return sortConfig.direction === 'ascending' ? 1 : -1;
           return 0;
         }
-        
+
         if (String(aValue).toLowerCase() < String(bValue).toLowerCase()) {
           return sortConfig.direction === 'ascending' ? -1 : 1;
         }
@@ -166,8 +166,8 @@ export default function ClientsListPage() {
     if (!sortConfig || sortConfig.key !== key) {
       return <ArrowUpDown className="ml-1 h-3 w-3 opacity-30 group-hover:opacity-70" />;
     }
-    return sortConfig.direction === 'ascending' ? 
-      <ArrowUpDown className="ml-1 h-3 w-3 transform rotate-0 text-primary" /> : 
+    return sortConfig.direction === 'ascending' ?
+      <ArrowUpDown className="ml-1 h-3 w-3 transform rotate-0 text-primary" /> :
       <ArrowUpDown className="ml-1 h-3 w-3 transform rotate-180 text-primary" />;
   };
 
@@ -182,7 +182,7 @@ export default function ClientsListPage() {
   const handleSelectRow = (clientId: string, checked: boolean) => {
     setSelectedRows(prev => ({ ...prev, [clientId]: checked }));
   };
-  
+
   const isAllSelected = filteredAndSortedClients.length > 0 && filteredAndSortedClients.every(client => selectedRows[client.id]);
   const isIndeterminate = Object.values(selectedRows).some(Boolean) && !isAllSelected;
 
@@ -234,8 +234,8 @@ export default function ClientsListPage() {
             size="sm"
             onClick={() => setActiveFilter(filter.value as LeadStatusType | 'all')}
             className={`py-1 px-3 h-auto text-sm font-medium rounded-full relative
-                        ${activeFilter === filter.value 
-                            ? 'text-primary after:content-[""] after:absolute after:left-1/2 after:-translate-x-1/2 after:bottom-[-13px] after:w-full after:h-0.5 after:bg-primary' 
+                        ${activeFilter === filter.value
+                            ? 'text-primary after:content-[""] after:absolute after:left-1/2 after:-translate-x-1/2 after:bottom-[-13px] after:w-full after:h-0.5 after:bg-primary'
                             : 'text-muted-foreground hover:text-foreground'}`}
           >
             {filter.label}
@@ -245,14 +245,14 @@ export default function ClientsListPage() {
           </Button>
         ))}
       </div>
-      
+
       <Card className="border-none shadow-none">
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow className="bg-transparent hover:bg-transparent border-b-2 border-border">
                 <TableHead className="w-[40px] px-2">
-                  <Checkbox 
+                  <Checkbox
                     checked={isAllSelected}
                     onCheckedChange={(checked) => handleSelectAllRows(Boolean(checked))}
                     aria-label="Select all rows"
@@ -295,7 +295,7 @@ export default function ClientsListPage() {
               {filteredAndSortedClients.length > 0 ? filteredAndSortedClients.map((client, index) => (
                 <TableRow key={client.id} className="border-b-gray-100 hover:bg-muted/30 data-[state=selected]:bg-primary/10">
                   <TableCell className="px-2">
-                    <Checkbox 
+                    <Checkbox
                         checked={!!selectedRows[client.id]}
                         onCheckedChange={(checked) => handleSelectRow(client.id, Boolean(checked))}
                         aria-label={`Select row ${index + 1}`}
@@ -307,7 +307,7 @@ export default function ClientsListPage() {
                     <ClientFormattedDateTime dateString={client.createdAt} />
                   </TableCell>
                   <TableCell className="px-2 font-medium text-sm">
-                    <Link href={`/proposals/${client.id}`} className="hover:text-primary hover:underline">
+                    <Link href={`/leads/${client.id}`} className="hover:text-primary hover:underline">
                       {client.name}
                     </Link>
                   </TableCell>

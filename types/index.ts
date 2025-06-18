@@ -33,6 +33,7 @@ export interface Lead {
   priority?: LeadPriorityType;
   dropReason?: DropReasonType;
   clientType?: ClientType;
+  electricityBillUrl?: string; // Added for electricity bill
 }
 
 export interface Proposal {

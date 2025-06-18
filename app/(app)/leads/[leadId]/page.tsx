@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label";
 import { MOCK_LEADS, USER_OPTIONS, LEAD_SOURCE_OPTIONS, LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, CLIENT_TYPES } from '@/lib/constants';
 import type { Lead, UserOptionType, LeadSourceOptionType, LeadStatusType, LeadPriorityType, ClientType } from '@/types';
 import { format, parseISO, isValid } from 'date-fns';
-import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, Clock, UserCircle2, FileText, ShoppingCart } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, Clock, UserCircle2, FileText, ShoppingCart, ReceiptText } from 'lucide-react';
 import { ProposalForm } from '@/app/(app)/proposals/proposal-form';
 import { DocumentCreationDialog } from '@/app/(app)/documents/document-creation-dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -27,7 +27,7 @@ export default function LeadDetailsPage() {
   const params = useParams();
   const leadId = typeof params.leadId === 'string' ? params.leadId : null;
   const { toast } = useToast();
-  const [lead, setLead] = useState<Lead | null | undefined>(undefined); 
+  const [lead, setLead] = useState<Lead | null | undefined>(undefined);
 
   const [isProposalFormOpen, setIsProposalFormOpen] = useState(false);
   const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
@@ -38,7 +38,7 @@ export default function LeadDetailsPage() {
   const [followUpDate, setFollowUpDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [followUpTime, setFollowUpTime] = useState<string>(format(new Date(), 'HH:mm'));
   const [followUpStatus, setFollowUpStatus] = useState<string>(FOLLOW_UP_STATUSES[0]);
-  const [followUpPriority, setFollowUpPriority] = useState<LeadPriorityType | undefined>(LEAD_PRIORITY_OPTIONS[1]); 
+  const [followUpPriority, setFollowUpPriority] = useState<LeadPriorityType | undefined>(LEAD_PRIORITY_OPTIONS[1]);
   const [followUpLeadStage, setFollowUpLeadStage] = useState<LeadStatusType | undefined>();
   const [followUpComment, setFollowUpComment] = useState('');
 
@@ -97,10 +97,18 @@ export default function LeadDetailsPage() {
     setDocumentTypeToCreate('Purchase Order');
     setIsDocumentDialogOpen(true);
   };
-  
+
   const handleCloseDocumentDialog = () => {
     setIsDocumentDialogOpen(false);
     setDocumentTypeToCreate(null);
+  };
+
+  const handleViewElectricityBill = () => {
+    if (lead?.electricityBillUrl) {
+      window.open(lead.electricityBillUrl, '_blank');
+    } else {
+      toast({ title: "No Bill Available", description: "Electricity bill has not been uploaded for this lead.", variant: "destructive" });
+    }
   };
 
 
@@ -115,8 +123,8 @@ export default function LeadDetailsPage() {
   }
 
   const creationDateTime = lead.createdAt && isValid(parseISO(lead.createdAt)) ? format(parseISO(lead.createdAt), 'dd-MM-yyyy HH:mm') : 'N/A';
-  const nextFollowUpDisplay = lead.nextFollowUpDate && isValid(parseISO(lead.nextFollowUpDate)) 
-    ? `${format(parseISO(lead.nextFollowUpDate), 'dd-MM-yyyy')} ${lead.nextFollowUpTime || ''}`.trim() 
+  const nextFollowUpDisplay = lead.nextFollowUpDate && isValid(parseISO(lead.nextFollowUpDate))
+    ? `${format(parseISO(lead.nextFollowUpDate), 'dd-MM-yyyy')} ${lead.nextFollowUpTime || ''}`.trim()
     : 'Not set';
 
   return (
@@ -125,7 +133,7 @@ export default function LeadDetailsPage() {
         <h1 className="text-xl font-semibold font-headline">{lead.name}</h1>
         <div className="flex gap-2">
           <Button variant="destructive" size="sm" disabled>Drop lead</Button>
-          <Button variant="outline" size="sm" onClick={() => router.push('/leads/current')}>
+          <Button variant="outline" size="sm" onClick={() => router.back()}>
             <ChevronLeft className="h-4 w-4 mr-1" /> Back to list
           </Button>
           <Button variant="outline" size="sm" disabled>Next <ChevronRight className="h-4 w-4 ml-1" /></Button>
@@ -138,7 +146,7 @@ export default function LeadDetailsPage() {
             <Card>
               <CardHeader className="flex flex-row justify-between items-center pb-2">
                 <CardTitle className="text-lg font-semibold">Lead Information</CardTitle>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => router.push(`/leads/edit/${lead.id}`)} disabled> 
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => router.push(`/leads/edit/${lead.id}`)} disabled>
                   <Edit className="h-4 w-4" />
                 </Button>
               </CardHeader>
@@ -189,6 +197,13 @@ export default function LeadDetailsPage() {
                   <Label className="text-xs">Address</Label>
                   <p className="text-sm bg-muted p-2 rounded-md min-h-[40px]">{lead.address || 'Not specified'}</p>
                 </div>
+                 {lead.electricityBillUrl && (
+                  <div>
+                    <Button onClick={handleViewElectricityBill} variant="outline" size="sm" className="w-full mt-2">
+                      <ReceiptText className="mr-2 h-4 w-4" /> View Electricity Bill
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -225,7 +240,7 @@ export default function LeadDetailsPage() {
                 </div>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-md">Quick Actions</CardTitle>
@@ -323,10 +338,10 @@ export default function LeadDetailsPage() {
                  <Button onClick={handleSaveTask} className="w-full">Save Task</Button>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader>
-                <CardTitle>All Follow-ups (0)</CardTitle> 
+                <CardTitle>All Follow-ups (0)</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">No follow-up history yet.</p>
@@ -389,7 +404,7 @@ export default function LeadDetailsPage() {
           initialData={{
             clientId: lead.id,
             name: lead.name,
-            clientType: lead.clientType || CLIENT_TYPES[0] 
+            clientType: lead.clientType || CLIENT_TYPES[0]
           }}
         />
       )}
@@ -397,7 +412,7 @@ export default function LeadDetailsPage() {
         <DocumentCreationDialog
           isOpen={isDocumentDialogOpen}
           onClose={handleCloseDocumentDialog}
-          documentType="Purchase Order" 
+          documentType="Purchase Order"
         />
       )}
     </div>

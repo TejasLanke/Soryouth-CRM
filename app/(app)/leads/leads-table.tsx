@@ -55,9 +55,9 @@ const formatDateInternal = (dateString?: string, includeTime: boolean = false) =
     if (isValid(date)) {
       return includeTime ? format(date, 'dd-MM-yyyy HH:mm') : format(date, 'dd-MM-yyyy');
     }
-    return dateString; 
+    return dateString;
   } catch (e) {
-    return dateString; 
+    return dateString;
   }
 };
 
@@ -80,13 +80,13 @@ const ClientFormattedDateTime: React.FC<{ dateString?: string }> = ({ dateString
 
 
 export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, requestSort, viewType = 'active' }: LeadsTableProps) {
-  
+
   const getSourceBadgeVariant = (source?: string) => {
     if (!source) return 'outline';
     const lowerSource = source.toLowerCase();
     if (lowerSource.includes('facebook')) return 'default';
     if (lowerSource.includes('website') || lowerSource.includes('online')) return 'secondary';
-    if (lowerSource.includes('referral')) return 'default'; 
+    if (lowerSource.includes('referral')) return 'default';
     return 'outline';
   };
 
@@ -94,11 +94,11 @@ export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, reques
     if (!requestSort || !sortConfig || sortConfig.key !== key) {
       return <ArrowUpDown className="ml-1 h-3 w-3 opacity-50" />;
     }
-    return sortConfig.direction === 'ascending' ? 
-      <ArrowUpDown className="ml-1 h-3 w-3 transform rotate-0 text-primary" /> : 
+    return sortConfig.direction === 'ascending' ?
+      <ArrowUpDown className="ml-1 h-3 w-3 transform rotate-0 text-primary" /> :
       <ArrowUpDown className="ml-1 h-3 w-3 transform rotate-180 text-primary" />;
   };
-  
+
   const formatDate = (dateString?: string) => {
     return formatDateInternal(dateString, false);
   };
@@ -227,7 +227,7 @@ export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, reques
                 </TableHead>
                 {viewType === 'dropped' && (
                   <>
-                    {renderHeaderCell('#', 'id')} 
+                    {renderHeaderCell('#', 'id')}
                     {renderHeaderCell('Created on', 'createdAt')}
                     {renderHeaderCell('Info', 'name')}
                     {renderHeaderCell('Mobile no.', 'phone')}

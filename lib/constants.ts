@@ -2,7 +2,7 @@
 import type { NavItem, Lead, Proposal, Document, Communication, DocumentType, ClientType, ModuleType, DCRStatus, ModuleWattage, LeadStatusType, LeadPriorityType, LeadSourceOptionType, UserOptionType, DropReasonType, Expense, ExpenseCategory, Survey, SurveyStatusType, SurveyTypeOption, MeterPhaseType, ConsumerLoadType, RoofType, DiscomType } from '@/types';
 import {
   LayoutDashboard,
-  UsersRound, 
+  UsersRound,
   FileText,
   Files,
   MessageSquareText,
@@ -13,14 +13,14 @@ import {
   Edit,
   Eye,
   FileSignature,
-  Briefcase, 
-  UserX,     
+  Briefcase,
+  UserX,
   Rows,
   CalendarDays,
-  ListChecks, 
+  ListChecks,
   UserCheck,
   Receipt,
-  Notebook, 
+  Notebook,
   ClipboardList,
   ClipboardEdit, // Added for Site Survey Form
 } from 'lucide-react';
@@ -73,7 +73,7 @@ export const MOCK_LEADS: Lead[] = [
     status: 'fresher', source: 'Facebook', createdAt: subDays(new Date(),5).toISOString(), updatedAt: new Date().toISOString(),
     lastCommentText: 'lb 8000/-', lastCommentDate: format(subDays(new Date(), 2), 'dd-MM-yyyy'),
     kilowatt: 10, clientType: 'Commercial', nextFollowUpDate: format(addDays(new Date(), 5), 'yyyy-MM-dd'), nextFollowUpTime: '10:00',
-    address: '123 Main St, Nagpur', priority: 'High', assignedTo: 'Mayur', createdBy: 'Admin'
+    address: '123 Main St, Nagpur', priority: 'High', assignedTo: 'Mayur', createdBy: 'Admin', electricityBillUrl: '/mock-bills/pramod-bill.pdf'
   },
   {
     id: 'lead2', name: 'sir (Jane Smith)', email: 'jane.smith.lead@example.com', phone: '7001173134',
@@ -81,7 +81,7 @@ export const MOCK_LEADS: Lead[] = [
     createdAt: new Date(Date.now() - 86400000).toISOString(), updatedAt: new Date().toISOString(),
     lastCommentText: 'Not answering', lastCommentDate: format(subDays(new Date(), 1), 'dd-MM-yyyy'),
     kilowatt: 5, clientType: 'Individual/Bungalow', nextFollowUpDate: format(addDays(new Date(), 7), 'yyyy-MM-dd'), nextFollowUpTime: '14:30',
-    address: '456 Oak Ave, Mumbai', priority: 'Medium'
+    address: '456 Oak Ave, Mumbai', priority: 'Medium', electricityBillUrl: '/mock-bills/jane-bill.jpg'
   },
   {
     id: 'lead_sky_avenue', name: 'Sky avenue Manu Bhai', phone: '8355979653',
@@ -109,17 +109,17 @@ export const MOCK_LEADS: Lead[] = [
     kilowatt: 0, clientType: 'Other', priority: 'Low', assignedTo: 'System', createdBy: 'System'
   },
    {
-    id: 'client1', name: 'Green Valley Society', 
+    id: 'client1', name: 'Green Valley Society',
     status: 'Deal Done', clientType: 'Housing Society', phone: '9876543210', assignedTo: 'Mayur',
-    createdAt: subDays(new Date(), 100).toISOString(), updatedAt: subDays(new Date(), 10).toISOString(),
+    createdAt: subDays(new Date(), 100).toISOString(), updatedAt: subDays(new Date(), 10).toISOString(), electricityBillUrl: '/mock-bills/greenvalley-bill.pdf'
   },
   {
-    id: 'client2', name: 'Mr. Anil Patel (Bungalow)', 
+    id: 'client2', name: 'Mr. Anil Patel (Bungalow)',
     status: 'Deal Done', clientType: 'Individual/Bungalow', phone: '9876543211', assignedTo: 'Sales Rep A',
     createdAt: subDays(new Date(), 120).toISOString(), updatedAt: subDays(new Date(), 5).toISOString(),
   },
   {
-    id: 'client3', name: 'FutureTech Industries', 
+    id: 'client3', name: 'FutureTech Industries',
     status: 'Deal Done', clientType: 'Commercial', phone: '9876543212', assignedTo: 'Sales Rep B',
     createdAt: subDays(new Date(), 80).toISOString(), updatedAt: subDays(new Date(), 1).toISOString(),
   },
