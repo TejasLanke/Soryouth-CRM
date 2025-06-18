@@ -26,8 +26,10 @@ const ClientTypeIcon = ({ type }: { type: Proposal['clientType'] }) => {
 
 
 export default function ClientProposalsPage() {
-  const { clientId } = useParams() as { clientId: string };
   const router = useRouter();
+  const params = useParams();
+  const clientId = typeof params.clientId === 'string' ? params.clientId : null;
+
 
   const [allProposals, setAllProposals] = useState<Proposal[]>(MOCK_PROPOSALS); 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -35,16 +37,20 @@ export default function ClientProposalsPage() {
   const { toast } = useToast();
 
   const clientProposals = useMemo(() => {
+    if (!clientId) return [];
     return allProposals.filter(p => p.clientId === clientId).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [allProposals, clientId]);
 
   const currentClient = useMemo(() => {
-    return clientProposals.length > 0 ? clientProposals[0] : MOCK_PROPOSALS.find(p => p.clientId === clientId);
+    if (!clientId) return null;
+    return clientProposals.length > 0 ? clientProposals[0] : MOCK_PROPOSALS.find(p => p.clientId === clientId) || null;
   }, [clientProposals, clientId]);
 
 
   useEffect(() => {
-    if (!clientId) {
+    if (!clientId && MOCK_PROPOSALS.length > 0) { // Check if clientId is null but proposals exist
+        // This case could mean direct navigation to /proposals/ (without ID)
+        // or a params issue. For now, redirecting to general proposals list.
         router.push('/proposals');
     }
   }, [clientId, router]);
@@ -67,7 +73,8 @@ export default function ClientProposalsPage() {
       setAllProposals(updatedProposals);
       toast({ title: "Proposal Updated", description: `Proposal ${submittedProposal.proposalNumber} has been updated.` });
     } else { 
-      const newProposalWithClientId = { ...submittedProposal, clientId: clientId };
+      // Ensure new proposals get the correct clientId if it's available
+      const newProposalWithClientId = { ...submittedProposal, clientId: clientId || submittedProposal.clientId };
       setAllProposals(prev => [newProposalWithClientId, ...prev]);
       toast({ title: "Proposal Created", description: `Proposal ${newProposalWithClientId.proposalNumber} for ${currentClient?.name || 'this client'} has been added.` });
     }
@@ -76,9 +83,14 @@ export default function ClientProposalsPage() {
   };
   
 
-  if (!currentClient) {
+  if (!currentClient && clientId) { // Still loading or client not found for a given ID
     return (
       <PageHeader title="Loading Client..." description="Fetching client details or client not found." />
+    );
+  }
+  if (!currentClient && !clientId) { // No client ID in URL, might redirect or show generic page
+     return (
+      <PageHeader title="Client Proposals" description="Select a client to view proposals." />
     );
   }
   
@@ -162,7 +174,7 @@ export default function ClientProposalsPage() {
         onClose={() => {setIsFormOpen(false); setSelectedProposalForEdit(null);}}
         onSubmit={handleFormSubmit}
         proposal={selectedProposalForEdit} 
-        initialData={!selectedProposalForEdit ? { clientId: clientId, name: currentClient.name, clientType: currentClient.clientType } : undefined}
+        initialData={!selectedProposalForEdit && clientId ? { clientId: clientId, name: currentClient?.name || '', clientType: currentClient?.clientType } : undefined}
       />
     </>
   );

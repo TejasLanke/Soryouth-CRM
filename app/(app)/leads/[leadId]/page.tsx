@@ -23,8 +23,9 @@ import { DocumentCreationDialog } from '@/app/(app)/documents/document-creation-
 import { useToast } from '@/hooks/use-toast';
 
 export default function LeadDetailsPage() {
-  const { leadId } = useParams() as { leadId: string };
   const router = useRouter();
+  const params = useParams();
+  const leadId = typeof params.leadId === 'string' ? params.leadId : null;
   const { toast } = useToast();
   const [lead, setLead] = useState<Lead | null | undefined>(undefined); 
 
@@ -54,6 +55,8 @@ export default function LeadDetailsPage() {
         setFollowUpLeadStage(foundLead.status);
         setFollowUpPriority(foundLead.priority || LEAD_PRIORITY_OPTIONS[1]);
       }
+    } else {
+      setLead(null); // Explicitly set to null if leadId is not found/valid
     }
   }, [leadId]);
 
@@ -400,4 +403,3 @@ export default function LeadDetailsPage() {
     </div>
   );
 }
-
