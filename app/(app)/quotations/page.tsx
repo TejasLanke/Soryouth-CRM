@@ -1,9 +1,9 @@
-// This file is intentionally left empty to effectively remove the /quotations route.
-// The functionality has been consolidated under /proposals.
-// You can manually delete the app/(app)/quotations directory.
+// This file implements a server-side redirect to /proposals.
+// The /quotations route functionality has been consolidated under /proposals.
+
+import { redirect } from 'next/navigation';
+
 export default function QuotationsPageRedirect() {
-  if (typeof window !== 'undefined') {
-    window.location.href = '/proposals';
-  }
-  return null;
+  redirect('/proposals');
+  // This component will not render anything as redirect() throws an error and stops execution.
 }
