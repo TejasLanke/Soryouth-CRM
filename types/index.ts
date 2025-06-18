@@ -1,5 +1,5 @@
 
-import type { LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, LEAD_SOURCE_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES, EXPENSE_CATEGORIES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS } from '@/lib/constants';
+import type { LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, LEAD_SOURCE_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES, EXPENSE_CATEGORIES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS, SURVEY_STATUS_OPTIONS, SURVEY_TYPE_OPTIONS } from '@/lib/constants';
 
 // Deriving types from the const arrays ensures type safety and single source of truth
 export type LeadStatusType = typeof LEAD_STATUS_OPTIONS[number];
@@ -163,4 +163,33 @@ export interface Expense {
   submittedAt: string;
   reviewedBy?: UserOptionType;
   reviewedAt?: string;
+}
+
+// Survey Related Types
+export type SurveyStatusType = typeof SURVEY_STATUS_OPTIONS[number];
+export type SurveyTypeOption = typeof SURVEY_TYPE_OPTIONS[number];
+
+export interface Survey {
+  id: string;
+  surveyNumber: string;
+  clientName: string;
+  location: string;
+  surveyDate: string; // ISO string
+  surveyorName: UserOptionType;
+  status: SurveyStatusType;
+  type: SurveyTypeOption;
+  notes?: string;
+  createdAt: string; // ISO string
+  updatedAt: string; // ISO string
+}
+
+export interface SurveySortConfig {
+  key: keyof Survey;
+  direction: 'ascending' | 'descending';
+}
+
+export interface SurveyStatusFilterItem {
+  label: SurveyStatusType | 'Show all';
+  count: number;
+  value: SurveyStatusType | 'all';
 }

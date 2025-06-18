@@ -2,38 +2,27 @@
 'use client';
 
 import { useMemo } from 'react';
+import Link from 'next/link';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, Legend as RechartsLegend, LabelList } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from '@/components/ui/chart';
-import { ClipboardList, CalendarDays, MapPin, Building, Home, Sun } from 'lucide-react';
+import { ClipboardList, CalendarDays, MapPin, Building, Home, Sun, List } from 'lucide-react';
 import { format, subDays, isWithinInterval, startOfDay, endOfDay, parseISO } from 'date-fns';
+import { MOCK_SURVEYS, USER_OPTIONS, SURVEY_TYPE_OPTIONS as SURVEY_TYPES_CONST } from '@/lib/constants'; // Use constant
+import type { Survey, SurveyTypeOption, UserOptionType } from '@/types';
+
 
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
-// Mock Survey Data
-const MOCK_SURVEYS = [
-  { id: 'survey1', date: subDays(new Date(), 5).toISOString(), location: 'Pune', type: 'Commercial', surveyor: 'Mayur' },
-  { id: 'survey2', date: subDays(new Date(), 10).toISOString(), location: 'Mumbai', type: 'Residential', surveyor: 'Kanchan Nikam' },
-  { id: 'survey3', date: subDays(new Date(), 15).toISOString(), location: 'Pune', type: 'Industrial', surveyor: 'Tejas' },
-  { id: 'survey4', date: subDays(new Date(), 20).toISOString(), location: 'Nagpur', type: 'Residential', surveyor: 'Ritesh' },
-  { id: 'survey5', date: subDays(new Date(), 25).toISOString(), location: 'Mumbai', type: 'Commercial', surveyor: 'Mayur' },
-  { id: 'survey6', date: subDays(new Date(), 35).toISOString(), location: 'Pune', type: 'Residential', surveyor: 'Kanchan Nikam' }, // Older than 30 days
-  { id: 'survey7', date: subDays(new Date(), 2).toISOString(), location: 'Satara', type: 'Commercial', surveyor: 'Prasad mudholkar' },
-  { id: 'survey8', date: subDays(new Date(), 8).toISOString(), location: 'Pune', type: 'Commercial', surveyor: 'Tejas' },
-  { id: 'survey9', date: subDays(new Date(), 12).toISOString(), location: 'Mumbai', type: 'Industrial', surveyor: 'Mayur' },
-  { id: 'survey10', date: subDays(new Date(), 18).toISOString(), location: 'Nagpur', type: 'Residential', surveyor: 'Ritesh' },
-];
-
-type SurveyType = 'Commercial' | 'Industrial' | 'Residential';
-const SURVEY_TYPES: SurveyType[] = ['Commercial', 'Industrial', 'Residential'];
 
 export default function SurveyReportsPage() {
   const surveysInLast30Days = useMemo(() => {
     const today = startOfDay(new Date());
-    const thirtyDaysAgo = startOfDay(subDays(today, 29)); // include today
+    const thirtyDaysAgo = startOfDay(subDays(today, 29)); 
     return MOCK_SURVEYS.filter(survey => {
-      const surveyDate = parseISO(survey.date);
+      const surveyDate = parseISO(survey.surveyDate); // Use surveyDate
       return isWithinInterval(surveyDate, { start: thirtyDaysAgo, end: endOfDay(today) });
     });
   }, []);
@@ -49,13 +38,17 @@ export default function SurveyReportsPage() {
   }, [surveysInLast30Days]);
 
   const typeDistributionData = useMemo(() => {
-    const counts: Record<SurveyType, number> = { Commercial: 0, Industrial: 0, Residential: 0 };
+    const counts: Record<string, number> = {};
+    SURVEY_TYPES_CONST.forEach(type => counts[type] = 0);
+
     surveysInLast30Days.forEach(survey => {
-      counts[survey.type]++;
+      if (counts[survey.type] !== undefined) {
+        counts[survey.type]++;
+      }
     });
-    return SURVEY_TYPES.map((type, index) => ({
+    return SURVEY_TYPES_CONST.map((type, index) => ({
       name: type,
-      value: counts[type],
+      value: counts[type] || 0,
       fill: COLORS[index % COLORS.length],
     })).filter(item => item.value > 0);
   }, [surveysInLast30Days]);
@@ -73,11 +66,12 @@ export default function SurveyReportsPage() {
   }, [typeDistributionData]);
 
 
-  const SurveyTypeIcon = ({ type }: { type: SurveyType }) => {
+  const SurveyTypeIconInternal = ({ type }: { type: SurveyTypeOption }) => {
     switch (type) {
       case 'Commercial': return <Building className="h-4 w-4 text-muted-foreground" />;
-      case 'Industrial': return <Sun className="h-4 w-4 text-muted-foreground" />; // Using Sun as placeholder for industrial
+      case 'Industrial': return <Sun className="h-4 w-4 text-muted-foreground" />; 
       case 'Residential': return <Home className="h-4 w-4 text-muted-foreground" />;
+      case 'Agricultural': return <ClipboardList className="h-4 w-4 text-muted-foreground" />; // Example for Agricultural
       default: return <ClipboardList className="h-4 w-4 text-muted-foreground" />;
     }
   };
@@ -88,6 +82,13 @@ export default function SurveyReportsPage() {
         title="Survey Reports"
         description="Overview of recent survey activities, distributions by location and type."
         icon={ClipboardList}
+        actions={
+          <Button asChild>
+            <Link href="/survey-list">
+              <List className="mr-2 h-4 w-4" /> View Survey List
+            </Link>
+          </Button>
+        }
       />
 
       <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3 mb-6">
@@ -142,7 +143,7 @@ export default function SurveyReportsPage() {
                 <ClipboardList className="h-5 w-5 text-primary" />
                 <CardTitle>Type-wise Distribution</CardTitle>
             </div>
-            <CardDescription>Breakdown of surveys by type (Commercial, Industrial, Residential) in the last 30 days.</CardDescription>
+            <CardDescription>Breakdown of surveys by type in the last 30 days.</CardDescription>
           </CardHeader>
           <CardContent className="h-[350px] pb-0">
             {typeDistributionData.length > 0 ? (
@@ -174,18 +175,18 @@ export default function SurveyReportsPage() {
         <CardContent>
             {surveysInLast30Days.length > 0 ? (
                 <div className="space-y-3">
-                    {surveysInLast30Days.slice(0, 5).map(survey => ( // Display top 5 recent
+                    {surveysInLast30Days.slice(0, 5).map(survey => ( 
                         <div key={survey.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50">
                             <div>
-                                <p className="font-medium text-sm">Survey ID: {survey.id}</p>
+                                <p className="font-medium text-sm">Survey No: {survey.surveyNumber}</p>
                                 <p className="text-xs text-muted-foreground">
                                     <MapPin className="inline h-3 w-3 mr-1"/>{survey.location} - 
-                                    <SurveyTypeIcon type={survey.type as SurveyType}/> {survey.type}
+                                    <SurveyTypeIconInternal type={survey.type as SurveyTypeOption}/> {survey.type}
                                 </p>
                             </div>
                             <div className="text-right">
-                                <p className="text-sm">{format(parseISO(survey.date), "dd MMM, yyyy")}</p>
-                                <p className="text-xs text-muted-foreground">By: {survey.surveyor}</p>
+                                <p className="text-sm">{format(parseISO(survey.surveyDate), "dd MMM, yyyy")}</p>
+                                <p className="text-xs text-muted-foreground">By: {survey.surveyorName}</p>
                             </div>
                         </div>
                     ))}
@@ -199,6 +200,3 @@ export default function SurveyReportsPage() {
     </>
   );
 }
-
-
-    

@@ -1,8 +1,8 @@
 
-import type { NavItem, Lead, Proposal, Document, Communication, DocumentType, ClientType, ModuleType, DCRStatus, ModuleWattage, LeadStatusType, LeadPriorityType, LeadSourceOptionType, UserOptionType, DropReasonType, Expense, ExpenseCategory } from '@/types';
+import type { NavItem, Lead, Proposal, Document, Communication, DocumentType, ClientType, ModuleType, DCRStatus, ModuleWattage, LeadStatusType, LeadPriorityType, LeadSourceOptionType, UserOptionType, DropReasonType, Expense, ExpenseCategory, Survey, SurveyStatusType, SurveyTypeOption } from '@/types';
 import {
   LayoutDashboard,
-  UsersRound, // Icon for Summary/Overview
+  UsersRound, 
   FileText,
   Files,
   MessageSquareText,
@@ -13,15 +13,15 @@ import {
   Edit,
   Eye,
   FileSignature,
-  Briefcase, // Icon for Clients List
-  UserX,    // Icon for Dropped Leads List
+  Briefcase, 
+  UserX,     
   Rows,
   CalendarDays,
-  ListChecks, // Icon for Leads List
+  ListChecks, 
   UserCheck,
   Receipt,
-  Notebook, // Icon for Expenses in main nav
-  ClipboardList, // Icon for Survey Reports
+  Notebook, 
+  ClipboardList, 
 } from 'lucide-react';
 import { format, parseISO, addDays, subDays } from 'date-fns';
 
@@ -107,17 +107,17 @@ export const MOCK_LEADS: Lead[] = [
     kilowatt: 0, clientType: 'Other', priority: 'Low', assignedTo: 'System', createdBy: 'System'
   },
    {
-    id: 'client1', name: 'Green Valley Society', // Corresponds to proposal client
+    id: 'client1', name: 'Green Valley Society', 
     status: 'Deal Done', clientType: 'Housing Society', phone: '9876543210', assignedTo: 'Mayur',
     createdAt: subDays(new Date(), 100).toISOString(), updatedAt: subDays(new Date(), 10).toISOString(),
   },
   {
-    id: 'client2', name: 'Mr. Anil Patel (Bungalow)', // Corresponds to proposal client
+    id: 'client2', name: 'Mr. Anil Patel (Bungalow)', 
     status: 'Deal Done', clientType: 'Individual/Bungalow', phone: '9876543211', assignedTo: 'Sales Rep A',
     createdAt: subDays(new Date(), 120).toISOString(), updatedAt: subDays(new Date(), 5).toISOString(),
   },
   {
-    id: 'client3', name: 'FutureTech Industries', // Corresponds to proposal client
+    id: 'client3', name: 'FutureTech Industries', 
     status: 'Deal Done', clientType: 'Commercial', phone: '9876543212', assignedTo: 'Sales Rep B',
     createdAt: subDays(new Date(), 80).toISOString(), updatedAt: subDays(new Date(), 1).toISOString(),
   },
@@ -218,4 +218,34 @@ export const MOCK_EXPENSES: Expense[] = [
   },
 ];
 
-    
+// Survey Constants
+export const SURVEY_STATUS_OPTIONS = ['Scheduled', 'In Progress', 'Completed', 'Cancelled', 'On Hold'] as const;
+export const SURVEY_TYPE_OPTIONS = ['Commercial', 'Residential', 'Industrial', 'Agricultural', 'Other'] as const;
+
+export const MOCK_SURVEYS: Survey[] = [
+  {
+    id: 'survey001', surveyNumber: 'SVY-2024-001', clientName: 'Innovatech Solutions', location: 'Pune',
+    surveyDate: subDays(new Date(), 7).toISOString(), surveyorName: 'Mayur', status: 'Completed', type: 'Commercial',
+    notes: 'Standard commercial rooftop survey. Good potential.', createdAt: subDays(new Date(), 8).toISOString(), updatedAt: subDays(new Date(), 7).toISOString()
+  },
+  {
+    id: 'survey002', surveyNumber: 'SVY-2024-002', clientName: 'Mr. Sharma\'s Residence', location: 'Mumbai',
+    surveyDate: subDays(new Date(), 3).toISOString(), surveyorName: 'Kanchan Nikam', status: 'Scheduled', type: 'Residential',
+    notes: 'Bungalow survey, appointment confirmed for next week.', createdAt: subDays(new Date(), 5).toISOString(), updatedAt: subDays(new Date(), 3).toISOString()
+  },
+  {
+    id: 'survey003', surveyNumber: 'SVY-2024-003', clientName: 'Agro Farms Ltd.', location: 'Nashik',
+    surveyDate: subDays(new Date(), 10).toISOString(), surveyorName: 'Tejas', status: 'In Progress', type: 'Agricultural',
+    notes: 'Large scale agricultural land survey for solar pumps.', createdAt: subDays(new Date(), 12).toISOString(), updatedAt: subDays(new Date(), 10).toISOString()
+  },
+  {
+    id: 'survey004', surveyNumber: 'SVY-2024-004', clientName: 'TechPark Building A', location: 'Pune',
+    surveyDate: subDays(new Date(), 1).toISOString(), surveyorName: 'Ritesh', status: 'Completed', type: 'Commercial',
+    notes: 'Complex rooftop with multiple AC units. Feasibility report attached.', createdAt: subDays(new Date(), 2).toISOString(), updatedAt: subDays(new Date(), 1).toISOString()
+  },
+  {
+    id: 'survey005', surveyNumber: 'SVY-2024-005', clientName: 'Greenwood Industries', location: 'Nagpur',
+    surveyDate: subDays(new Date(), 15).toISOString(), surveyorName: 'Prasad mudholkar', status: 'On Hold', type: 'Industrial',
+    notes: 'Client requested to put survey on hold due to internal approvals.', createdAt: subDays(new Date(), 16).toISOString(), updatedAt: subDays(new Date(), 15).toISOString()
+  },
+];
