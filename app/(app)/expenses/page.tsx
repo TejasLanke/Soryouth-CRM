@@ -243,9 +243,6 @@ export default function ExpensesPage() {
           </CardContent>
         </Card>
       </div>
-       <div className="mt-8">
-        <img src="https://placehold.co/1200x300.png" data-ai-hint="expenses management dashboard" alt="Expenses Management" className="w-full rounded-lg object-cover"/>
-      </div>
     </>
   );
 }

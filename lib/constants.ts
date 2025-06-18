@@ -20,6 +20,7 @@ import {
   ListChecks,
   UserCheck,
   Receipt,
+  Notebook,
 } from 'lucide-react';
 import { format, parseISO, addDays, subDays } from 'date-fns';
 
@@ -31,6 +32,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/leads/current', label: 'Summary', icon: UsersRound },
   { href: '/proposals', label: 'Proposals', icon: FileText },
   { href: '/clients', label: 'Clients', icon: Briefcase },
+  { href: '/expenses', label: 'Expenses', icon: Notebook },
   { href: '/communications', label: 'Communications', icon: MessageSquareText },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays },
 ];
