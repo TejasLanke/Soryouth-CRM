@@ -17,7 +17,7 @@ import {
   UserX,
   Rows,
   CalendarDays,
-  ListChecks,
+  ListChecks, // Will be used for the new "Leads" link
   UserCheck,
   Receipt,
   Notebook,
@@ -29,7 +29,8 @@ export const APP_NAME = "Soryouth";
 // Primary CRM Navigation for the main sidebar
 export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/leads/current', label: 'Summary', icon: UsersRound },
+  { href: '/leads/current', label: 'Summary', icon: UsersRound }, // Retained "Summary" link
+  { href: '/leads/current', label: 'Leads', icon: ListChecks },    // New "Leads" link
   { href: '/proposals', label: 'Proposals', icon: FileText },
   { href: '/clients', label: 'Clients', icon: Briefcase },
   { href: '/expenses', label: 'Expenses', icon: Notebook },
@@ -43,7 +44,7 @@ export const TOOLS_NAV_ITEMS: NavItem[] = [
   { href: '/documents', label: 'Documents', icon: Files },
   { href: '/document-customizer', label: 'AI Document Customizer', icon: WandSparkles },
   { href: '/automation', label: 'Automation Scripts', icon: TerminalSquare },
-  { href: '/expenses', label: 'Expenses', icon: Receipt },
+  { href: '/expenses', label: 'Expenses', icon: Receipt }, // Note: Expenses is also in main nav; consider if this is intended duplication or if one should be removed.
 ];
 
 export const CLIENT_TYPES = ['Individual/Bungalow', 'Housing Society', 'Commercial', 'Industrial', 'Other'] as const;
