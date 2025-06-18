@@ -2,8 +2,8 @@
 import type { NavItem, Lead, Proposal, Document, Communication, DocumentType, ClientType, ModuleType, DCRStatus, ModuleWattage, LeadStatusType, LeadPriorityType, LeadSourceOptionType, UserOptionType, DropReasonType, Expense, ExpenseCategory } from '@/types';
 import {
   LayoutDashboard,
-  UsersRound, // Icon for Leads/Summary section
-  FileText,   // Used for Proposals link
+  UsersRound, // Icon for Summary/Overview
+  FileText,
   Files,
   MessageSquareText,
   WandSparkles,
@@ -13,14 +13,14 @@ import {
   Edit,
   Eye,
   FileSignature,
-  Briefcase, // Used for Clients link
-  UserX,
+  Briefcase, // Icon for Clients List
+  UserX,    // Icon for Dropped Leads List
   Rows,
   CalendarDays,
-  ListChecks, // Will be used for the new "Leads" link
+  ListChecks, // Icon for Leads List
   UserCheck,
   Receipt,
-  Notebook,
+  Notebook, // Icon for Expenses in main nav
 } from 'lucide-react';
 import { format, parseISO, addDays, subDays } from 'date-fns';
 
@@ -29,10 +29,11 @@ export const APP_NAME = "Soryouth";
 // Primary CRM Navigation for the main sidebar
 export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/leads/current', label: 'Summary', icon: UsersRound }, // Retained "Summary" link
-  { href: '/leads/current', label: 'Leads', icon: ListChecks },    // New "Leads" link
+  { href: '/leads/current', label: 'Summary', icon: UsersRound }, // Points to Leads Summary Report
+  { href: '/leads-list', label: 'Leads', icon: ListChecks },        // Points to new Active Leads List
+  { href: '/clients-list', label: 'Clients', icon: Briefcase },    // Points to new Clients List
+  { href: '/dropped-leads-list', label: 'Dropped', icon: UserX }, // Points to new Dropped Leads List
   { href: '/proposals', label: 'Proposals', icon: FileText },
-  { href: '/clients', label: 'Clients', icon: Briefcase },
   { href: '/expenses', label: 'Expenses', icon: Notebook },
   { href: '/communications', label: 'Communications', icon: MessageSquareText },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays },
@@ -44,7 +45,7 @@ export const TOOLS_NAV_ITEMS: NavItem[] = [
   { href: '/documents', label: 'Documents', icon: Files },
   { href: '/document-customizer', label: 'AI Document Customizer', icon: WandSparkles },
   { href: '/automation', label: 'Automation Scripts', icon: TerminalSquare },
-  { href: '/expenses', label: 'Expenses', icon: Receipt }, // Note: Expenses is also in main nav; consider if this is intended duplication or if one should be removed.
+  // Removed duplicate Expenses from here as it's in main nav
 ];
 
 export const CLIENT_TYPES = ['Individual/Bungalow', 'Housing Society', 'Commercial', 'Industrial', 'Other'] as const;
@@ -106,17 +107,17 @@ export const MOCK_LEADS: Lead[] = [
   },
    {
     id: 'client1', name: 'Green Valley Society', // Corresponds to proposal client
-    status: 'Deal Done', clientType: 'Housing Society',
+    status: 'Deal Done', clientType: 'Housing Society', phone: '9876543210', assignedTo: 'Mayur',
     createdAt: subDays(new Date(), 100).toISOString(), updatedAt: subDays(new Date(), 10).toISOString(),
   },
   {
     id: 'client2', name: 'Mr. Anil Patel (Bungalow)', // Corresponds to proposal client
-    status: 'Deal Done', clientType: 'Individual/Bungalow',
+    status: 'Deal Done', clientType: 'Individual/Bungalow', phone: '9876543211', assignedTo: 'Sales Rep A',
     createdAt: subDays(new Date(), 120).toISOString(), updatedAt: subDays(new Date(), 5).toISOString(),
   },
   {
     id: 'client3', name: 'FutureTech Industries', // Corresponds to proposal client
-    status: 'Deal Done', clientType: 'Commercial',
+    status: 'Deal Done', clientType: 'Commercial', phone: '9876543212', assignedTo: 'Sales Rep B',
     createdAt: subDays(new Date(), 80).toISOString(), updatedAt: subDays(new Date(), 1).toISOString(),
   },
 ];
@@ -215,5 +216,3 @@ export const MOCK_EXPENSES: Expense[] = [
     reviewedAt: subDays(new Date(), 9).toISOString(),
   },
 ];
-
-    
