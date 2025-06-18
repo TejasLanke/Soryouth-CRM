@@ -13,9 +13,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MOCK_LEADS, LEAD_STATUS_OPTIONS, USER_OPTIONS, LEAD_SOURCE_OPTIONS } from '@/lib/constants';
 import type { Lead, LeadStatusType, SortConfig } from '@/types';
 import { format, parseISO, isValid } from 'date-fns';
-import { Filter, Search, UploadCloud, PlusCircle, Settings2, ArrowUpDown, ChevronDown, SquareCheckBig } from 'lucide-react'; // Changed Funnel to Filter
+import { Filter, Search, UploadCloud, PlusCircle, Settings2, ArrowUpDown, ChevronDown, SquareCheckBig } from 'lucide-react';
 import { LeadForm } from '../leads/lead-form'; // Assuming LeadForm is in leads directory
 import { useToast } from "@/hooks/use-toast";
+import { Card, CardContent } from '@/components/ui/card'; // Added Card and CardContent import
 
 // Helper function for date formatting
 const ClientFormattedDateTime: React.FC<{ dateString?: string }> = ({ dateString }) => {
@@ -337,7 +338,5 @@ export default function ClientsPage() {
     </>
   );
 }
-
     
-
     
