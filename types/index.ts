@@ -1,5 +1,5 @@
 
-import type { LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, LEAD_SOURCE_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES, EXPENSE_CATEGORIES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS, SURVEY_STATUS_OPTIONS, SURVEY_TYPE_OPTIONS } from '@/lib/constants';
+import type { LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, LEAD_SOURCE_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES, EXPENSE_CATEGORIES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS, SURVEY_STATUS_OPTIONS, SURVEY_TYPE_OPTIONS, METER_PHASES, CONSUMER_LOAD_TYPES, ROOF_TYPES, DISCOM_OPTIONS } from '@/lib/constants';
 
 // Deriving types from the const arrays ensures type safety and single source of truth
 export type LeadStatusType = typeof LEAD_STATUS_OPTIONS[number];
@@ -193,3 +193,34 @@ export interface SurveyStatusFilterItem {
   count: number;
   value: SurveyStatusType | 'all';
 }
+
+// Site Survey Form Types
+export type ConsumerCategoryType = ClientType; // Reusing ClientType as they are similar
+export type MeterPhaseType = typeof METER_PHASES[number];
+export type ConsumerLoadType = typeof CONSUMER_LOAD_TYPES[number];
+export type RoofType = typeof ROOF_TYPES[number];
+export type DiscomType = typeof DISCOM_OPTIONS[number];
+
+export interface SiteSurveyData {
+  consumerName: string;
+  date: string; // ISO string for date
+  consumerCategory: ConsumerCategoryType;
+  location: string;
+  numberOfMeters: number;
+  meterRating?: string;
+  meterPhase?: MeterPhaseType;
+  electricityAmount?: number;
+  consumerLoadType: ConsumerLoadType;
+  roofType: RoofType;
+  buildingHeight: string;
+  shadowFreeArea: string;
+  discom: DiscomType;
+  sanctionedLoad?: string;
+  remark?: string;
+  surveyorName: UserOptionType;
+  electricityBillFile?: File | null;
+}
+
+export type SiteSurveyFormValues = Omit<SiteSurveyData, 'electricityBillFile'> & {
+  electricityBillFile?: FileList | null; // For react-hook-form
+};

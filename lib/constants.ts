@@ -1,5 +1,5 @@
 
-import type { NavItem, Lead, Proposal, Document, Communication, DocumentType, ClientType, ModuleType, DCRStatus, ModuleWattage, LeadStatusType, LeadPriorityType, LeadSourceOptionType, UserOptionType, DropReasonType, Expense, ExpenseCategory, Survey, SurveyStatusType, SurveyTypeOption } from '@/types';
+import type { NavItem, Lead, Proposal, Document, Communication, DocumentType, ClientType, ModuleType, DCRStatus, ModuleWattage, LeadStatusType, LeadPriorityType, LeadSourceOptionType, UserOptionType, DropReasonType, Expense, ExpenseCategory, Survey, SurveyStatusType, SurveyTypeOption, MeterPhaseType, ConsumerLoadType, RoofType, DiscomType } from '@/types';
 import {
   LayoutDashboard,
   UsersRound, 
@@ -21,7 +21,8 @@ import {
   UserCheck,
   Receipt,
   Notebook, 
-  ClipboardList, 
+  ClipboardList,
+  ClipboardEdit, // Added for Site Survey Form
 } from 'lucide-react';
 import { format, parseISO, addDays, subDays } from 'date-fns';
 
@@ -44,6 +45,7 @@ export const NAV_ITEMS: NavItem[] = [
 // Secondary Navigation for tools/other sections, in user profile dropdown
 export const TOOLS_NAV_ITEMS: NavItem[] = [
   { href: '/proposals/batch', label: 'Batch Proposals', icon: Rows },
+  { href: '/site-survey', label: 'Site Survey Form', icon: ClipboardEdit },
   { href: '/documents', label: 'Documents', icon: Files },
   { href: '/document-customizer', label: 'AI Document Customizer', icon: WandSparkles },
   { href: '/automation', label: 'Automation Scripts', icon: TerminalSquare },
@@ -233,19 +235,11 @@ export const MOCK_SURVEYS: Survey[] = [
     surveyDate: subDays(new Date(), 3).toISOString(), surveyorName: 'Kanchan Nikam', status: 'Scheduled', type: 'Residential',
     notes: 'Bungalow survey, appointment confirmed for next week.', createdAt: subDays(new Date(), 5).toISOString(), updatedAt: subDays(new Date(), 3).toISOString()
   },
-  {
-    id: 'survey003', surveyNumber: 'SVY-2024-003', clientName: 'Agro Farms Ltd.', location: 'Nashik',
-    surveyDate: subDays(new Date(), 10).toISOString(), surveyorName: 'Tejas', status: 'In Progress', type: 'Agricultural',
-    notes: 'Large scale agricultural land survey for solar pumps.', createdAt: subDays(new Date(), 12).toISOString(), updatedAt: subDays(new Date(), 10).toISOString()
-  },
-  {
-    id: 'survey004', surveyNumber: 'SVY-2024-004', clientName: 'TechPark Building A', location: 'Pune',
-    surveyDate: subDays(new Date(), 1).toISOString(), surveyorName: 'Ritesh', status: 'Completed', type: 'Commercial',
-    notes: 'Complex rooftop with multiple AC units. Feasibility report attached.', createdAt: subDays(new Date(), 2).toISOString(), updatedAt: subDays(new Date(), 1).toISOString()
-  },
-  {
-    id: 'survey005', surveyNumber: 'SVY-2024-005', clientName: 'Greenwood Industries', location: 'Nagpur',
-    surveyDate: subDays(new Date(), 15).toISOString(), surveyorName: 'Prasad mudholkar', status: 'On Hold', type: 'Industrial',
-    notes: 'Client requested to put survey on hold due to internal approvals.', createdAt: subDays(new Date(), 16).toISOString(), updatedAt: subDays(new Date(), 15).toISOString()
-  },
 ];
+
+// Site Survey Form Constants
+export const CONSUMER_CATEGORIES_OPTIONS = CLIENT_TYPES; // Reusing CLIENT_TYPES
+export const METER_PHASES = ['Single Phase', 'Three Phase', 'Not Applicable'] as const;
+export const CONSUMER_LOAD_TYPES = ['LT', 'HT'] as const;
+export const ROOF_TYPES = ['Metal', 'RCC', 'Asbestos', 'Other'] as const;
+export const DISCOM_OPTIONS = ['MSEDCL', 'Adani Electricity', 'Tata Power', 'Torrent Power', 'Other'] as const;
