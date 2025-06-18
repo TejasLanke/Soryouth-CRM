@@ -21,6 +21,7 @@ import {
   UserCheck,
   Receipt,
   Notebook, // Icon for Expenses in main nav
+  ClipboardList, // Icon for Survey Reports
 } from 'lucide-react';
 import { format, parseISO, addDays, subDays } from 'date-fns';
 
@@ -29,14 +30,15 @@ export const APP_NAME = "Soryouth";
 // Primary CRM Navigation for the main sidebar
 export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/leads/current', label: 'Summary', icon: UsersRound }, // Points to Leads Summary Report
-  { href: '/leads-list', label: 'Leads', icon: ListChecks },        // Points to new Active Leads List
-  { href: '/clients-list', label: 'Clients', icon: Briefcase },    // Points to new Clients List
-  { href: '/dropped-leads-list', label: 'Dropped', icon: UserX }, // Points to new Dropped Leads List
+  { href: '/leads/current', label: 'Summary', icon: UsersRound },
+  { href: '/leads-list', label: 'Leads', icon: ListChecks },
+  { href: '/clients-list', label: 'Clients', icon: Briefcase },
+  { href: '/dropped-leads-list', label: 'Dropped', icon: UserX },
   { href: '/proposals', label: 'Proposals', icon: FileText },
   { href: '/expenses', label: 'Expenses', icon: Notebook },
   { href: '/communications', label: 'Communications', icon: MessageSquareText },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays },
+  { href: '/survey-reports', label: 'Survey Reports', icon: ClipboardList },
 ];
 
 // Secondary Navigation for tools/other sections, in user profile dropdown
@@ -45,7 +47,6 @@ export const TOOLS_NAV_ITEMS: NavItem[] = [
   { href: '/documents', label: 'Documents', icon: Files },
   { href: '/document-customizer', label: 'AI Document Customizer', icon: WandSparkles },
   { href: '/automation', label: 'Automation Scripts', icon: TerminalSquare },
-  // Removed duplicate Expenses from here as it's in main nav
 ];
 
 export const CLIENT_TYPES = ['Individual/Bungalow', 'Housing Society', 'Commercial', 'Industrial', 'Other'] as const;
@@ -216,3 +217,5 @@ export const MOCK_EXPENSES: Expense[] = [
     reviewedAt: subDays(new Date(), 9).toISOString(),
   },
 ];
+
+    
