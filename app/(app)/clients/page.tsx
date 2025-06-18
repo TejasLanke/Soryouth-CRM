@@ -13,7 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MOCK_LEADS, LEAD_STATUS_OPTIONS, USER_OPTIONS, LEAD_SOURCE_OPTIONS } from '@/lib/constants';
 import type { Lead, LeadStatusType, SortConfig } from '@/types';
 import { format, parseISO, isValid } from 'date-fns';
-import { Funnel, Search, UploadCloud, PlusCircle, Settings2, ArrowUpDown, ChevronDown, SquareCheckBig } from 'lucide-react';
+import { Filter, Search, UploadCloud, PlusCircle, Settings2, ArrowUpDown, ChevronDown, SquareCheckBig } from 'lucide-react'; // Changed Funnel to Filter
 import { LeadForm } from '../leads/lead-form'; // Assuming LeadForm is in leads directory
 import { useToast } from "@/hooks/use-toast";
 
@@ -184,7 +184,7 @@ export default function ClientsPage() {
         actions={
           <div className="flex items-center gap-2">
             <Button variant="outline" size="icon" className="h-9 w-9">
-              <Funnel className="h-4 w-4" />
+              <Filter className="h-4 w-4" />
             </Button>
             <Button variant="outline" size="icon" className="h-9 w-9">
               <Search className="h-4 w-4" />
@@ -337,3 +337,7 @@ export default function ClientsPage() {
     </>
   );
 }
+
+    
+
+    
