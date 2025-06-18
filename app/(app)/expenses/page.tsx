@@ -224,7 +224,12 @@ export default function ExpensesPage() {
                   <TableRow key={expense.id}>
                     <TableCell>{format(parseISO(expense.date), 'dd MMM, yyyy')}</TableCell>
                     <TableCell>{expense.category}</TableCell>
-                    <TableCell className="text-right font-medium">₹{expense.amount.toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-medium">
+                      <div className="flex items-center justify-end">
+                        <IndianRupee className="h-4 w-4 mr-0.5 text-muted-foreground" />
+                        {expense.amount.toFixed(2)}
+                      </div>
+                    </TableCell>
                     <TableCell className="max-w-[200px] truncate">{expense.description}</TableCell>
                     <TableCell>{expense.userName || expense.userId}</TableCell>
                     <TableCell>
