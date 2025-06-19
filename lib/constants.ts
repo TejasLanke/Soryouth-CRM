@@ -22,7 +22,8 @@ import {
   Receipt,
   Notebook,
   ClipboardList,
-  ClipboardEdit, // Added for Site Survey Form
+  ClipboardEdit,
+  MapPinnedIcon, // Added for Site Survey Form
 } from 'lucide-react';
 import { format, parseISO, addDays, subDays } from 'date-fns';
 
@@ -39,7 +40,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/expenses', label: 'Expenses', icon: Notebook },
   { href: '/communications', label: 'Communications', icon: MessageSquareText },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays },
-  { href: '/survey-reports', label: 'Survey Reports', icon: ClipboardList },
+  { href: '/survey-reports', label: 'Site Survey', icon: MapPinnedIcon },
 ];
 
 // Secondary Navigation for tools/other sections, in user profile dropdown
