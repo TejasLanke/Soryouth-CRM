@@ -41,11 +41,6 @@ export default function HomePage() {
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
             </Button>
-            <Button size="lg" variant="outline" asChild className="shadow-lg hover:shadow-xl transition-shadow">
-              <Link href="/proposals">
-                Manage Proposals
-              </Link>
-            </Button>
           </div>
         </section>
 
