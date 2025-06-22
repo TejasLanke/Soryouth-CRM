@@ -1,5 +1,5 @@
 
-import type { NavItem, Lead, Proposal, Document, Communication, DocumentType, ClientType, ModuleType, DCRStatus, ModuleWattage, LeadStatusType, LeadPriorityType, LeadSourceOptionType, UserOptionType, DropReasonType, Expense, ExpenseCategory, Survey, SurveyStatusType, SurveyTypeOption, MeterPhaseType, ConsumerLoadType, RoofType, DiscomType } from '@/types';
+import type { NavItem, Lead, Proposal, Document, Communication, DocumentType, ClientType, LeadStatusType, LeadPriorityType, LeadSourceOptionType, UserOptionType, DropReasonType, Expense, ExpenseCategory, Survey, SurveyStatusType, SurveyTypeOption, MeterPhaseType, ConsumerLoadType, RoofType, DiscomType } from '@/types';
 import {
   LayoutDashboard,
   UsersRound,
@@ -23,7 +23,8 @@ import {
   Notebook,
   ClipboardList,
   ClipboardEdit,
-  MapPinnedIcon, // Added for Site Survey Form
+  MapPinnedIcon,
+  BarChart3, // Added for Reports
 } from 'lucide-react';
 import { format, parseISO, addDays, subDays } from 'date-fns';
 
@@ -40,7 +41,9 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/expenses', label: 'Expenses', icon: Notebook },
   { href: '/communications', label: 'Communications', icon: MessageSquareText },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays },
-  { href: '/survey-reports', label: 'Site Survey', icon: MapPinnedIcon },
+  { href: '/survey-reports', label: 'Survey Reports', icon: MapPinnedIcon },
+  { href: '/tickets', label: 'Tickets', icon: Receipt },
+  { href: '/reports', label: 'Reports', icon: BarChart3 },
 ];
 
 // Secondary Navigation for tools/other sections, in user profile dropdown
@@ -54,7 +57,7 @@ export const TOOLS_NAV_ITEMS: NavItem[] = [
 
 export const CLIENT_TYPES = ['Individual/Bungalow', 'Housing Society', 'Commercial', 'Industrial', 'Other'] as const;
 export const LEAD_STATUS_OPTIONS = ['fresher', 'Requirement', 'site visit', 'Quotation send', 'Followup', 'Deal Done', 'installer', 'ON HOLD', 'Lost', 'New'] as const;
-export const LEAD_PRIORITY_OPTIONS = ['High', 'Medium', 'Low', 'Average'] as const;
+export const LEAD_PRIORITY_OPTIONS = ['Hot', 'High', 'Medium', 'Low', 'Average'] as const;
 export const LEAD_SOURCE_OPTIONS = ['Facebook', 'Website', 'Referral', 'Cold Call', 'Walk-in', 'Other', 'OWN Reference'] as const;
 export const USER_OPTIONS = ['Mayur', 'Sales Rep A', 'Sales Rep B', 'Admin', 'System', 'Kanchan Nikam', 'tejas', 'MAYUR', 'Prasad mudholkar', 'Ritesh'] as const;
 export const DROP_REASON_OPTIONS = [
@@ -126,9 +129,9 @@ export const MOCK_LEADS: Lead[] = [
   },
 ];
 
-export const MODULE_TYPES: ModuleType[] = ['Mono PERC', 'TOPCon'];
-export const DCR_STATUSES: DCRStatus[] = ['DCR', 'Non-DCR'];
-export const MODULE_WATTAGE_OPTIONS: ModuleWattage[] = ["540", "545", "550", "585", "590"];
+export const MODULE_TYPES = ['Mono PERC', 'TOPCon'] as const;
+export const DCR_STATUSES = ['DCR', 'Non-DCR'] as const;
+export const MODULE_WATTAGE_OPTIONS = ["540", "545", "550", "585", "590"] as const;
 
 const calculateFinancialsAndSubsidy = (ratePerWatt: number, capacity: number, clientType: ClientType): Pick<Proposal, 'baseAmount' | 'cgstAmount' | 'sgstAmount' | 'subtotalAmount' | 'finalAmount' | 'subsidyAmount'> => {
   const baseAmount = ratePerWatt * capacity * 1000;

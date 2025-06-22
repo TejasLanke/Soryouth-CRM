@@ -45,6 +45,7 @@ interface LeadsTableProps {
   sortConfig?: SortConfig | null;
   requestSort?: (key: keyof Lead) => void;
   viewType?: 'active' | 'dropped';
+  columnVisibility?: Record<string, boolean>;
 }
 
 // Helper function for date formatting
@@ -79,7 +80,7 @@ const ClientFormattedDateTime: React.FC<{ dateString?: string }> = ({ dateString
 };
 
 
-export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, requestSort, viewType = 'active' }: LeadsTableProps) {
+export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, requestSort, viewType = 'active', columnVisibility }: LeadsTableProps) {
 
   const getSourceBadgeVariant = (source?: string) => {
     if (!source) return 'outline';
@@ -126,25 +127,18 @@ export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, reques
           {lead.name}
         </Link>
       </TableCell>
-      <TableCell className="py-3">{lead.phone || '-'}</TableCell>
-      <TableCell className="py-3">
-        <Badge variant="secondary" className="capitalize">{lead.status}</Badge>
-      </TableCell>
-      <TableCell className="py-3 text-xs">
-        <div>{lead.lastCommentText || '-'}</div>
-        {lead.lastCommentDate && <div className="text-muted-foreground">{lead.lastCommentDate}</div>}
-      </TableCell>
-      <TableCell className="py-3 text-xs">
-        {lead.nextFollowUpDate ? `${formatDate(lead.nextFollowUpDate)} ${lead.nextFollowUpTime || ''}`.trim() : '-'}
-      </TableCell>
-      <TableCell className="py-3">{lead.kilowatt !== undefined ? `${lead.kilowatt} kW` : '-'}</TableCell>
-      <TableCell className="py-3">
-        {lead.source ? <Badge variant={getSourceBadgeVariant(lead.source)}>{lead.source}</Badge> : '-'}
-      </TableCell>
-      <TableCell className="py-3">
-        {lead.priority ? <Badge variant={lead.priority === 'High' ? 'destructive' : lead.priority === 'Medium' ? 'secondary' : 'outline'} className="capitalize">{lead.priority}</Badge> : '-'}
-      </TableCell>
-      <TableCell className="py-3">{lead.assignedTo || '-'}</TableCell>
+      {(!columnVisibility || columnVisibility.email) && <TableCell className="py-3 text-xs">{lead.email || '-'}</TableCell>}
+      {(!columnVisibility || columnVisibility.phone) && <TableCell className="py-3">{lead.phone || '-'}</TableCell>}
+      {(!columnVisibility || columnVisibility.status) && <TableCell className="py-3"><Badge variant="secondary" className="capitalize">{lead.status}</Badge></TableCell>}
+      {(!columnVisibility || columnVisibility.lastCommentText) && <TableCell className="py-3 text-xs"><div>{lead.lastCommentText || '-'}</div>{lead.lastCommentDate && <div className="text-muted-foreground">{lead.lastCommentDate}</div>}</TableCell>}
+      {(!columnVisibility || columnVisibility.nextFollowUpDate) && <TableCell className="py-3 text-xs">{lead.nextFollowUpDate ? `${formatDate(lead.nextFollowUpDate)} ${lead.nextFollowUpTime || ''}`.trim() : '-'}</TableCell>}
+      {(!columnVisibility || columnVisibility.followupCount) && <TableCell className="py-3 text-center">{lead.followUpCount || 0}</TableCell>}
+      {(!columnVisibility || columnVisibility.calls) && <TableCell className="py-3 text-center">{0}</TableCell>}
+      {(!columnVisibility || columnVisibility.kilowatt) && <TableCell className="py-3">{lead.kilowatt !== undefined ? `${lead.kilowatt} kW` : '-'}</TableCell>}
+      {(!columnVisibility || columnVisibility.source) && <TableCell className="py-3">{lead.source ? <Badge variant={getSourceBadgeVariant(lead.source)}>{lead.source}</Badge> : '-'}</TableCell>}
+      {(!columnVisibility || columnVisibility.priority) && <TableCell className="py-3">{lead.priority ? <Badge variant={lead.priority === 'High' ? 'destructive' : lead.priority === 'Medium' ? 'secondary' : 'outline'} className="capitalize">{lead.priority}</Badge> : '-'}</TableCell>}
+      {(!columnVisibility || columnVisibility.assignedTo) && <TableCell className="py-3">{lead.assignedTo || '-'}</TableCell>}
+      
       {onEditLead && onDeleteLead && (
         <TableCell className="text-right py-3">
           <DropdownMenu>
@@ -239,14 +233,17 @@ export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, reques
                 {viewType === 'active' && (
                   <>
                     {renderHeaderCell('Name', 'name')}
-                    {renderHeaderCell('Mobile no.', 'phone')}
-                    {renderHeaderCell('Stage', 'status')}
-                    {renderHeaderCell('Last comment', 'lastCommentText')}
-                    {renderHeaderCell('Next follow-up', 'nextFollowUpDate')}
-                    {renderHeaderCell('Kilowatt', 'kilowatt')}
-                    {renderHeaderCell('Source', 'source')}
-                    {renderHeaderCell('Priority', 'priority')}
-                    {renderHeaderCell('Assigned To', 'assignedTo')}
+                    {(!columnVisibility || columnVisibility.email) && renderHeaderCell('Email', 'email')}
+                    {(!columnVisibility || columnVisibility.phone) && renderHeaderCell('Mobile no.', 'phone')}
+                    {(!columnVisibility || columnVisibility.status) && renderHeaderCell('Stage', 'status')}
+                    {(!columnVisibility || columnVisibility.lastCommentText) && renderHeaderCell('Last comment', 'lastCommentText')}
+                    {(!columnVisibility || columnVisibility.nextFollowUpDate) && renderHeaderCell('Next follow-up', 'nextFollowUpDate')}
+                    {(!columnVisibility || columnVisibility.followupCount) && renderHeaderCell('Followups', 'followUpCount')}
+                    {(!columnVisibility || columnVisibility.calls) && <TableHead className="text-muted-foreground whitespace-nowrap">Calls</TableHead>}
+                    {(!columnVisibility || columnVisibility.kilowatt) && renderHeaderCell('Kilowatt', 'kilowatt')}
+                    {(!columnVisibility || columnVisibility.source) && renderHeaderCell('Source', 'source')}
+                    {(!columnVisibility || columnVisibility.priority) && renderHeaderCell('Priority', 'priority')}
+                    {(!columnVisibility || columnVisibility.assignedTo) && renderHeaderCell('Assigned To', 'assignedTo')}
                     {onEditLead && onDeleteLead && <TableHead className="text-right text-muted-foreground">Actions</TableHead>}
                   </>
                 )}

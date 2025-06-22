@@ -14,27 +14,31 @@ export type ModuleWattage = typeof MODULE_WATTAGE_OPTIONS[number];
 
 
 export interface Lead {
-  id: string;
+  id: string; // Handled by Prisma (e.g., CUID)
   name: string;
-  email?: string;
-  phone?: string;
-  status: LeadStatusType;
-  source?: LeadSourceOptionType;
-  assignedTo?: UserOptionType;
-  createdBy?: UserOptionType;
-  createdAt: string;
-  updatedAt: string;
-  lastCommentText?: string;
-  lastCommentDate?: string;
-  nextFollowUpDate?: string;
-  nextFollowUpTime?: string;
-  kilowatt?: number;
-  address?: string;
-  priority?: LeadPriorityType;
-  dropReason?: DropReasonType;
-  clientType?: ClientType;
-  electricityBillUrl?: string; // Added for electricity bill
+  email?: string | null; // Prisma schema uses String?, so allow null
+  phone?: string | null;
+  status: LeadStatusType; // In Prisma, this will be a String; ensure validation/mapping
+  source?: LeadSourceOptionType | null;
+  assignedTo?: UserOptionType | null;
+  createdBy?: UserOptionType | null;
+  createdAt: string; // Prisma DateTime will be stringified (ISO 8601)
+  updatedAt: string; // Prisma DateTime will be stringified (ISO 8601)
+
+  lastCommentText?: string | null;
+  lastCommentDate?: string | null; // Consider storing as DateTime in Prisma if complex queries are needed
+  nextFollowUpDate?: string | null; // Consider storing as DateTime
+  nextFollowUpTime?: string | null;
+  kilowatt?: number | null; // Prisma Float?
+  address?: string | null;
+  priority?: LeadPriorityType | null;
+  dropReason?: DropReasonType | null;
+  clientType?: ClientType | null;
+  electricityBillUrl?: string | null;
+  followUpCount?: number;
 }
+
+export type CreateLeadData = Omit<Lead, 'id' | 'createdAt' | 'updatedAt' | 'followUpCount'>;
 
 export interface Proposal {
   id: string;
@@ -127,15 +131,26 @@ export interface FollowUp {
   id: string;
   leadId: string;
   type: FollowUpType;
-  date: string;
-  time: string;
+  date: string; // ISO string for the activity date
+  time?: string; // HH:MM
   status: FollowUpStatus;
-  priority: LeadPriorityType;
-  leadStage: LeadStatusType;
-  comment: string;
-  createdBy: UserOptionType;
-  createdAt: string;
+  leadStageAtTimeOfFollowUp?: LeadStatusType;
+  comment?: string;
+  createdBy?: UserOptionType;
+  createdAt: string; // ISO string for when the record was created
+
+  followupOrTask: 'Followup' | 'Task';
+
+  // Task-specific fields
+  taskForUser?: UserOptionType;
+  taskDate?: string; // ISO string for the task due date
+  taskTime?: string; // HH:MM for the task due time
 }
+
+export type AddActivityData = Omit<FollowUp, 'id' | 'createdAt'> & {
+  priority?: LeadPriorityType;
+};
+
 
 export interface Task {
   id: string;

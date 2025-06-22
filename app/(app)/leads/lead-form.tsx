@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Lead, LeadStatusType, LeadPriorityType, LeadSourceOptionType, UserOptionType } from '@/types';
+import type { Lead, LeadStatusType, LeadPriorityType, LeadSourceOptionType, UserOptionType, ClientType } from '@/types';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -32,14 +32,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import React, { useEffect } from 'react';
-import { LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, LEAD_SOURCE_OPTIONS, USER_OPTIONS } from '@/lib/constants';
+import { LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, LEAD_SOURCE_OPTIONS, USER_OPTIONS, CLIENT_TYPES } from '@/lib/constants';
 import { format, parseISO, isValid } from 'date-fns';
 
 const leadSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   email: z.string().email({ message: 'Invalid email address.' }).optional().or(z.literal('')),
   phone: z.string().min(10, { message: 'Phone number must be at least 10 digits.' }).optional().or(z.literal('')),
-  status: z.enum(LEAD_STATUS_OPTIONS), 
+  status: z.enum(LEAD_STATUS_OPTIONS),
   source: z.enum(LEAD_SOURCE_OPTIONS).optional(),
   assignedTo: z.enum(USER_OPTIONS).optional(),
   lastCommentText: z.string().optional(),
@@ -48,6 +48,7 @@ const leadSchema = z.object({
   kilowatt: z.coerce.number().min(0).optional(),
   address: z.string().optional(),
   priority: z.enum(LEAD_PRIORITY_OPTIONS).optional(),
+  clientType: z.enum(CLIENT_TYPES).optional(),
 });
 
 type LeadFormValues = z.infer<typeof leadSchema>;
@@ -75,6 +76,7 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead }: LeadFormProps) {
       kilowatt: 0,
       address: '',
       priority: undefined,
+      clientType: undefined,
     },
   });
 
@@ -83,7 +85,7 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead }: LeadFormProps) {
       if (lead) {
         form.reset({
           ...lead,
-          email: lead.email || '', // Ensure email is empty string if undefined
+          email: lead.email || '',
           phone: lead.phone || '',
           kilowatt: lead.kilowatt ?? 0,
           nextFollowUpDate: lead.nextFollowUpDate ? format(parseISO(lead.nextFollowUpDate), 'yyyy-MM-dd') : '',
@@ -92,6 +94,7 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead }: LeadFormProps) {
           priority: lead.priority || undefined,
           source: lead.source || undefined,
           assignedTo: lead.assignedTo || undefined,
+          clientType: lead.clientType || undefined,
         });
       } else {
         form.reset({
@@ -107,6 +110,7 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead }: LeadFormProps) {
           kilowatt: 0,
           address: '',
           priority: undefined,
+          clientType: undefined,
         });
       }
     }
@@ -120,6 +124,7 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead }: LeadFormProps) {
       lastCommentDate: values.lastCommentText ? format(new Date(), 'dd-MM-yyyy') : undefined,
       nextFollowUpDate: values.nextFollowUpDate || undefined,
       nextFollowUpTime: values.nextFollowUpTime || undefined,
+      clientType: values.clientType || undefined,
     };
     if (lead) {
       onSubmit({ ...lead, ...submissionData, status: values.status as LeadStatusType });
@@ -180,7 +185,7 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead }: LeadFormProps) {
                 )}
               />
             </div>
-            
+
             <FormField
               control={form.control}
               name="address"
@@ -198,7 +203,7 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead }: LeadFormProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="status" 
+                name="status"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Stage *</FormLabel>
@@ -241,7 +246,45 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead }: LeadFormProps) {
                 )}
               />
             </div>
-            
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="clientType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Customer Type</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select customer type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {CLIENT_TYPES.map(type => (
+                          <SelectItem key={type} value={type}>{type}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="kilowatt"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Kilowatt (kW)</FormLabel>
+                    <FormControl>
+                        <Input type="number" placeholder="0" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+              />
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -331,21 +374,7 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead }: LeadFormProps) {
                 )}
                 />
             </div>
-            
-            <FormField
-                control={form.control}
-                name="kilowatt"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Kilowatt (kW)</FormLabel>
-                    <FormControl>
-                        <Input type="number" placeholder="0" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-            />
-            
+
             <DialogFooter className="pt-4">
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancel
