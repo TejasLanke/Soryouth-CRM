@@ -6,7 +6,7 @@ import { LeadsTable } from '@/app/(app)/leads/leads-table';
 import { MOCK_LEADS, DROP_REASON_OPTIONS } from '@/lib/constants';
 import { Search, Settings2, ListFilter, UserX } from 'lucide-react'; // Filter icon imported as ListFilter
 import { Button } from '@/components/ui/button';
-import type { Lead, DropReasonType, DropReasonFilterItem, SortConfig } from '@/types';
+import type { Lead, DropReasonType, DropReasonFilterItem, LeadSortConfig } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO } from 'date-fns';
 
@@ -18,7 +18,7 @@ export default function DroppedLeadsListPage() {
   // This page is primarily for viewing. Actions like "restore lead" could be added.
   // const [droppedLeads, setDroppedLeads] = useState<Lead[]>(initialDroppedLeads); 
   const [activeFilter, setActiveFilter] = useState<DropReasonType | 'all'>('all');
-  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
+  const [sortConfig, setSortConfig] = useState<LeadSortConfig | null>(null);
 
   const dropReasonFilters = useMemo((): DropReasonFilterItem[] => {
     const counts: Record<string, number> = {};
@@ -122,7 +122,7 @@ export default function DroppedLeadsListPage() {
       </div>
       
       <LeadsTable 
-        leads={sortedAndFilteredLeads} 
+        items={sortedAndFilteredLeads} 
         viewType="dropped"
         sortConfig={sortConfig}
         requestSort={requestSort}

@@ -3,13 +3,13 @@
 import React, { useState, useMemo, useEffect, useTransition } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { LeadsTable } from '@/app/(app)/leads/leads-table';
-import { LEAD_STATUS_OPTIONS, LEAD_SOURCE_OPTIONS } from '@/lib/constants';
+import { ACTIVE_LEAD_STATUS_OPTIONS, LEAD_SOURCE_OPTIONS } from '@/lib/constants';
 import { Filter, Search, Upload, PlusCircle, Settings2, ListChecks, ListFilter, Rows } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LeadForm } from '@/app/(app)/leads/lead-form';
 import { LeadSettingsDialog } from '@/app/(app)/leads/lead-settings-dialog';
 import { useToast } from "@/hooks/use-toast";
-import type { Lead, LeadStatusType, StatusFilterItem, SortConfig } from '@/types';
+import type { Lead, LeadStatusType, StatusFilterItem, LeadSortConfig, CreateLeadData } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO, startOfDay, isSameDay } from 'date-fns';
 import { getLeads, createLead, updateLead, deleteLead } from './actions';
@@ -24,7 +24,7 @@ const allColumns: Record<string, string> = {
     status: 'Stage',
     lastCommentText: 'Last Comment',
     nextFollowUpDate: 'Next Follow-up',
-    followUpCount: 'Followups',
+    followupCount: 'Followups',
     calls: 'Calls',
     kilowatt: 'Kilowatt',
     source: 'Source',
@@ -44,7 +44,7 @@ export default function LeadsListPage() {
   const [quickFilter, setQuickFilter] = useState<string>('Show all');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
+  const [sortConfig, setSortConfig] = useState<LeadSortConfig | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const [pageSize, setPageSize] = useState(10);
@@ -56,7 +56,7 @@ export default function LeadsListPage() {
     status: true,
     lastCommentText: true,
     nextFollowUpDate: true,
-    followUpCount: true,
+    followupCount: true,
     calls: false,
     kilowatt: true,
     source: false,
@@ -68,7 +68,8 @@ export default function LeadsListPage() {
     async function fetchLeads() {
       setIsLoading(true);
       const fetchedLeads = await getLeads();
-      setLeads(fetchedLeads.filter(lead => lead.status !== 'Lost'));
+      const activeLeads = fetchedLeads.filter(lead => lead.status !== 'Lost');
+      setLeads(activeLeads);
       setIsLoading(false);
     }
     fetchLeads();
@@ -79,7 +80,7 @@ export default function LeadsListPage() {
     setIsFormOpen(true);
   };
 
-  const handleFormSubmit = async (leadData: Omit<Lead, 'id' | 'createdAt' | 'updatedAt' | 'followUpCount'> | Lead) => {
+  const handleFormSubmit = async (leadData: CreateLeadData | Lead) => {
     startTransition(async () => {
       let result;
       if ('id' in leadData && leadData.id) { // Existing lead
@@ -91,9 +92,9 @@ export default function LeadsListPage() {
           toast({ title: "Error", description: "Failed to update lead.", variant: "destructive" });
         }
       } else { // New lead
-        result = await createLead(leadData as Omit<Lead, 'id' | 'createdAt' | 'updatedAt' | 'followUpCount'>);
+        result = await createLead(leadData as CreateLeadData);
         if (result) {
-          setLeads(prevLeads => [result!, ...prevLeads].filter(l => l.status !== 'Lost'));
+          setLeads(prevLeads => [result!, ...prevLeads]);
           toast({ title: "Lead Added", description: `${result.name} has been added to leads.` });
         } else {
           toast({ title: "Error", description: "Failed to create lead.", variant: "destructive" });
@@ -119,27 +120,32 @@ export default function LeadsListPage() {
   };
   
   const statusFilters = useMemo((): StatusFilterItem[] => {
-    const activeLeads = leads.filter(lead => lead.status !== 'Lost');
+    const activeLeads = leads;
     const counts: Record<string, number> = {};
-    LEAD_STATUS_OPTIONS.filter(s => s !== 'Lost').forEach(status => counts[status] = 0);
     
+    // Initialize counts for all possible active statuses
+    ACTIVE_LEAD_STATUS_OPTIONS.forEach(status => counts[status] = 0);
+    
+    // Count leads for each status
     activeLeads.forEach(lead => {
       if (counts[lead.status] !== undefined) {
         counts[lead.status]++;
       }
     });
 
+    // Create the filter items, starting with "Show all"
     const filters: StatusFilterItem[] = [{ label: 'Show all', count: activeLeads.length, value: 'all' }];
-    LEAD_STATUS_OPTIONS.filter(s => s !== 'Lost').forEach(status => {
-       if (counts[status] > 0 || LEAD_STATUS_OPTIONS.includes(status as LeadStatusType)) {
-        filters.push({ label: status, count: counts[status] || 0, value: status });
-      }
+    
+    // Add a filter tab for each active status option
+    ACTIVE_LEAD_STATUS_OPTIONS.forEach(status => {
+       filters.push({ label: status, count: counts[status] || 0, value: status });
     });
+
     return filters;
   }, [leads]);
 
   const allFilteredLeads = useMemo(() => {
-    let leadsToDisplay = leads.filter(lead => lead.status !== 'Lost');
+    let leadsToDisplay = [...leads];
     
     if (activeFilter !== 'all') {
       leadsToDisplay = leadsToDisplay.filter(lead => lead.status === activeFilter);
@@ -168,7 +174,7 @@ export default function LeadsListPage() {
         leadsToDisplay = leadsToDisplay.filter(lead => !lead.assignedTo);
         break;
       case 'No stage':
-        leadsToDisplay = leadsToDisplay.filter(lead => lead.status === 'fresher' || lead.status === 'New');
+        leadsToDisplay = leadsToDisplay.filter(lead => lead.status === 'Fresher' || lead.status === 'New');
         break;
       case 'Show all':
       default:
@@ -325,7 +331,7 @@ export default function LeadsListPage() {
                                     setPageSize(Number(value));
                                     setCurrentPage(1);
                                 }}>
-                                    {[10, 20, 50, 100, 500].map(size => (
+                                    {[10, 20, 50, 100].map(size => (
                                         <DropdownMenuRadioItem key={size} value={String(size)}>{size}</DropdownMenuRadioItem>
                                     ))}
                                 </DropdownMenuRadioGroup>
@@ -344,7 +350,7 @@ export default function LeadsListPage() {
               key={filter.value}
               variant={activeFilter === filter.value ? 'secondary' : 'ghost'}
               size="sm"
-              onClick={() => setActiveFilter(filter.value)}
+              onClick={() => setActiveFilter(filter.value as LeadStatusType | 'all')}
               className={`py-1 px-3 h-auto text-xs rounded-full ${activeFilter === filter.value ? 'border-b-2 border-primary font-semibold' : 'text-muted-foreground'}`}
             >
               {filter.label}
@@ -356,12 +362,12 @@ export default function LeadsListPage() {
         </div>
       </div>
       
-      <LeadsTable 
-        leads={paginatedLeads} 
-        onEditLead={(lead) => { setSelectedLeadForEdit(lead); setIsFormOpen(true); }}
-        onDeleteLead={handleDeleteLead}
+      <LeadsTable
+        items={paginatedLeads}
+        onEdit={(item) => setSelectedLeadForEdit(item as Lead)}
+        onDelete={handleDeleteLead}
         sortConfig={sortConfig}
-        requestSort={requestSort}
+        requestSort={requestSort as (key: keyof Lead) => void}
         viewType="active"
         columnVisibility={columnVisibility}
       />
@@ -399,13 +405,14 @@ export default function LeadsListPage() {
           onClose={() => setIsFormOpen(false)}
           onSubmit={handleFormSubmit}
           lead={selectedLeadForEdit}
+          formMode="active"
         />
       )}
       {isSettingsDialogOpen && (
         <LeadSettingsDialog
           isOpen={isSettingsDialogOpen}
           onClose={() => setIsSettingsDialogOpen(false)}
-          initialStatuses={[...LEAD_STATUS_OPTIONS]}
+          initialStatuses={[...ACTIVE_LEAD_STATUS_OPTIONS]}
           initialSources={[...LEAD_SOURCE_OPTIONS]}
         />
       )}

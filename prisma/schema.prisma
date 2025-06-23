@@ -32,31 +32,52 @@ model Lead {
   electricityBillUrl String?
   followUpCount Int @default(0)
 
-  followups FollowUp[]
+  followUps FollowUp[]
+}
+
+model Client {
+  id                 String    @id @default(cuid())
+  name               String
+  email              String?
+  phone              String?
+  status             String
+  source             String? // Corresponds to ClientSourceOptionType
+  priority           String?
+  assignedTo         String?
+  createdBy          String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  lastCommentText   String?
+  lastCommentDate   DateTime? // Store as String, or DateTime if you prefer
+  nextFollowUpDate  DateTime? // Store as String, or DateTime
+  nextFollowUpTime  String?
+  kilowatt           Float?
+  address            String?
+  clientType         String?
+  electricityBillUrl String?
+  followUpCount Int @default(0)
+  followUps          FollowUp[]
 }
 
 model FollowUp {
-  id         String   @id @default(cuid())
-  type       String // e.g., Call, SMS, Email
-  date       DateTime // The date the activity itself occurred
-  time       String?
-  status     String
+  id                       String    @id @default(cuid())
+  type                     String
+  date                     DateTime
+  time                     String?
+  status                   String
   leadStageAtTimeOfFollowUp String?
-  comment    String?
-  createdBy  String?
-  createdAt  DateTime @default(now())
-
-  // Fields for distinguishing Task vs Followup
-  followupOrTask String // Will store "Followup" or "Task"
-
-  // Task-specific fields
-  taskForUser String?
-  taskDate    DateTime? // Due date for the task
-  taskTime    String?   // Due time for the task
-
-  // Relation to Lead model
-  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  leadId String
-
-  @@index([leadId])
+  comment                  String?
+  createdBy                String?
+  createdAt                DateTime  @default(now())
+  followupOrTask           String
+  taskForUser              String?
+  taskDate                 DateTime?
+  taskTime                 String?
+  
+  lead                     Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadId                   String?
+  
+  client                   Client?   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientId                 String?
 }

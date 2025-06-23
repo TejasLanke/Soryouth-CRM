@@ -1,9 +1,9 @@
 
 'use client';
 
-import type { Lead, SortConfig, DropReasonType } from '@/types';
-import React, { useState, useEffect } from 'react'; // Added useState, useEffect
-import Link from 'next/link'; // Added Link
+import type { Lead, Client } from '@/types';
+import React from 'react';
+import Link from 'next/link';
 import {
   Table,
   TableBody,
@@ -15,7 +15,7 @@ import {
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Edit2, Trash2, MoreVertical, ArrowUpDown, UsersRound, UserCircle2 } from 'lucide-react';
+import { Edit2, Trash2, MoreVertical, ArrowUpDown, UsersRound } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,26 +35,27 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Card, CardContent } from '@/components/ui/card';
 import { format, parseISO, isValid } from 'date-fns';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import type { LeadSortConfig, ClientSortConfig } from '@/types';
 
+type Item = Lead | Client;
+type GenericSortConfig<T extends Item> = { key: keyof T; direction: 'ascending' | 'descending' };
 
-interface LeadsTableProps {
-  leads: Lead[];
-  onEditLead?: (lead: Lead) => void;
-  onDeleteLead?: (leadId: string) => void;
-  sortConfig?: SortConfig | null;
-  requestSort?: (key: keyof Lead) => void;
-  viewType?: 'active' | 'dropped';
+interface LeadsTableProps<T extends Item> {
+  items: T[];
+  viewType: 'active' | 'dropped' | 'client';
+  onEdit?: (item: T) => void;
+  onDelete?: (itemId: string) => void;
+  sortConfig?: GenericSortConfig<T> | null;
+  requestSort?: (key: keyof T) => void;
   columnVisibility?: Record<string, boolean>;
 }
 
-// Helper function for date formatting
-const formatDateInternal = (dateString?: string, includeTime: boolean = false) => {
+const formatDate = (dateString?: string | null) => {
   if (!dateString) return '-';
   try {
     const date = parseISO(dateString);
     if (isValid(date)) {
-      return includeTime ? format(date, 'dd-MM-yyyy HH:mm') : format(date, 'dd-MM-yyyy');
+      return format(date, 'dd-MM-yyyy');
     }
     return dateString;
   } catch (e) {
@@ -62,25 +63,7 @@ const formatDateInternal = (dateString?: string, includeTime: boolean = false) =
   }
 };
 
-const ClientFormattedDateTime: React.FC<{ dateString?: string }> = ({ dateString }) => {
-  const [formattedDate, setFormattedDate] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (dateString) {
-      setFormattedDate(formatDateInternal(dateString, true));
-    } else {
-      setFormattedDate('-');
-    }
-  }, [dateString]);
-
-  if (formattedDate === null) {
-    return <span className="text-muted-foreground">Loading time...</span>;
-  }
-  return <>{formattedDate}</>;
-};
-
-
-export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, requestSort, viewType = 'active', columnVisibility }: LeadsTableProps) {
+export function LeadsTable<T extends Item>({ items, viewType, onEdit, onDelete, sortConfig, requestSort, columnVisibility }: LeadsTableProps<T>) {
 
   const getSourceBadgeVariant = (source?: string) => {
     if (!source) return 'outline';
@@ -91,7 +74,7 @@ export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, reques
     return 'outline';
   };
 
-  const getSortIndicator = (key: keyof Lead) => {
+  const getSortIndicator = (key: keyof T) => {
     if (!requestSort || !sortConfig || sortConfig.key !== key) {
       return <ArrowUpDown className="ml-1 h-3 w-3 opacity-50" />;
     }
@@ -100,16 +83,11 @@ export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, reques
       <ArrowUpDown className="ml-1 h-3 w-3 transform rotate-180 text-primary" />;
   };
 
-  const formatDate = (dateString?: string) => {
-    return formatDateInternal(dateString, false);
-  };
-
-
-  const renderHeaderCell = (label: string, sortKey: keyof Lead) => (
+  const renderHeaderCell = (label: string, sortKey: string) => (
     <TableHead className="text-muted-foreground whitespace-nowrap">
       {requestSort ? (
-        <Button variant="ghost" size="sm" className="px-1 py-0 h-auto text-xs" onClick={() => requestSort(sortKey)}>
-          {label} {getSortIndicator(sortKey)}
+        <Button variant="ghost" size="sm" className="px-1 py-0 h-auto text-xs" onClick={() => requestSort(sortKey as keyof T)}>
+          {label} {getSortIndicator(sortKey as keyof T)}
         </Button>
       ) : (
         label
@@ -117,29 +95,33 @@ export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, reques
     </TableHead>
   );
 
-  const renderActiveViewRow = (lead: Lead, index: number) => (
-     <TableRow key={lead.id} className="hover:bg-muted/20">
+  const renderRow = (item: T, index: number) => {
+    const href = viewType === 'client' ? `/clients/${item.id}` : `/leads/${item.id}`;
+    const leadItem = viewType !== 'client' ? (item as Lead) : undefined;
+    
+    return (
+     <TableRow key={item.id} className="hover:bg-muted/20">
       <TableCell>
-        <Checkbox id={`select-lead-${lead.id}`} aria-label={`Select lead ${lead.name}`} />
+        <Checkbox id={`select-lead-${item.id}`} aria-label={`Select lead ${item.name}`} />
       </TableCell>
       <TableCell className="font-medium py-3">
-        <Link href={`/leads/${lead.id}`} className="hover:underline text-primary">
-          {lead.name}
+        <Link href={href} className="hover:underline text-primary">
+          {item.name}
         </Link>
       </TableCell>
-      {(!columnVisibility || columnVisibility.email) && <TableCell className="py-3 text-xs">{lead.email || '-'}</TableCell>}
-      {(!columnVisibility || columnVisibility.phone) && <TableCell className="py-3">{lead.phone || '-'}</TableCell>}
-      {(!columnVisibility || columnVisibility.status) && <TableCell className="py-3"><Badge variant="secondary" className="capitalize">{lead.status}</Badge></TableCell>}
-      {(!columnVisibility || columnVisibility.lastCommentText) && <TableCell className="py-3 text-xs"><div>{lead.lastCommentText || '-'}</div>{lead.lastCommentDate && <div className="text-muted-foreground">{lead.lastCommentDate}</div>}</TableCell>}
-      {(!columnVisibility || columnVisibility.nextFollowUpDate) && <TableCell className="py-3 text-xs">{lead.nextFollowUpDate ? `${formatDate(lead.nextFollowUpDate)} ${lead.nextFollowUpTime || ''}`.trim() : '-'}</TableCell>}
-      {(!columnVisibility || columnVisibility.followupCount) && <TableCell className="py-3 text-center">{lead.followUpCount || 0}</TableCell>}
-      {(!columnVisibility || columnVisibility.calls) && <TableCell className="py-3 text-center">{0}</TableCell>}
-      {(!columnVisibility || columnVisibility.kilowatt) && <TableCell className="py-3">{lead.kilowatt !== undefined ? `${lead.kilowatt} kW` : '-'}</TableCell>}
-      {(!columnVisibility || columnVisibility.source) && <TableCell className="py-3">{lead.source ? <Badge variant={getSourceBadgeVariant(lead.source)}>{lead.source}</Badge> : '-'}</TableCell>}
-      {(!columnVisibility || columnVisibility.priority) && <TableCell className="py-3">{lead.priority ? <Badge variant={lead.priority === 'High' ? 'destructive' : lead.priority === 'Medium' ? 'secondary' : 'outline'} className="capitalize">{lead.priority}</Badge> : '-'}</TableCell>}
-      {(!columnVisibility || columnVisibility.assignedTo) && <TableCell className="py-3">{lead.assignedTo || '-'}</TableCell>}
+      {(!columnVisibility || columnVisibility.email) && <TableCell className="py-3 text-xs">{item.email || '-'}</TableCell>}
+      {(!columnVisibility || columnVisibility.phone) && <TableCell className="py-3">{item.phone || '-'}</TableCell>}
+      {(!columnVisibility || columnVisibility.status) && <TableCell className="py-3"><Badge variant="secondary" className="capitalize">{item.status}</Badge></TableCell>}
+      {(!columnVisibility || columnVisibility.lastCommentText) && <TableCell className="py-3 text-xs"><div>{item.lastCommentText || '-'}</div>{item.lastCommentDate && <div className="text-muted-foreground">{formatDate(item.lastCommentDate)}</div>}</TableCell>}
+      {(viewType === 'active' || viewType === 'client') && (!columnVisibility || columnVisibility.nextFollowUpDate) && <TableCell className="py-3 text-xs">{(item as Lead | Client).nextFollowUpDate ? `${formatDate((item as Lead | Client).nextFollowUpDate)} ${(item as Lead | Client).nextFollowUpTime || ''}`.trim() : '-'}</TableCell>}
+      {(!columnVisibility || columnVisibility.followupCount) && <TableCell className="py-3 text-center">{item.followupCount || 0}</TableCell>}
+      {viewType === 'active' && (!columnVisibility || columnVisibility.calls) && <TableCell className="py-3 text-center">{0}</TableCell>}
+      {(!columnVisibility || columnVisibility.kilowatt) && <TableCell className="py-3">{item.kilowatt !== undefined ? `${item.kilowatt} kW` : '-'}</TableCell>}
+      {viewType === 'active' && (!columnVisibility || columnVisibility.source) && <TableCell className="py-3">{leadItem?.source ? <Badge variant={getSourceBadgeVariant(leadItem.source)}>{leadItem.source}</Badge> : '-'}</TableCell>}
+      {(!columnVisibility || columnVisibility.priority) && <TableCell className="py-3">{item.priority ? <Badge variant={item.priority === 'Hot' || item.priority === 'High' ? 'destructive' : item.priority === 'Medium' ? 'secondary' : 'outline'} className="capitalize">{item.priority}</Badge> : '-'}</TableCell>}
+      {(!columnVisibility || columnVisibility.assignedTo) && <TableCell className="py-3">{item.assignedTo || '-'}</TableCell>}
       
-      {onEditLead && onDeleteLead && (
+      {onEdit && onDelete && (
         <TableCell className="text-right py-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -149,7 +131,7 @@ export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, reques
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onEditLead(lead)}>
+              <DropdownMenuItem onClick={() => onEdit(item)}>
                 <Edit2 className="mr-2 h-4 w-4" /> Edit
               </DropdownMenuItem>
               <AlertDialog>
@@ -162,12 +144,12 @@ export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, reques
                   <AlertDialogHeader>
                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This action cannot be undone. This will permanently delete the lead "{lead.name}".
+                      This action cannot be undone. This will permanently delete "{item.name}".
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => onDeleteLead(lead.id)} className={buttonVariants({ variant: "destructive" })}>
+                    <AlertDialogAction onClick={() => onDelete(item.id)} className={buttonVariants({ variant: "destructive" })}>
                       Delete
                     </AlertDialogAction>
                   </AlertDialogFooter>
@@ -179,35 +161,7 @@ export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, reques
       )}
     </TableRow>
   );
-
-  const renderDroppedViewRow = (lead: Lead, index: number) => (
-    <TableRow key={lead.id} className="hover:bg-muted/20">
-      <TableCell>
-        <Checkbox id={`select-lead-${lead.id}`} aria-label={`Select lead ${lead.name}`} />
-      </TableCell>
-      <TableCell className="py-3 text-center">{index + 1}</TableCell>
-      <TableCell className="py-3 text-xs whitespace-nowrap">
-        <ClientFormattedDateTime dateString={lead.createdAt} />
-      </TableCell>
-      <TableCell className="font-medium py-3">
-         <Link href={`/leads/${lead.id}`} className="hover:underline text-primary">
-          {lead.name}
-        </Link>
-      </TableCell>
-      <TableCell className="py-3">{lead.phone || '-'}</TableCell>
-      <TableCell className="py-3">{lead.dropReason || '-'}</TableCell>
-      <TableCell className="py-3 text-xs whitespace-nowrap">{formatDate(lead.updatedAt)}</TableCell>
-      <TableCell className="py-3">
-        <div className="flex items-center gap-2">
-          <Avatar className="h-6 w-6">
-            <AvatarImage src={`https://placehold.co/40x40.png?text=${lead.assignedTo?.charAt(0) || 'U'}`} data-ai-hint="user avatar" alt={lead.assignedTo || 'User'} />
-            <AvatarFallback>{lead.assignedTo ? lead.assignedTo.charAt(0).toUpperCase() : 'U'}</AvatarFallback>
-          </Avatar>
-          <span className="text-xs">{lead.assignedTo || '-'}</span>
-        </div>
-      </TableCell>
-    </TableRow>
-  );
+  }
 
   return (
     <div className="space-y-4">
@@ -217,49 +171,34 @@ export function LeadsTable({ leads, onEditLead, onDeleteLead, sortConfig, reques
             <TableHeader>
               <TableRow className="bg-muted/30 hover:bg-muted/40">
                 <TableHead className="w-[50px] text-muted-foreground">
-                  <Checkbox id="selectAllLeads" aria-label="Select all leads" />
+                  <Checkbox id="selectAll" aria-label="Select all items" />
                 </TableHead>
-                {viewType === 'dropped' && (
-                  <>
-                    {renderHeaderCell('#', 'id')}
-                    {renderHeaderCell('Created on', 'createdAt')}
-                    {renderHeaderCell('Info', 'name')}
-                    {renderHeaderCell('Mobile no.', 'phone')}
-                    {renderHeaderCell('Drop reason', 'dropReason')}
-                    {renderHeaderCell('Drop date', 'updatedAt')}
-                    {renderHeaderCell('User', 'assignedTo')}
-                  </>
-                )}
-                {viewType === 'active' && (
-                  <>
-                    {renderHeaderCell('Name', 'name')}
-                    {(!columnVisibility || columnVisibility.email) && renderHeaderCell('Email', 'email')}
-                    {(!columnVisibility || columnVisibility.phone) && renderHeaderCell('Mobile no.', 'phone')}
-                    {(!columnVisibility || columnVisibility.status) && renderHeaderCell('Stage', 'status')}
-                    {(!columnVisibility || columnVisibility.lastCommentText) && renderHeaderCell('Last comment', 'lastCommentText')}
-                    {(!columnVisibility || columnVisibility.nextFollowUpDate) && renderHeaderCell('Next follow-up', 'nextFollowUpDate')}
-                    {(!columnVisibility || columnVisibility.followupCount) && renderHeaderCell('Followups', 'followUpCount')}
-                    {(!columnVisibility || columnVisibility.calls) && <TableHead className="text-muted-foreground whitespace-nowrap">Calls</TableHead>}
-                    {(!columnVisibility || columnVisibility.kilowatt) && renderHeaderCell('Kilowatt', 'kilowatt')}
-                    {(!columnVisibility || columnVisibility.source) && renderHeaderCell('Source', 'source')}
-                    {(!columnVisibility || columnVisibility.priority) && renderHeaderCell('Priority', 'priority')}
-                    {(!columnVisibility || columnVisibility.assignedTo) && renderHeaderCell('Assigned To', 'assignedTo')}
-                    {onEditLead && onDeleteLead && <TableHead className="text-right text-muted-foreground">Actions</TableHead>}
-                  </>
-                )}
+                {renderHeaderCell('Name', 'name')}
+                {(!columnVisibility || columnVisibility.email) && renderHeaderCell('Email', 'email')}
+                {(!columnVisibility || columnVisibility.phone) && renderHeaderCell('Mobile no.', 'phone')}
+                {(!columnVisibility || columnVisibility.status) && renderHeaderCell('Stage', 'status')}
+                {(!columnVisibility || columnVisibility.lastCommentText) && renderHeaderCell('Last comment', 'lastCommentText')}
+                {(viewType === 'active' || viewType === 'client') && (!columnVisibility || columnVisibility.nextFollowUpDate) && renderHeaderCell('Next follow-up', 'nextFollowUpDate')}
+                {(!columnVisibility || columnVisibility.followupCount) && renderHeaderCell('Followups', 'followupCount')}
+                {viewType === 'active' && (!columnVisibility || columnVisibility.calls) && <TableHead className="text-muted-foreground whitespace-nowrap">Calls</TableHead>}
+                {(!columnVisibility || columnVisibility.kilowatt) && renderHeaderCell('Kilowatt', 'kilowatt')}
+                {viewType === 'active' && (!columnVisibility || columnVisibility.source) && renderHeaderCell('Source', 'source')}
+                {(!columnVisibility || columnVisibility.priority) && renderHeaderCell('Priority', 'priority')}
+                {(!columnVisibility || columnVisibility.assignedTo) && renderHeaderCell('Assigned To', 'assignedTo')}
+                {onEdit && onDelete && <TableHead className="text-right text-muted-foreground">Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {leads.map((lead, index) => viewType === 'dropped' ? renderDroppedViewRow(lead, index) : renderActiveViewRow(lead, index))}
+              {items.map(renderRow)}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
-      {leads.length === 0 && (
+      {items.length === 0 && (
         <div className="text-center text-muted-foreground py-12">
             <UsersRound className="mx-auto h-12 w-12 text-gray-400 mb-3" />
-            <h3 className="text-lg font-medium">No leads found.</h3>
-            <p className="text-sm">Try adjusting your filters or add a new lead.</p>
+            <h3 className="text-lg font-medium">No items found.</h3>
+            <p className="text-sm">Try adjusting your filters or add a new item.</p>
         </div>
       )}
     </div>

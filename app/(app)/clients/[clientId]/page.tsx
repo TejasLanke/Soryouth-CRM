@@ -12,17 +12,18 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { USER_OPTIONS, LEAD_SOURCE_OPTIONS, LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, CLIENT_TYPES } from '@/lib/constants';
-import type { Lead, UserOptionType, LeadSourceOptionType, LeadStatusType, LeadPriorityType, ClientType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateLeadData, AnyStatusType } from '@/types';
+import { USER_OPTIONS, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, CLIENT_STATUS_OPTIONS, CLIENT_PRIORITY_OPTIONS } from '@/lib/constants';
+import type { Client, UserOptionType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateClientData, ClientStatusType, ClientPriorityType } from '@/types';
 import { format, parseISO, isValid } from 'date-fns';
 import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, UserCircle2, FileText, ShoppingCart, Loader2, Save, Send, Video, Building, Repeat } from 'lucide-react';
+import { ProposalForm } from '@/app/(app)/proposals/proposal-form';
+import { DocumentCreationDialog } from '@/app/(app)/documents/document-creation-dialog';
 import { useToast } from "@/hooks/use-toast";
-import { getLeadById, updateLead, addActivity, getActivitiesForLead, convertToClient } from '@/app/(app)/leads-list/actions';
-import { LeadForm } from '@/app/(app)/leads/lead-form';
+import { getClientById, updateClient, addClientActivity, getActivitiesForClient, convertClientToLead } from '@/app/(app)/clients-list/actions';
+import { ClientForm } from '@/app/(app)/clients/client-form';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-
 
 const ActivityIcon = ({ type, className }: { type: string, className?: string }) => {
   const defaultClassName = "h-4 w-4";
@@ -38,26 +39,29 @@ const ActivityIcon = ({ type, className }: { type: string, className?: string })
   }
 };
 
-export default function LeadDetailsPage() {
+export default function ClientDetailsPage() {
   const router = useRouter();
   const params = useParams();
-  const leadId = typeof params.leadId === 'string' ? params.leadId : null;
+  const clientId = typeof params.clientId === 'string' ? params.clientId : null;
   const { toast } = useToast();
-  const [lead, setLead] = useState<Lead | null | undefined>(undefined);
+  const [client, setClient] = useState<Client | null | undefined>(undefined);
   const [isFormPending, startFormTransition] = useTransition();
   const [isUpdating, startUpdateTransition] = useTransition();
+  const [isConverting, startConversionTransition] = useTransition();
   
   const [activities, setActivities] = useState<FollowUp[]>([]);
   const [isActivitiesLoading, setActivitiesLoading] = useState(true);
 
+  const [isProposalFormOpen, setIsProposalFormOpen] = useState(false);
+  const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
+  const [documentTypeToCreate, setDocumentTypeToCreate] = useState<'Purchase Order' | null>(null);
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
 
   const [activityType, setActivityType] = useState<FollowUpType>(FOLLOW_UP_TYPES[0]);
   const [activityDate, setActivityDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [activityTime, setActivityTime] = useState<string>(format(new Date(), 'HH:mm'));
   const [activityStatus, setActivityStatus] = useState<FollowUpStatus>(FOLLOW_UP_STATUSES[0]);
-  const [activityLeadStage, setActivityLeadStage] = useState<LeadStatusType | undefined>();
-  const [activityPriority, setActivityPriority] = useState<LeadPriorityType | undefined>();
+  const [activityClientStage, setActivityClientStage] = useState<ClientStatusType | undefined>();
   const [activityComment, setActivityComment] = useState('');
   
   const [taskForUser, setTaskForUser] = useState<UserOptionType | undefined>(USER_OPTIONS[0]);
@@ -65,49 +69,47 @@ export default function LeadDetailsPage() {
   const [taskTime, setTaskTime] = useState('');
 
   useEffect(() => {
-    if (leadId) {
-      const fetchLeadDetails = async () => {
-        setLead(undefined);
+    if (clientId) {
+      const fetchClientDetails = async () => {
+        setClient(undefined);
         try {
-          const fetchedLead = await getLeadById(leadId);
-          setLead(fetchedLead);
-          if (fetchedLead) {
-            setActivityLeadStage(fetchedLead.status as LeadStatusType);
-            setActivityPriority(fetchedLead.priority as LeadPriorityType || undefined);
+          const fetchedClient = await getClientById(clientId);
+          setClient(fetchedClient);
+          if (fetchedClient) {
+            setActivityClientStage(fetchedClient.status as ClientStatusType);
           }
         } catch (error) {
-          console.error("Failed to fetch lead details:", error);
-          setLead(null);
+          console.error("Failed to fetch client details:", error);
+          setClient(null);
           toast({
             title: "Error",
-            description: "Could not load lead details.",
+            description: "Could not load client details.",
             variant: "destructive",
           });
         }
       };
-      fetchLeadDetails();
+      fetchClientDetails();
       
       const fetchActivities = async () => {
         setActivitiesLoading(true);
-        const fetchedActivities = await getActivitiesForLead(leadId);
+        const fetchedActivities = await getActivitiesForClient(clientId);
         setActivities(fetchedActivities);
         setActivitiesLoading(false);
       };
       fetchActivities();
     } else {
-      setLead(null);
+      setClient(null);
     }
-  }, [leadId, toast]);
+  }, [clientId, toast]);
 
   useEffect(() => {
-    if (lead) {
-        setActivityLeadStage(lead.status as LeadStatusType);
-        setActivityPriority(lead.priority as LeadPriorityType || undefined);
+    if (client) {
+        setActivityClientStage(client.status as ClientStatusType);
     }
-  }, [lead]);
+  }, [client]);
 
   const handleSaveActivity = () => {
-    if (!lead) return;
+    if (!client) return;
 
     startFormTransition(async () => {
       const isTask = taskDate && taskTime;
@@ -115,15 +117,14 @@ export default function LeadDetailsPage() {
 
       const activityData: AddActivityData = {
         followupOrTask: activityCategory,
-        leadId: lead.id,
+        clientId: client.id,
         type: activityType,
         date: activityDate,
         time: activityTime,
         status: activityStatus,
-        leadStageAtTimeOfFollowUp: activityLeadStage,
+        leadStageAtTimeOfFollowUp: activityClientStage,
         comment: activityComment,
-        createdBy: 'Mayur',
-        priority: activityPriority,
+        createdBy: 'Mayur', 
         ...(isTask && {
           taskForUser,
           taskDate,
@@ -131,17 +132,17 @@ export default function LeadDetailsPage() {
         }),
       };
 
-      const newActivity = await addActivity(activityData);
+      const newActivity = await addClientActivity(activityData);
 
       if (newActivity) {
         toast({
           title: `${activityCategory} Saved`,
-          description: `${activityType} for ${lead.name} has been recorded.`,
+          description: `${activityType} for ${client.name} has been recorded.`,
         });
         setActivities(prev => [newActivity, ...prev]);
-        const updatedLead = await getLeadById(lead.id);
-        if (updatedLead) {
-          setLead(updatedLead);
+        const updatedClient = await getClientById(client.id);
+        if (updatedClient) {
+          setClient(updatedClient);
         }
         setActivityComment('');
         setTaskForUser(USER_OPTIONS[0]);
@@ -156,111 +157,109 @@ export default function LeadDetailsPage() {
       }
     });
   };
-
-  const handleOpenEditForm = () => {
-    if (lead) {
-      setIsEditFormOpen(true);
-    }
-  };
-
-  const handleEditFormSubmit = async (updatedLeadData: CreateLeadData | Lead) => {
-    if (!lead || !lead.id) return;
-    startFormTransition(async () => {
-      const result = await updateLead(lead.id, updatedLeadData as Partial<CreateLeadData>);
-      if (result) {
-        setLead(result);
-        toast({ title: "Lead Updated", description: `${result.name}'s information has been updated.` });
-        setIsEditFormOpen(false);
-      } else {
-        toast({ title: "Error", description: "Failed to update lead.", variant: "destructive" });
-      }
-    });
-  };
   
   const handleAttributeChange = (
-    key: 'status' | 'priority' | 'assignedTo' | 'clientType' | 'kilowatt',
+    key: 'status' | 'priority' | 'assignedTo',
     value: string | number
   ) => {
-    if (!lead || value === undefined || isUpdating) return;
-    const originalLead = { ...lead };
+    if (!client || value === undefined || isUpdating) return;
+    const originalClient = { ...client };
 
-    setLead(prev => (prev ? { ...prev, [key]: value } : null));
+    setClient(prev => (prev ? { ...prev, [key]: value } : null));
 
     startUpdateTransition(async () => {
-        const result = await updateLead(lead.id, { [key]: value });
+        const result = await updateClient(client.id, { [key]: value });
         if (result) {
-            setLead(result);
+            setClient(result);
             toast({
                 title: `${key.charAt(0).toUpperCase() + key.slice(1)} Updated`,
-                description: `Lead ${key} set to "${value}".`,
+                description: `Client ${key} set to "${value}".`,
             });
         } else {
-            setLead(originalLead);
+            setClient(originalClient);
             toast({
                 title: "Update Failed",
-                description: `Could not update lead ${key}.`,
+                description: `Could not update client ${key}.`,
                 variant: "destructive",
             });
         }
     });
   };
 
-  const handleConvertToClient = () => {
-    if (!lead || isUpdating) return;
-    startUpdateTransition(async () => {
-      const result = await convertToClient(lead.id);
-      if (result.success && result.clientId) {
-        toast({
-          title: "Conversion Successful",
-          description: `${lead.name} is now a client.`
-        });
-        router.push(`/clients/${result.clientId}`);
+  const handleOpenEditForm = () => {
+    if (client) {
+      setIsEditFormOpen(true);
+    }
+  };
+
+  const handleEditFormSubmit = async (updatedClientData: CreateClientData | Client) => {
+    if (!client || !client.id) return;
+    startFormTransition(async () => {
+      const result = await updateClient(client.id, updatedClientData as Partial<CreateClientData>);
+      if (result) {
+        setClient(result);
+        toast({ title: "Client Updated", description: `${result.name}'s information has been updated.` });
+        setIsEditFormOpen(false);
       } else {
-        toast({
-          title: "Conversion Failed",
-          description: result.message || "Could not convert lead to client.",
-          variant: "destructive",
-        });
+        toast({ title: "Error", description: "Failed to update client.", variant: "destructive" });
       }
     });
   };
+  
+  const handleConvertToLead = () => {
+    if (!client || isConverting) return;
+    startConversionTransition(async () => {
+        const result = await convertClientToLead(client.id);
+        if (result.success && result.leadId) {
+            toast({
+                title: "Conversion Successful",
+                description: `${client.name} has been converted back to a lead.`
+            });
+            router.push(`/leads/${result.leadId}`);
+        } else {
+            toast({
+                title: "Conversion Failed",
+                description: result.message || "Could not convert client to lead.",
+                variant: "destructive",
+            });
+        }
+    });
+  };
 
-
-  if (lead === undefined) {
+  if (client === undefined) {
     return (
         <div className="flex flex-1 items-center justify-center h-full">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            <p className="ml-4 text-lg text-muted-foreground">Loading Lead Details...</p>
+            <p className="ml-4 text-lg text-muted-foreground">Loading Client Details...</p>
         </div>
     );
   }
 
-  if (lead === null) {
+  if (client === null) {
     return (
         <div className="flex flex-col flex-1 items-center justify-center h-full p-8 text-center">
             <UserCircle2 className="h-16 w-16 mb-4 text-destructive" />
-            <h2 className="text-2xl font-semibold mb-2">Lead Not Found</h2>
+            <h2 className="text-2xl font-semibold mb-2">Client Not Found</h2>
             <p className="text-muted-foreground mb-6">
-                The lead you are looking for does not exist or could not be loaded.
+                The client you are looking for does not exist or could not be loaded.
             </p>
-            <Button onClick={() => router.push('/leads-list')}>
-                <ChevronLeft className="mr-2 h-4 w-4" /> Back to Leads List
+            <Button onClick={() => router.push('/clients-list')}>
+                <ChevronLeft className="mr-2 h-4 w-4" /> Back to Clients List
             </Button>
         </div>
     );
   }
 
-  const creationDateTime = lead.createdAt && isValid(parseISO(lead.createdAt)) ? format(parseISO(lead.createdAt), 'dd-MM-yyyy HH:mm') : 'N/A';
-  const nextFollowUpDisplay = lead.nextFollowUpDate && isValid(parseISO(lead.nextFollowUpDate))
-    ? `${format(parseISO(lead.nextFollowUpDate), 'dd-MM-yyyy')} ${lead.nextFollowUpTime || ''}`.trim()
+  const creationDateTime = client.createdAt && isValid(parseISO(client.createdAt)) ? format(parseISO(client.createdAt), 'dd-MM-yyyy HH:mm') : 'N/A';
+  const nextFollowUpDisplay = client.nextFollowUpDate && isValid(parseISO(client.nextFollowUpDate))
+    ? `${format(parseISO(client.nextFollowUpDate), 'dd-MM-yyyy')} ${client.nextFollowUpTime || ''}`.trim()
     : 'Not set';
-
+  
   return (
     <div className="flex flex-col h-full">
       <div className="flex justify-between items-center p-4 border-b bg-card sticky top-0 z-10">
-        <h1 className="text-xl font-semibold font-headline">{lead.name}</h1>
+        <h1 className="text-xl font-semibold font-headline">{client.name}</h1>
         <div className="flex gap-2">
-          <Button variant="destructive" size="sm" disabled>Drop lead</Button>
           <Button variant="outline" size="sm" onClick={() => router.back()}>
             <ChevronLeft className="h-4 w-4 mr-1" /> Back
           </Button>
@@ -273,38 +272,38 @@ export default function LeadDetailsPage() {
           <div className="lg:col-span-3 space-y-6">
             <Card>
               <CardHeader className="flex flex-row justify-between items-center pb-2">
-                <CardTitle className="text-lg font-semibold">Lead Information</CardTitle>
+                <CardTitle className="text-lg font-semibold">Client Information</CardTitle>
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleOpenEditForm} >
                   <Edit className="h-4 w-4" />
                 </Button>
               </CardHeader>
               <CardContent className="space-y-3">
-                <p className="text-xl font-bold text-primary">{lead.name}</p>
-                <p className="text-sm text-muted-foreground">{lead.phone || 'No phone number'}</p>
-                <p className="text-xs text-muted-foreground">Created: {creationDateTime}</p>
+                <p className="text-xl font-bold text-primary">{client.name}</p>
+                <p className="text-sm text-muted-foreground">{client.phone || 'No phone number'}</p>
+                <p className="text-xs text-muted-foreground">Client Since: {creationDateTime}</p>
                 <div>
-                  <Label htmlFor="lead-status" className="text-xs font-medium">Stage</Label>
-                  <Select value={lead.status || ''} onValueChange={(value) => handleAttributeChange('status', value)} disabled={isUpdating}>
-                    <SelectTrigger id="lead-status" className="h-8 text-xs">
+                  <Label htmlFor="client-stage" className="text-xs font-medium">Stage</Label>
+                  <Select value={client.status || ''} onValueChange={(value) => handleAttributeChange('status', value)} disabled={isUpdating}>
+                    <SelectTrigger id="client-stage" className="h-8 text-xs">
                       <SelectValue placeholder="Select stage" />
                     </SelectTrigger>
                     <SelectContent>
-                      {LEAD_STATUS_OPTIONS.map(stage => <SelectItem key={stage} value={stage} className="text-xs">{stage}</SelectItem>)}
+                      {CLIENT_STATUS_OPTIONS.map(stage => <SelectItem key={stage} value={stage} className="text-xs">{stage}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                  <div>
-                  <Label htmlFor="lead-priority" className="text-xs font-medium">Priority</Label>
-                  <Select value={lead.priority || ''} onValueChange={(value) => handleAttributeChange('priority', value as LeadPriorityType)} disabled={isUpdating}>
-                    <SelectTrigger id="lead-priority" className="h-8 text-xs">
+                  <Label htmlFor="client-priority" className="text-xs font-medium">Priority</Label>
+                  <Select value={client.priority || ''} onValueChange={(value) => handleAttributeChange('priority', value as ClientPriorityType)} disabled={isUpdating}>
+                    <SelectTrigger id="client-priority" className="h-8 text-xs">
                       <SelectValue placeholder="Select priority" />
                     </SelectTrigger>
                     <SelectContent>
-                      {LEAD_PRIORITY_OPTIONS.map(p => <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>)}
+                      {CLIENT_PRIORITY_OPTIONS.map(p => <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
+                 <div>
                   <p className="text-xs font-medium">Next follow-up:</p>
                   <p className="text-sm">{nextFollowUpDisplay}</p>
                 </div>
@@ -325,96 +324,39 @@ export default function LeadDetailsPage() {
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-md">Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <Label htmlFor="leadSource" className="text-xs">Source</Label>
-                  <Select value={lead.source || undefined} disabled>
-                    <SelectTrigger id="leadSource" className="h-8 text-xs">
-                      <SelectValue placeholder="Select source" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {LEAD_SOURCE_OPTIONS.map(src => <SelectItem key={src} value={src} className="text-xs">{src}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-xs">Address</Label>
-                  <p className="text-sm bg-muted p-2 rounded-md min-h-[40px]">{lead.address || 'Not specified'}</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-md">Lead Attributes</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                 <div>
-                  <Label htmlFor="customerType" className="text-xs">Customer Type</Label>
-                  <Select
-                    value={lead.clientType || undefined}
-                    onValueChange={(value) => handleAttributeChange('clientType', value as ClientType)}
-                    disabled={isUpdating}
-                  >
-                    <SelectTrigger id="customerType" className="h-8 text-xs">
-                      <SelectValue placeholder="Select customer type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CLIENT_TYPES.map(type => <SelectItem key={type} value={type} className="text-xs">{type}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="kilowatt" className="text-xs">Kilowatt</Label>
-                  <Input
-                    id="kilowatt"
-                    type="number"
-                    defaultValue={lead.kilowatt ?? ''}
-                    onBlur={(e) => handleAttributeChange('kilowatt', parseFloat(e.target.value) || 0)}
-                    className="h-8 text-xs"
-                    disabled={isUpdating}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
                 <CardTitle className="text-md">Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button className="w-full bg-green-600 hover:bg-green-700" size="sm" disabled={isUpdating}>
-                      <Repeat className="mr-2 h-4 w-4" /> Convert to Client
+                    <Button variant="outline" size="sm" className="w-full" disabled={isConverting}>
+                      <Repeat className="mr-2 h-4 w-4" /> Convert to Lead
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Convert Lead to Client?</AlertDialogTitle>
+                      <AlertDialogTitle>Convert Client to Lead?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This will convert "{lead.name}" into a client, moving them and their activity history to the Clients section. This action cannot be undone.
+                        This will move "{client.name}" back to the leads list. This action can be reversed later. Are you sure?
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleConvertToClient} disabled={isUpdating}>
-                        {isUpdating ? "Converting..." : "Yes, Convert"}
+                      <AlertDialogAction onClick={handleConvertToLead} disabled={isConverting}>
+                        {isConverting ? "Converting..." : "Yes, Convert"}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
-                <Button className="w-full" variant="outline" size="sm" onClick={() => toast({ title: "Coming Soon", description: "Create proposals after converting lead to client."})}><FileText className="mr-2 h-4 w-4" /> Create Proposal</Button>
-                <Button className="w-full" variant="outline" size="sm" disabled><ShoppingCart className="mr-2 h-4 w-4" /> Create Purchase Order</Button>
+                <Button onClick={() => setIsProposalFormOpen(true)} className="w-full" size="sm"><FileText className="mr-2 h-4 w-4" /> Create Proposal</Button>
+                <Button onClick={() => { setDocumentTypeToCreate('Purchase Order'); setIsDocumentDialogOpen(true); }} className="w-full" variant="outline" size="sm"><ShoppingCart className="mr-2 h-4 w-4" /> Create Purchase Order</Button>
               </CardContent>
             </Card>
           </div>
 
           <div className="lg:col-span-6 space-y-6">
-            <Card>
-              <CardHeader><CardTitle>New follow-up</CardTitle></CardHeader>
+             <Card>
+              <CardHeader><CardTitle>New Activity</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
                   <div className="sm:col-span-1">
@@ -431,16 +373,12 @@ export default function LeadDetailsPage() {
                 </RadioGroup>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="activityLeadStage">Lead Stage</Label>
-                    <Select value={activityLeadStage} onValueChange={(val) => setActivityLeadStage(val as LeadStatusType)}><SelectTrigger id="activityLeadStage"><SelectValue placeholder="Select stage" /></SelectTrigger><SelectContent>{LEAD_STATUS_OPTIONS.map(stage => <SelectItem key={stage} value={stage}>{stage}</SelectItem>)}</SelectContent></Select>
-                  </div>
-                   <div>
-                    <Label htmlFor="activityPriority">Lead Priority</Label>
-                    <Select value={activityPriority} onValueChange={(val) => setActivityPriority(val as LeadPriorityType)}><SelectTrigger id="activityPriority"><SelectValue placeholder="Select priority" /></SelectTrigger><SelectContent>{LEAD_PRIORITY_OPTIONS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select>
+                    <Label htmlFor="activityClientStage">Client Stage</Label>
+                    <Select value={activityClientStage} onValueChange={(val) => setActivityClientStage(val as ClientStatusType)}><SelectTrigger id="activityClientStage"><SelectValue placeholder="Select stage" /></SelectTrigger><SelectContent>{CLIENT_STATUS_OPTIONS.map(stage => <SelectItem key={stage} value={stage}>{stage}</SelectItem>)}</SelectContent></Select>
                   </div>
                 </div>
                 <div>
-                  <Label htmlFor="activityComment">Follow-up Comment</Label>
+                  <Label htmlFor="activityComment">Activity Comment</Label>
                   <Textarea id="activityComment" placeholder="Enter comment..." value={activityComment} onChange={e => setActivityComment(e.target.value)} />
                 </div>
                 <Separator />
@@ -462,7 +400,7 @@ export default function LeadDetailsPage() {
             </Card>
 
             <Card>
-              <CardHeader><CardTitle>Activity History ({lead.followUpCount || 0})</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Activity History ({client.followUpCount || 0})</CardTitle></CardHeader>
               <CardContent>
                 {isActivitiesLoading ? (
                    <div className="flex items-center justify-center p-6"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
@@ -470,30 +408,30 @@ export default function LeadDetailsPage() {
                   <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
                     {activities.map(activity => (
                       <div key={activity.id} className="flex items-start gap-4 p-3 border rounded-md">
-                         <Avatar className="h-9 w-9 border mt-1">
+                        <Avatar className="h-9 w-9 border mt-1">
                            <ActivityIcon type={activity.type} className="h-full w-full p-2 text-muted-foreground" />
                         </Avatar>
                         <div className="flex-1 space-y-1.5">
-                           <p className="text-sm font-semibold">
+                          <p className="text-sm font-semibold">
                               {activity.comment || (activity.followupOrTask === 'Task' ? 'Task Scheduled' : 'Activity Logged')}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {format(parseISO(activity.createdAt), 'dd-MM-yyyy p')} by {activity.createdBy || 'System'}
                           </p>
-                           <div className="flex items-center gap-2 flex-wrap pt-1">
-                              <Badge variant="secondary" className="capitalize bg-blue-100 text-blue-800 border-transparent hover:bg-blue-200">
-                                 {activity.type}
+                          <div className="flex items-center gap-2 flex-wrap pt-1">
+                            <Badge variant="secondary" className="capitalize bg-teal-100 text-teal-800 border-transparent hover:bg-teal-200">
+                               {activity.type}
+                            </Badge>
+                            {activity.leadStageAtTimeOfFollowUp && (
+                              <Badge variant="outline" className="capitalize bg-slate-800 text-white border-transparent hover:bg-slate-700">{activity.leadStageAtTimeOfFollowUp}</Badge>
+                            )}
+                             {activity.followupOrTask === 'Task' ? (
+                               <Badge className="bg-green-600 text-white border-transparent hover:bg-green-700">
+                                Task Due: {activity.taskDate ? format(parseISO(activity.taskDate), 'dd-MM-yyyy') : ''} {activity.taskTime || ''}
                               </Badge>
-                              {activity.leadStageAtTimeOfFollowUp && (
-                                <Badge variant="outline" className="capitalize bg-slate-800 text-white border-transparent hover:bg-slate-700">{activity.leadStageAtTimeOfFollowUp}</Badge>
-                              )}
-                              {activity.followupOrTask === 'Task' ? (
-                                <Badge className="bg-green-600 text-white border-transparent hover:bg-green-700">
-                                  Task Due: {activity.taskDate ? format(parseISO(activity.taskDate), 'dd-MM-yyyy') : ''} {activity.taskTime || ''}
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline" className="bg-slate-800 text-white border-transparent hover:bg-slate-700">Followup</Badge>
-                              )}
+                            ) : (
+                              <Badge variant="outline" className="bg-slate-800 text-white border-transparent hover:bg-slate-700">Followup</Badge>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -510,9 +448,9 @@ export default function LeadDetailsPage() {
             <Card>
               <CardContent className="pt-6 space-y-1">
                 <div className="flex items-center gap-2">
-                   <Avatar className="h-8 w-8"><AvatarImage src={`https://placehold.co/40x40.png?text=${lead.assignedTo?.charAt(0) || 'U'}`} data-ai-hint="user avatar" /><AvatarFallback>{lead.assignedTo?.charAt(0) || 'U'}</AvatarFallback></Avatar>
+                   <Avatar className="h-8 w-8"><AvatarImage src={`https://placehold.co/40x40.png?text=${client.assignedTo?.charAt(0) || 'U'}`} data-ai-hint="user avatar" /><AvatarFallback>{client.assignedTo?.charAt(0) || 'U'}</AvatarFallback></Avatar>
                    <Select
-                      value={lead.assignedTo || ''}
+                      value={client.assignedTo || ''}
                       onValueChange={(value) => handleAttributeChange('assignedTo', value as UserOptionType)}
                       disabled={isUpdating}
                     >
@@ -528,8 +466,8 @@ export default function LeadDetailsPage() {
             <Card>
               <CardContent className="pt-6 space-y-1">
                  <div className="flex items-center gap-2">
-                   <Avatar className="h-8 w-8"><AvatarImage src={`https://placehold.co/40x40.png?text=${lead.createdBy?.charAt(0) || 'S'}`} data-ai-hint="user avatar"/><AvatarFallback>{lead.createdBy?.charAt(0) || 'S'}</AvatarFallback></Avatar>
-                  <p className="text-sm font-medium flex-grow bg-muted px-3 py-2 rounded-md h-9 flex items-center">{lead.createdBy || 'System'}</p>
+                   <Avatar className="h-8 w-8"><AvatarImage src={`https://placehold.co/40x40.png?text=${client.createdBy?.charAt(0) || 'S'}`} data-ai-hint="user avatar"/><AvatarFallback>{client.createdBy?.charAt(0) || 'S'}</AvatarFallback></Avatar>
+                  <p className="text-sm font-medium flex-grow bg-muted px-3 py-2 rounded-md h-9 flex items-center">{client.createdBy || 'System'}</p>
                 </div>
                 <p className="text-xs text-muted-foreground ml-10">Created by</p>
               </CardContent>
@@ -541,7 +479,9 @@ export default function LeadDetailsPage() {
           </div>
         </div>
       </div>
-      {isEditFormOpen && lead && (<LeadForm isOpen={isEditFormOpen} onClose={() => setIsEditFormOpen(false)} onSubmit={handleEditFormSubmit} lead={lead} formMode="lead"/>)}
+      {isProposalFormOpen && client && (<ProposalForm isOpen={isProposalFormOpen} onClose={() => setIsProposalFormOpen(false)} onSubmit={() => {}} initialData={{ clientId: client.id, name: client.name, clientType: client.clientType || 'Other' }} />)}
+      {isDocumentDialogOpen && documentTypeToCreate === 'Purchase Order' && client && (<DocumentCreationDialog isOpen={isDocumentDialogOpen} onClose={() => setIsDocumentDialogOpen(false)} documentType="Purchase Order" />)}
+      {isEditFormOpen && client && (<ClientForm isOpen={isEditFormOpen} onClose={() => setIsEditFormOpen(false)} onSubmit={handleEditFormSubmit} client={client}/>)}
     </div>
   );
 }

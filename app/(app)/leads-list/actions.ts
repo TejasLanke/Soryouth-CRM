@@ -2,9 +2,9 @@
 'use server';
 
 import prisma from '@/lib/prisma';
-import type { Lead, FollowUp, AddActivityData } from '@/types';
+import type { Lead, FollowUp, AddActivityData, CreateLeadData, Client } from '@/types';
 import { revalidatePath } from 'next/cache';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 // Helper function to map Prisma lead to frontend Lead type
 function mapPrismaLeadToLeadType(prismaLead: any): Lead {
@@ -29,7 +29,7 @@ function mapPrismaLeadToLeadType(prismaLead: any): Lead {
     dropReason: prismaLead.dropReason ?? undefined,
     clientType: prismaLead.clientType ?? undefined,
     electricityBillUrl: prismaLead.electricityBillUrl ?? undefined,
-    followUpCount: prismaLead.followUpCount ?? 0,
+    followupCount: prismaLead.followUps?.length ?? 0,
   } as Lead;
 }
 
@@ -37,7 +37,8 @@ function mapPrismaLeadToLeadType(prismaLead: any): Lead {
 function mapPrismaFollowUpToFollowUpType(prismaFollowUp: any): FollowUp {
   return {
     id: prismaFollowUp.id,
-    leadId: prismaFollowUp.leadId,
+    leadId: prismaFollowUp.leadId ?? undefined,
+    clientId: prismaFollowUp.clientId ?? undefined,
     type: prismaFollowUp.type,
     date: prismaFollowUp.date.toISOString(),
     time: prismaFollowUp.time ?? undefined,
@@ -60,6 +61,9 @@ export async function getLeads(): Promise<Lead[]> {
       orderBy: {
         createdAt: 'desc',
       },
+      include: {
+        followUps: true
+      }
     });
     return leadsFromDb.map(mapPrismaLeadToLeadType);
   } catch (error) {
@@ -76,6 +80,7 @@ export async function getLeadById(id: string): Promise<Lead | null> {
   try {
     const leadFromDb = await prisma.lead.findUnique({
       where: { id },
+      include: { followUps: true }
     });
 
     if (!leadFromDb) {
@@ -88,7 +93,7 @@ export async function getLeadById(id: string): Promise<Lead | null> {
   }
 }
 
-export async function createLead(data: Omit<Lead, 'id' | 'createdAt' | 'updatedAt' | 'followUpCount'>): Promise<Lead | null> {
+export async function createLead(data: CreateLeadData): Promise<Lead | null> {
   try {
     const newLead = await prisma.lead.create({
       data: {
@@ -100,8 +105,8 @@ export async function createLead(data: Omit<Lead, 'id' | 'createdAt' | 'updatedA
         assignedTo: data.assignedTo || null,
         createdBy: data.createdBy || 'System', // Default createdBy
         lastCommentText: data.lastCommentText || null,
-        lastCommentDate: data.lastCommentDate ? new Date(data.lastCommentDate.split('-').reverse().join('-')) : null,
-        nextFollowUpDate: data.nextFollowUpDate ? new Date(data.nextFollowUpDate) : null,
+        lastCommentDate: data.lastCommentDate ? parseISO(data.lastCommentDate.split('-').reverse().join('-')) : null,
+        nextFollowUpDate: data.nextFollowUpDate ? parseISO(data.nextFollowUpDate) : null,
         nextFollowUpTime: data.nextFollowUpTime || null,
         kilowatt: data.kilowatt === undefined ? null : Number(data.kilowatt),
         address: data.address || null,
@@ -109,7 +114,6 @@ export async function createLead(data: Omit<Lead, 'id' | 'createdAt' | 'updatedA
         dropReason: data.dropReason || null,
         clientType: data.clientType || null,
         electricityBillUrl: data.electricityBillUrl || null,
-        followUpCount: 0, // Initialize count
       },
     });
     revalidatePath('/leads-list');
@@ -120,26 +124,22 @@ export async function createLead(data: Omit<Lead, 'id' | 'createdAt' | 'updatedA
   }
 }
 
-export async function updateLead(id: string, data: Partial<Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>>): Promise<Lead | null> {
+export async function updateLead(id: string, data: Partial<Omit<Lead, 'id' | 'createdAt' | 'updatedAt' | 'followupCount'>>): Promise<Lead | null> {
   try {
     const prismaData: any = {};
     for (const key in data) {
       if (Object.prototype.hasOwnProperty.call(data, key)) {
         const typedKey = key as keyof Partial<Lead>;
-        // Skip keys that are handled by relations or Prisma's defaults
-        if (['id', 'createdAt', 'updatedAt'].includes(typedKey)) continue;
+        if (['id', 'createdAt', 'updatedAt', 'followupCount'].includes(typedKey)) continue;
 
         if (typedKey === 'kilowatt') {
           prismaData[typedKey] = data[typedKey] === undefined || data[typedKey] === null ? null : Number(data[typedKey]);
         } else if (typedKey === 'nextFollowUpDate' && data.nextFollowUpDate) {
-           prismaData[typedKey] = new Date(data.nextFollowUpDate);
+           prismaData[typedKey] = parseISO(data.nextFollowUpDate);
         } else if (typedKey === 'lastCommentDate' && data.lastCommentDate) {
-           prismaData[typedKey] = new Date(data.lastCommentDate.split('-').reverse().join('-'));
+           prismaData[typedKey] = parseISO(data.lastCommentDate.split('-').reverse().join('-'));
         }
         else {
-          // Use `undefined` to skip updating a field, and `null` to set it to null in the DB.
-          // This ensures that if a field is not in the `data` object, it's not changed.
-          // The `|| null` ensures empty strings from forms become null in the db.
           (prismaData as any)[typedKey] = (data as any)[typedKey] || null;
         }
       }
@@ -149,8 +149,13 @@ export async function updateLead(id: string, data: Partial<Omit<Lead, 'id' | 'cr
       where: { id },
       data: prismaData,
     });
+    
     revalidatePath('/leads-list');
     revalidatePath(`/leads/${id}`);
+    revalidatePath('/clients-list');
+    revalidatePath(`/clients/${id}`);
+
+
     return mapPrismaLeadToLeadType(updatedLeadFromDb);
   } catch (error) {
     console.error("Failed to update lead:", error);
@@ -164,7 +169,6 @@ export async function deleteLead(id: string): Promise<{ success: boolean }> {
       where: { id },
     });
     revalidatePath('/leads-list');
-    revalidatePath(`/leads/${id}`);
     return { success: true };
   } catch (error) {
     console.error("Failed to delete lead:", error);
@@ -189,13 +193,17 @@ export async function getActivitiesForLead(leadId: string): Promise<FollowUp[]> 
 export async function addActivity(
   data: AddActivityData
 ): Promise<FollowUp | null> {
+  if (!data.leadId) {
+    console.error("addActivity requires a leadId");
+    return null;
+  }
   try {
     const result = await prisma.$transaction(async (tx) => {
       const newActivity = await tx.followUp.create({
         data: {
           leadId: data.leadId,
           type: data.type,
-          date: new Date(data.date),
+          date: parseISO(data.date),
           time: data.time || null,
           status: data.status,
           leadStageAtTimeOfFollowUp: data.leadStageAtTimeOfFollowUp || null,
@@ -203,15 +211,14 @@ export async function addActivity(
           createdBy: data.createdBy || 'System',
           followupOrTask: data.followupOrTask,
           taskForUser: data.taskForUser || null,
-          taskDate: data.taskDate ? new Date(data.taskDate) : null,
+          taskDate: data.taskDate ? parseISO(data.taskDate) : null,
           taskTime: data.taskTime || null,
         },
       });
 
       const leadUpdateData: any = {
-        followUpCount: { increment: 1 },
         lastCommentText: data.comment,
-        lastCommentDate: new Date(data.date),
+        lastCommentDate: parseISO(data.date),
       };
 
       if (data.leadStageAtTimeOfFollowUp) {
@@ -222,14 +229,16 @@ export async function addActivity(
         leadUpdateData.priority = data.priority;
       }
       
-      const activityDateTime = new Date(`${data.date}T${data.time || '00:00:00'}`);
-      if (activityDateTime > new Date()) {
-         leadUpdateData.nextFollowUpDate = new Date(data.date);
-         leadUpdateData.nextFollowUpTime = data.time;
+      if (data.taskDate && data.taskTime) {
+        const activityDateTime = new Date(`${data.taskDate}T${data.taskTime || '00:00:00'}`);
+        if (activityDateTime > new Date()) {
+           leadUpdateData.nextFollowUpDate = parseISO(data.taskDate);
+           leadUpdateData.nextFollowUpTime = data.taskTime;
+        }
       }
 
       await tx.lead.update({
-        where: { id: data.leadId },
+        where: { id: data.leadId! },
         data: leadUpdateData,
       });
 
@@ -241,5 +250,65 @@ export async function addActivity(
   } catch (error) {
     console.error('Failed to add activity:', error);
     return null;
+  }
+}
+
+
+export async function convertToClient(leadId: string): Promise<{ success: boolean; clientId?: string; message?: string }> {
+  try {
+    const lead = await prisma.lead.findUnique({
+      where: { id: leadId },
+      include: { followUps: true },
+    });
+
+    if (!lead) {
+      return { success: false, message: 'Lead not found.' };
+    }
+
+    const newClient = await prisma.$transaction(async (tx) => {
+      // 1. Create a new client from the lead data
+      const createdClient = await tx.client.create({
+        data: {
+          name: lead.name,
+          email: lead.email,
+          phone: lead.phone,
+          status: 'Fresher',
+          priority: 'Average',
+          assignedTo: lead.assignedTo,
+          createdBy: lead.createdBy,
+          createdAt: lead.createdAt, // Preserve original creation date from the lead
+          kilowatt: lead.kilowatt,
+          address: lead.address,
+          clientType: lead.clientType,
+          electricityBillUrl: lead.electricityBillUrl,
+        },
+      });
+
+      // 2. Re-associate all follow-ups with the new client
+      if (lead.followUps.length > 0) {
+        await tx.followUp.updateMany({
+          where: { leadId: lead.id },
+          data: {
+            clientId: createdClient.id,
+            leadId: null, // Disassociate from the lead
+          },
+        });
+      }
+
+      // 3. Delete the original lead
+      await tx.lead.delete({
+        where: { id: lead.id },
+      });
+
+      return createdClient;
+    });
+
+    revalidatePath('/leads-list');
+    revalidatePath('/clients-list');
+
+    return { success: true, clientId: newClient.id };
+  } catch (error) {
+    console.error(`Failed to convert lead ${leadId} to client:`, error);
+    return { success: false, message: 'An unexpected error occurred during conversion.' };
   }
 }

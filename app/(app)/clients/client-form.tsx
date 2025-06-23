@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Lead, LeadStatusType, LeadPriorityType, LeadSourceOptionType, UserOptionType, ClientType, CreateLeadData } from '@/types';
+import type { Client, ClientStatusType, ClientPriorityType, UserOptionType, ClientType, CreateClientData } from '@/types';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -31,133 +31,88 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import React, { useEffect, useMemo } from 'react';
-import { ACTIVE_LEAD_STATUS_OPTIONS, LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, LEAD_SOURCE_OPTIONS, USER_OPTIONS, CLIENT_TYPES } from '@/lib/constants';
-import { format, parseISO, isValid } from 'date-fns';
+import React, { useEffect } from 'react';
+import { CLIENT_STATUS_OPTIONS, CLIENT_PRIORITY_OPTIONS, USER_OPTIONS, CLIENT_TYPES } from '@/lib/constants';
 
-// Define a schema for the form's value types using the widest possible enum for `status`.
-// This ensures the form's data type is stable.
-const leadFormValuesSchema = z.object({
+const clientSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   email: z.string().email({ message: 'Invalid email address.' }).optional().or(z.literal('')),
   phone: z.string().min(10, { message: 'Phone number must be at least 10 digits.' }).optional().or(z.literal('')),
-  status: z.enum(LEAD_STATUS_OPTIONS),
-  source: z.enum(LEAD_SOURCE_OPTIONS).optional(),
+  status: z.enum(CLIENT_STATUS_OPTIONS),
   assignedTo: z.enum(USER_OPTIONS).optional(),
-  lastCommentText: z.string().optional(),
-  nextFollowUpDate: z.string().optional().refine(val => !val || (isValid(parseISO(val))), { message: "Invalid date" }),
-  nextFollowUpTime: z.string().optional().refine(val => !val || /^([01]\d|2[0-3]):([0-5]\d)$/.test(val), { message: "Invalid time (HH:MM)"}),
   kilowatt: z.coerce.number().min(0).optional(),
   address: z.string().optional(),
-  priority: z.enum(LEAD_PRIORITY_OPTIONS).optional(),
+  priority: z.enum(CLIENT_PRIORITY_OPTIONS).optional(),
   clientType: z.enum(CLIENT_TYPES).optional(),
 });
 
-type LeadFormValues = z.infer<typeof leadFormValuesSchema>;
+type ClientFormValues = z.infer<typeof clientSchema>;
 
-interface LeadFormProps {
+interface ClientFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: CreateLeadData | Lead) => void;
-  lead?: Lead | null;
-  formMode?: 'active' | 'detail';
+  onSubmit: (data: ClientFormValues | Client) => void;
+  client?: Client | null;
 }
 
-export function LeadForm({ isOpen, onClose, onSubmit, lead, formMode = 'detail' }: LeadFormProps) {
-  const statusOptions = useMemo(() => 
-    formMode === 'active' ? ACTIVE_LEAD_STATUS_OPTIONS : LEAD_STATUS_OPTIONS, 
-    [formMode]
-  );
-  
-  // Create a dynamic schema specifically for validation, which can change based on `formMode`.
-  const dynamicValidationSchema = useMemo(() => 
-    leadFormValuesSchema.extend({
-      status: z.enum(statusOptions),
-    }),
-    [statusOptions]
-  );
-
-  const form = useForm<LeadFormValues>({
-    resolver: zodResolver(dynamicValidationSchema),
+export function ClientForm({ isOpen, onClose, onSubmit, client }: ClientFormProps) {
+  const form = useForm<ClientFormValues>({
+    resolver: zodResolver(clientSchema),
     defaultValues: {
       name: '',
       email: '',
       phone: '',
-      status: 'Fresher',
-      source: undefined,
+      status: 'Deal Done',
       assignedTo: undefined,
-      lastCommentText: '',
-      nextFollowUpDate: '',
-      nextFollowUpTime: '',
       kilowatt: 0,
       address: '',
-      priority: undefined,
+      priority: 'Average',
       clientType: undefined,
     },
   });
 
   useEffect(() => {
     if (isOpen) {
-      if (lead) {
-        const currentStatusIsValid = (statusOptions as readonly string[]).includes(lead.status);
-        const statusToSet = currentStatusIsValid ? lead.status : statusOptions[0];
-
+      if (client) {
         form.reset({
-          name: lead.name,
-          email: lead.email ?? '',
-          phone: lead.phone ?? '',
-          status: statusToSet,
-          source: lead.source ?? undefined,
-          assignedTo: lead.assignedTo ?? undefined,
-          lastCommentText: lead.lastCommentText ?? '',
-          nextFollowUpDate: lead.nextFollowUpDate ? format(parseISO(lead.nextFollowUpDate), 'yyyy-MM-dd') : '',
-          nextFollowUpTime: lead.nextFollowUpTime ?? '',
-          kilowatt: lead.kilowatt ?? 0,
-          address: lead.address ?? '',
-          priority: lead.priority ?? undefined,
-          clientType: lead.clientType ?? undefined,
+          name: client.name || '',
+          email: client.email || '',
+          phone: client.phone || '',
+          status: client.status,
+          assignedTo: client.assignedTo || undefined,
+          kilowatt: client.kilowatt || 0,
+          address: client.address || '',
+          priority: client.priority || 'Average',
+          clientType: client.clientType || undefined,
         });
       } else {
         form.reset({
-          name: '',
-          email: '',
-          phone: '',
-          status: 'Fresher',
-          source: undefined,
-          assignedTo: undefined,
-          lastCommentText: '',
-          nextFollowUpDate: '',
-          nextFollowUpTime: '',
-          kilowatt: 0,
-          address: '',
-          priority: undefined,
-          clientType: undefined,
+            name: '',
+            email: '',
+            phone: '',
+            status: 'Deal Done',
+            assignedTo: undefined,
+            kilowatt: 0,
+            address: '',
+            priority: 'Average',
+            clientType: undefined,
         });
       }
     }
-  }, [lead, form, isOpen, statusOptions]);
+  }, [client, form, isOpen]);
 
-
-  const handleSubmit = (values: LeadFormValues) => {
-    // `values.status` is now correctly typed as LeadStatusType because of the static `LeadFormValues` definition.
-    const submissionData = {
-      ...values,
-      kilowatt: values.kilowatt ?? undefined,
-      lastCommentDate: values.lastCommentText ? format(new Date(), 'dd-MM-yyyy') : undefined,
-      nextFollowUpDate: values.nextFollowUpDate ? values.nextFollowUpDate : undefined,
-      nextFollowUpTime: values.nextFollowUpTime ? values.nextFollowUpTime : undefined,
-      clientType: values.clientType || undefined,
-    };
-    if (lead) {
-      onSubmit({ ...lead, ...submissionData });
+  const handleSubmit = (values: ClientFormValues) => {
+    const submissionData = { ...values };
+    if (client) {
+      onSubmit({ ...client, ...submissionData });
     } else {
-      onSubmit(submissionData as CreateLeadData);
+      onSubmit(submissionData);
     }
   };
 
-  const dialogTitle = lead ? 'Edit Lead' : 'Add New Lead';
-  const dialogDescription = lead ? "Update the lead's information." : 'Enter the details for the new lead.';
-  const submitButtonText = lead ? 'Save Changes' : 'Add Lead';
+  const dialogTitle = client ? 'Edit Client' : 'Add New Client';
+  const dialogDescription = client ? "Update the client's information." : 'Enter the details for the new client.';
+  const submitButtonText = client ? 'Save Changes' : 'Add Client';
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -168,6 +123,14 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead, formMode = 'detail' 
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 py-2 pb-4 pr-1">
+            {client?.id && (
+              <FormItem>
+                <FormLabel>Client ID</FormLabel>
+                <FormControl>
+                  <Input readOnly disabled value={client.id} />
+                </FormControl>
+              </FormItem>
+            )}
             <FormField
               control={form.control}
               name="name"
@@ -202,14 +165,13 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead, formMode = 'detail' 
                   <FormItem>
                     <FormLabel>Mobile No.</FormLabel>
                     <FormControl>
-                      <Input type="tel" placeholder="6263537508" {...field} />
+                      <Input type="tel" placeholder="9876543210" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
-
             <FormField
               control={form.control}
               name="address"
@@ -223,7 +185,6 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead, formMode = 'detail' 
                 </FormItem>
               )}
             />
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -234,11 +195,11 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead, formMode = 'detail' 
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select lead stage" />
+                          <SelectValue placeholder="Select client stage" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {statusOptions.map(statusValue => (
+                        {CLIENT_STATUS_OPTIONS.map(statusValue => (
                           <SelectItem key={statusValue} value={statusValue} className="capitalize">{statusValue}</SelectItem>
                         ))}
                       </SelectContent>
@@ -260,7 +221,7 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead, formMode = 'detail' 
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {LEAD_PRIORITY_OPTIONS.map(priorityValue => (
+                        {CLIENT_PRIORITY_OPTIONS.map(priorityValue => (
                           <SelectItem key={priorityValue} value={priorityValue}>{priorityValue}</SelectItem>
                         ))}
                       </SelectContent>
@@ -270,7 +231,6 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead, formMode = 'detail' 
                 )}
               />
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -308,30 +268,7 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead, formMode = 'detail' 
                 )}
               />
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="source"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Source</FormLabel>
-                     <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select source" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {LEAD_SOURCE_OPTIONS.map(sourceValue => (
-                          <SelectItem key={sourceValue} value={sourceValue}>{sourceValue}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
                <FormField
                 control={form.control}
                 name="assignedTo"
@@ -355,50 +292,6 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead, formMode = 'detail' 
                 )}
               />
             </div>
-            
-            <FormField
-              control={form.control}
-              name="lastCommentText"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Last Comment</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Enter last comment..." {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                <FormField
-                control={form.control}
-                name="nextFollowUpDate"
-                render={({ field }) => (
-                    <FormItem className="md:col-span-2">
-                    <FormLabel>Next Follow-up Date</FormLabel>
-                    <FormControl>
-                        <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
-                <FormField
-                control={form.control}
-                name="nextFollowUpTime"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Time</FormLabel>
-                    <FormControl>
-                        <Input type="time" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
-            </div>
-
             <DialogFooter className="pt-4">
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancel
@@ -413,4 +306,3 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead, formMode = 'detail' 
     </Dialog>
   );
 }
-

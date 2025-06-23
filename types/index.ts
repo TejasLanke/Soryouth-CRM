@@ -1,5 +1,5 @@
 
-import type { LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, LEAD_SOURCE_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES, EXPENSE_CATEGORIES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS, SURVEY_STATUS_OPTIONS, SURVEY_TYPE_OPTIONS, METER_PHASES, CONSUMER_LOAD_TYPES, ROOF_TYPES, DISCOM_OPTIONS } from '@/lib/constants';
+import type { LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, LEAD_SOURCE_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES, EXPENSE_CATEGORIES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS, SURVEY_STATUS_OPTIONS, SURVEY_TYPE_OPTIONS, METER_PHASES, CONSUMER_LOAD_TYPES, ROOF_TYPES, DISCOM_OPTIONS, CLIENT_STATUS_OPTIONS, CLIENT_PRIORITY_OPTIONS } from '@/lib/constants';
 
 // Deriving types from the const arrays ensures type safety and single source of truth
 export type LeadStatusType = typeof LEAD_STATUS_OPTIONS[number];
@@ -11,40 +11,65 @@ export type ClientType = typeof CLIENT_TYPES[number];
 export type ModuleType = typeof MODULE_TYPES[number];
 export type DCRStatus = typeof DCR_STATUSES[number];
 export type ModuleWattage = typeof MODULE_WATTAGE_OPTIONS[number];
+export type ClientStatusType = typeof CLIENT_STATUS_OPTIONS[number];
+export type ClientPriorityType = typeof CLIENT_PRIORITY_OPTIONS[number];
 
+export type AnyStatusType = LeadStatusType | ClientStatusType;
 
 export interface Lead {
-  id: string; // Handled by Prisma (e.g., CUID)
+  id: string;
   name: string;
-  email?: string | null; // Prisma schema uses String?, so allow null
+  email?: string | null;
   phone?: string | null;
-  status: LeadStatusType; // In Prisma, this will be a String; ensure validation/mapping
+  status: LeadStatusType ;
   source?: LeadSourceOptionType | null;
   assignedTo?: UserOptionType | null;
   createdBy?: UserOptionType | null;
-  createdAt: string; // Prisma DateTime will be stringified (ISO 8601)
-  updatedAt: string; // Prisma DateTime will be stringified (ISO 8601)
-
+  createdAt: string;
+  updatedAt: string;
   lastCommentText?: string | null;
-  lastCommentDate?: string | null; // Consider storing as DateTime in Prisma if complex queries are needed
-  nextFollowUpDate?: string | null; // Consider storing as DateTime
+  lastCommentDate?: string | null;
+  nextFollowUpDate?: string | null;
   nextFollowUpTime?: string | null;
-  kilowatt?: number | null; // Prisma Float?
+  kilowatt?: number | null;
   address?: string | null;
   priority?: LeadPriorityType | null;
   dropReason?: DropReasonType | null;
   clientType?: ClientType | null;
   electricityBillUrl?: string | null;
-  followUpCount?: number;
+  followupCount?: number;
 }
+export type CreateLeadData = Omit<Lead, 'id' | 'createdAt' | 'updatedAt' | 'followupCount'>;
 
-export type CreateLeadData = Omit<Lead, 'id' | 'createdAt' | 'updatedAt' | 'followUpCount'>;
+
+export interface Client {
+  id: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  status: ClientStatusType;
+  priority?: ClientPriorityType | null;
+  assignedTo?: UserOptionType | null;
+  createdBy?: UserOptionType | null;
+  createdAt: string;
+  updatedAt: string;
+  kilowatt?: number | null;
+  address?: string | null;
+  clientType?: ClientType | null;
+  electricityBillUrl?: string | null;
+  followUpCount?: number;
+  lastCommentText?: string | null;
+  lastCommentDate?: string | null;
+  nextFollowUpDate?: string | null;
+  nextFollowUpTime?: string | null;
+}
+export type CreateClientData = Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'followupCount' | 'lastCommentText' | 'lastCommentDate' | 'nextFollowUpDate' | 'nextFollowUpTime'>;
+
 
 export interface Proposal {
   id: string;
   proposalNumber: string;
-  clientId: string;
-
+  clientId: string; // Proposals are linked to Clients
   name: string;
   clientType: ClientType;
   contactPerson: string;
@@ -57,14 +82,12 @@ export interface Proposal {
   inverterQty: number;
   ratePerWatt: number;
   proposalDate: string;
-
   baseAmount: number;
   cgstAmount: number;
   sgstAmount: number;
   subtotalAmount: number;
   finalAmount: number;
   subsidyAmount: number;
-
   createdAt: string;
   updatedAt?: string;
 }
@@ -83,6 +106,7 @@ export interface Document {
   title: string;
   type: DocumentType;
   relatedLeadId?: string;
+  relatedClientId?: string; // Can be related to a client now
   relatedProposalId?: string;
   createdAt: string;
   filePath?: string;
@@ -90,7 +114,8 @@ export interface Document {
 
 export interface Communication {
   id: string;
-  leadId: string;
+  leadId?: string; // Optional
+  clientId?: string; // Optional
   type: 'Email' | 'Call' | 'SMS' | 'Meeting' | 'System Alert';
   subject?: string;
   content: string;
@@ -113,48 +138,54 @@ export interface StatusFilterItem {
   value: LeadStatusType | 'all';
 }
 
+export interface ClientStatusFilterItem {
+  label: ClientStatusType | 'Show all';
+  count: number;
+  value: ClientStatusType | 'all';
+}
+
 export interface DropReasonFilterItem {
   label: DropReasonType | 'Show all';
   count: number;
   value: DropReasonType | 'all';
 }
 
-export interface SortConfig {
-  key: keyof Lead;
-  direction: 'ascending' | 'descending';
-}
+export type GenericSortConfig<T extends Item> = { key: keyof T; direction: 'ascending' | 'descending' };
+export type LeadSortConfig = GenericSortConfig<Lead>;
+export type ClientSortConfig = GenericSortConfig<Client>;
+type Item = Lead | Client;
+
 
 export type FollowUpType = typeof FOLLOW_UP_TYPES[number];
 export type FollowUpStatus = typeof FOLLOW_UP_STATUSES[number];
 
 export interface FollowUp {
   id: string;
-  leadId: string;
+  leadId?: string;
+  clientId?: string;
   type: FollowUpType;
   date: string; // ISO string for the activity date
   time?: string; // HH:MM
   status: FollowUpStatus;
-  leadStageAtTimeOfFollowUp?: LeadStatusType;
+  leadStageAtTimeOfFollowUp?: AnyStatusType;
   comment?: string;
   createdBy?: UserOptionType;
   createdAt: string; // ISO string for when the record was created
-
   followupOrTask: 'Followup' | 'Task';
-
-  // Task-specific fields
   taskForUser?: UserOptionType;
   taskDate?: string; // ISO string for the task due date
   taskTime?: string; // HH:MM for the task due time
 }
 
 export type AddActivityData = Omit<FollowUp, 'id' | 'createdAt'> & {
-  priority?: LeadPriorityType;
+  priority?: LeadPriorityType | ClientPriorityType;
 };
 
 
 export interface Task {
   id: string;
-  leadId: string;
+  entityId: string; // leadId or clientId
+  entityType: 'lead' | 'client';
   assignedTo: UserOptionType;
   dueDate: string;
   dueTime: string;

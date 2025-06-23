@@ -56,9 +56,9 @@ export default function ClientsPage() {
 
   const clientStatusFilters: Array<{ label: string; value: LeadStatusType | 'all'; count?: number }> = [
     { label: 'Show all', value: 'all' },
-    { label: 'fresher', value: 'fresher' },
+    { label: 'Fresher', value: 'Fresher' },
     { label: 'installer', value: 'installer' as LeadStatusType }, // Cast if 'installer' is a custom status
-    { label: 'ON HOLD', value: 'ON HOLD' },
+    { label: 'ON HOLD', value: 'On Hold' },
   ];
   
   const [activeFilter, setActiveFilter] = useState<LeadStatusType | 'all'>('all');

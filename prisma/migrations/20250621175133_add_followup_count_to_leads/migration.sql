@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE "FollowUp" ADD COLUMN     "followupCount" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "FollowUp" ADD COLUMN     "followUpCount" INTEGER NOT NULL DEFAULT 0;
