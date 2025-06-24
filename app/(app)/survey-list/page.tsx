@@ -59,7 +59,7 @@ export default function SurveyListPage() {
         counts[survey.status]++;
       }
     });
-    return [{ label: 'Show all', value: 'all', count: counts.all }, 
+    return [{ label: 'show all', value: 'all', count: counts.all }, 
             ...SURVEY_STATUS_OPTIONS.map(status => ({ label: status, value: status, count: counts[status] || 0 }))
            ].filter(f => f.count > 0 || f.value === 'all');
   }, [surveys]);

@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { USER_OPTIONS, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, CLIENT_STATUS_OPTIONS, CLIENT_PRIORITY_OPTIONS } from '@/lib/constants';
 import type { Client, UserOptionType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateClientData, ClientStatusType, ClientPriorityType } from '@/types';
 import { format, parseISO, isValid } from 'date-fns';
-import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, UserCircle2, FileText, ShoppingCart, Loader2, Save, Send, Video, Building, Repeat } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, UserCircle2, FileText, ShoppingCart, Loader2, Save, Send, Video, Building, Repeat, UserX } from 'lucide-react';
 import { ProposalForm } from '@/app/(app)/proposals/proposal-form';
 import { DocumentCreationDialog } from '@/app/(app)/documents/document-creation-dialog';
 import { useToast } from "@/hooks/use-toast";
@@ -48,6 +48,7 @@ export default function ClientDetailsPage() {
   const [isFormPending, startFormTransition] = useTransition();
   const [isUpdating, startUpdateTransition] = useTransition();
   const [isConverting, startConversionTransition] = useTransition();
+  const [isStatusChanging, startStatusChangeTransition] = useTransition();
   
   const [activities, setActivities] = useState<FollowUp[]>([]);
   const [isActivitiesLoading, setActivitiesLoading] = useState(true);
@@ -226,6 +227,30 @@ export default function ClientDetailsPage() {
     });
   };
 
+  const handleSetClientStatus = (status: ClientStatusType) => {
+    if (!client || isStatusChanging) return;
+    startStatusChangeTransition(async () => {
+      const result = await updateClient(client.id, { status });
+      if (result) {
+        toast({
+          title: `Client Status Updated`,
+          description: `${client.name} has been marked as ${status}.`
+        });
+        if (status === 'Inactive') {
+          router.push('/inactive-clients');
+        } else {
+          setClient(result);
+        }
+      } else {
+        toast({
+          title: "Status Update Failed",
+          description: "Could not update the client's status.",
+          variant: "destructive",
+        });
+      }
+    });
+  };
+
   if (client === undefined) {
     return (
         <div className="flex flex-1 items-center justify-center h-full">
@@ -327,6 +352,52 @@ export default function ClientDetailsPage() {
                 <CardTitle className="text-md">Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
+                {client.status !== 'Inactive' && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="sm" className="w-full" disabled={isStatusChanging}>
+                        <UserX className="mr-2 h-4 w-4" /> Make Inactive
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Make Client Inactive?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will move "{client.name}" to the inactive clients list. You can reactivate them later. Are you sure?
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleSetClientStatus('Inactive')} disabled={isStatusChanging}>
+                          {isStatusChanging ? "Updating..." : "Yes, Make Inactive"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+                 {client.status === 'Inactive' && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="secondary" size="sm" className="w-full" disabled={isStatusChanging}>
+                        <UserCircle2 className="mr-2 h-4 w-4" /> Make Active
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Make Client Active?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will move "{client.name}" back to the active clients list with the stage 'Fresher'. Are you sure?
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleSetClientStatus('Fresher')} disabled={isStatusChanging}>
+                           {isStatusChanging ? "Updating..." : "Yes, Make Active"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="outline" size="sm" className="w-full" disabled={isConverting}>
@@ -400,7 +471,7 @@ export default function ClientDetailsPage() {
             </Card>
 
             <Card>
-              <CardHeader><CardTitle>Activity History ({client.followUpCount || 0})</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Activity History ({client.followupCount || 0})</CardTitle></CardHeader>
               <CardContent>
                 {isActivitiesLoading ? (
                    <div className="flex items-center justify-center p-6"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>

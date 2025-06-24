@@ -12,17 +12,26 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { USER_OPTIONS, LEAD_SOURCE_OPTIONS, LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, CLIENT_TYPES } from '@/lib/constants';
-import type { Lead, UserOptionType, LeadSourceOptionType, LeadStatusType, LeadPriorityType, ClientType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateLeadData, AnyStatusType } from '@/types';
+import { USER_OPTIONS, LEAD_SOURCE_OPTIONS, LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, CLIENT_TYPES, DROP_REASON_OPTIONS } from '@/lib/constants';
+import type { Lead, UserOptionType, LeadSourceOptionType, LeadStatusType, LeadPriorityType, ClientType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateLeadData, AnyStatusType, DropReasonType } from '@/types';
 import { format, parseISO, isValid } from 'date-fns';
-import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, UserCircle2, FileText, ShoppingCart, Loader2, Save, Send, Video, Building, Repeat } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, UserCircle2, FileText, ShoppingCart, Loader2, Save, Send, Video, Building, Repeat, Trash2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { getLeadById, updateLead, addActivity, getActivitiesForLead, convertToClient } from '@/app/(app)/leads-list/actions';
+import { getActivitiesForLead, getLeadById, updateLead, addActivity, convertToClient, dropLead } from '@/app/(app)/leads-list/actions';
 import { LeadForm } from '@/app/(app)/leads/lead-form';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import * as z from 'zod';
 
+const dropLeadSchema = z.object({
+  dropReason: z.enum(DROP_REASON_OPTIONS, { required_error: "Drop reason is required." }),
+  dropComment: z.string().optional(),
+});
+type DropLeadFormValues = z.infer<typeof dropLeadSchema>;
 
 const ActivityIcon = ({ type, className }: { type: string, className?: string }) => {
   const defaultClassName = "h-4 w-4";
@@ -46,11 +55,13 @@ export default function LeadDetailsPage() {
   const [lead, setLead] = useState<Lead | null | undefined>(undefined);
   const [isFormPending, startFormTransition] = useTransition();
   const [isUpdating, startUpdateTransition] = useTransition();
+  const [isDropping, startDropTransition] = useTransition();
   
   const [activities, setActivities] = useState<FollowUp[]>([]);
   const [isActivitiesLoading, setActivitiesLoading] = useState(true);
 
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
+  const [isDropDialogOpen, setIsDropDialogOpen] = useState(false);
 
   const [activityType, setActivityType] = useState<FollowUpType>(FOLLOW_UP_TYPES[0]);
   const [activityDate, setActivityDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -63,6 +74,10 @@ export default function LeadDetailsPage() {
   const [taskForUser, setTaskForUser] = useState<UserOptionType | undefined>(USER_OPTIONS[0]);
   const [taskDate, setTaskDate] = useState('');
   const [taskTime, setTaskTime] = useState('');
+
+  const dropForm = useForm<DropLeadFormValues>({
+    resolver: zodResolver(dropLeadSchema),
+  });
 
   useEffect(() => {
     if (leadId) {
@@ -224,6 +239,27 @@ export default function LeadDetailsPage() {
       }
     });
   };
+  
+  const handleDropLead = (values: DropLeadFormValues) => {
+    if (!lead) return;
+    startDropTransition(async () => {
+        const result = await dropLead(lead.id, values.dropReason, values.dropComment);
+        if (result.success) {
+            toast({
+                title: "Lead Dropped",
+                description: `${lead.name} has been moved to the dropped leads list.`
+            });
+            router.push('/dropped-leads-list');
+        } else {
+            toast({
+                title: "Drop Failed",
+                description: result.message || "Could not drop lead.",
+                variant: "destructive",
+            });
+            setIsDropDialogOpen(false);
+        }
+    });
+  };
 
 
   if (lead === undefined) {
@@ -260,7 +296,57 @@ export default function LeadDetailsPage() {
       <div className="flex justify-between items-center p-4 border-b bg-card sticky top-0 z-10">
         <h1 className="text-xl font-semibold font-headline">{lead.name}</h1>
         <div className="flex gap-2">
-          <Button variant="destructive" size="sm" disabled>Drop lead</Button>
+            <AlertDialog open={isDropDialogOpen} onOpenChange={setIsDropDialogOpen}>
+                <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm" disabled={isDropping}><Trash2 className="mr-2 h-4 w-4" /> Drop lead</Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                    <Form {...dropForm}>
+                        <form onSubmit={dropForm.handleSubmit(handleDropLead)}>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Drop Lead: {lead.name}?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Select a reason for dropping this lead. This action will move the lead to the dropped list and cannot be undone directly.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <div className="py-4 space-y-4">
+                                <FormField control={dropForm.control} name="dropReason"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <Label>Reason *</Label>
+                                            <Select onValueChange={field.onChange} value={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger><SelectValue placeholder="Select a drop reason" /></SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {DROP_REASON_OPTIONS.map(reason => <SelectItem key={reason} value={reason}>{reason}</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField control={dropForm.control} name="dropComment"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <Label>Comment (Optional)</Label>
+                                            <FormControl><Textarea placeholder="Add an optional comment..." {...field} /></FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel disabled={isDropping}>Cancel</AlertDialogCancel>
+                                <Button type="submit" variant="destructive" disabled={isDropping}>
+                                    {isDropping && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                                    Confirm Drop
+                                </Button>
+                            </AlertDialogFooter>
+                        </form>
+                    </Form>
+                </AlertDialogContent>
+            </AlertDialog>
           <Button variant="outline" size="sm" onClick={() => router.back()}>
             <ChevronLeft className="h-4 w-4 mr-1" /> Back
           </Button>
@@ -462,7 +548,7 @@ export default function LeadDetailsPage() {
             </Card>
 
             <Card>
-              <CardHeader><CardTitle>Activity History ({lead.followUpCount || 0})</CardTitle></CardHeader>
+              <CardHeader><CardTitle>Activity History ({lead.followupCount || 0})</CardTitle></CardHeader>
               <CardContent>
                 {isActivitiesLoading ? (
                    <div className="flex items-center justify-center p-6"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
@@ -541,7 +627,7 @@ export default function LeadDetailsPage() {
           </div>
         </div>
       </div>
-      {isEditFormOpen && lead && (<LeadForm isOpen={isEditFormOpen} onClose={() => setIsEditFormOpen(false)} onSubmit={handleEditFormSubmit} lead={lead} formMode="lead"/>)}
+      {isEditFormOpen && lead && (<LeadForm isOpen={isEditFormOpen} onClose={() => setIsEditFormOpen(false)} onSubmit={handleEditFormSubmit} lead={lead} formMode="detail"/>)}
     </div>
   );
 }

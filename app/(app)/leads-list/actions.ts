@@ -2,7 +2,7 @@
 'use server';
 
 import prisma from '@/lib/prisma';
-import type { Lead, FollowUp, AddActivityData, CreateLeadData, Client } from '@/types';
+import type { Lead, FollowUp, AddActivityData, CreateLeadData, Client, DropReasonType } from '@/types';
 import { revalidatePath } from 'next/cache';
 import { format, parseISO } from 'date-fns';
 
@@ -311,4 +311,68 @@ export async function convertToClient(leadId: string): Promise<{ success: boolea
     console.error(`Failed to convert lead ${leadId} to client:`, error);
     return { success: false, message: 'An unexpected error occurred during conversion.' };
   }
+}
+
+export async function dropLead(leadId: string, dropReason: DropReasonType, dropComment?: string): Promise<{ success: boolean, droppedLeadId?: string, message?: string }> {
+    try {
+        const leadToDrop = await prisma.lead.findUnique({
+            where: { id: leadId },
+            include: { followUps: true }
+        });
+
+        if (!leadToDrop) {
+            return { success: false, message: "Lead not found." };
+        }
+
+        const newDroppedLead = await prisma.$transaction(async (tx) => {
+            const createdDroppedLead = await tx.droppedLead.create({
+                data: {
+                    name: leadToDrop.name,
+                    email: leadToDrop.email,
+                    phone: leadToDrop.phone,
+                    status: leadToDrop.status || 'Dropped',
+                    source: leadToDrop.source,
+                    assignedTo: leadToDrop.assignedTo,
+                    createdBy: leadToDrop.createdBy,
+                    createdAt: leadToDrop.createdAt,
+                    updatedAt: leadToDrop.updatedAt,
+                    lastCommentText: leadToDrop.lastCommentText,
+                    lastCommentDate: leadToDrop.lastCommentDate,
+                    nextFollowUpDate: leadToDrop.nextFollowUpDate,
+                    nextFollowUpTime: leadToDrop.nextFollowUpTime,
+                    kilowatt: leadToDrop.kilowatt,
+                    address: leadToDrop.address,
+                    priority: leadToDrop.priority,
+                    clientType: leadToDrop.clientType,
+                    electricityBillUrl: leadToDrop.electricityBillUrl,
+                    dropReason: dropReason,
+                    dropComment: dropComment,
+                }
+            });
+            
+            if (leadToDrop.followUps.length > 0) {
+                await tx.followUp.updateMany({
+                    where: { leadId: leadToDrop.id },
+                    data: {
+                        droppedLeadId: createdDroppedLead.id,
+                        leadId: null,
+                    }
+                });
+            }
+
+            await tx.lead.delete({
+                where: { id: leadId }
+            });
+
+            return createdDroppedLead;
+        });
+
+        revalidatePath('/leads-list');
+        revalidatePath('/dropped-leads-list');
+        return { success: true, droppedLeadId: newDroppedLead.id };
+
+    } catch (error) {
+        console.error(`Failed to drop lead ${leadId}:`, error);
+        return { success: false, message: "An unexpected error occurred while dropping the lead." };
+    }
 }

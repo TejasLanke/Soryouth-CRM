@@ -3,15 +3,12 @@
 import React, { useState, useMemo, useEffect, useTransition } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { LeadsTable } from '@/app/(app)/leads/leads-table'; // Reusing this for consistent display
-import { ACTIVE_CLIENT_STATUS_OPTIONS } from '@/lib/constants';
-import { Filter, Search, PlusCircle, Settings2, ListFilter, Rows, Briefcase } from 'lucide-react';
+import { Filter, Search, Settings2, ListFilter, Rows, Archive } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ClientForm } from '@/app/(app)/clients/client-form';
 import { useToast } from "@/hooks/use-toast";
-import type { Lead, Client, ClientStatusFilterItem, ClientSortConfig, ClientStatusType, CreateClientData } from '@/types';
+import type { Client, ClientSortConfig } from '@/types';
 import { Badge } from '@/components/ui/badge';
-import { format, parseISO, startOfDay, isSameDay } from 'date-fns';
-import { getActiveClients, createClient, updateClient, deleteClient } from './actions';
+import { getInactiveClients } from '@/app/(app)/clients-list/actions';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuCheckboxItem, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
@@ -29,24 +26,19 @@ const allColumns: Record<string, string> = {
     assignedTo: 'Assigned To',
 };
 
-export default function ClientsListPage() {
+export default function InactiveClientsListPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedClientForEdit, setSelectedClientForEdit] = useState<Client | null>(null);
   const { toast } = useToast();
-  const [activeFilter, setActiveFilter] = useState<ClientStatusType | 'all'>('all');
-  const [quickFilter, setQuickFilter] = useState<string>('Show all');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<ClientSortConfig | null>(null);
-  const [isPending, startTransition] = useTransition();
-
+  
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
   const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({
-    email: true, phone: true, status: true, lastCommentText: false,
+    email: true, phone: true, status: true, lastCommentText: true,
     nextFollowUpDate: true,
     followupCount: true, kilowatt: true, priority: true, assignedTo: true,
   });
@@ -54,108 +46,15 @@ export default function ClientsListPage() {
   useEffect(() => {
     async function fetchClients() {
       setIsLoading(true);
-      const allClients = await getActiveClients();
-      setClients(allClients);
+      const inactiveClients = await getInactiveClients();
+      setClients(inactiveClients);
       setIsLoading(false);
     }
     fetchClients();
   }, []);
 
-  const handleAddClient = () => {
-    setSelectedClientForEdit(null);
-    setIsFormOpen(true);
-  };
-
-  const handleFormSubmit = async (data: CreateClientData | Client) => {
-    startTransition(async () => {
-      let result;
-      if ('id' in data && data.id) { // Existing client
-        result = await updateClient(data.id, data as Partial<CreateClientData>);
-        if (result) {
-          setClients(prev => prev.map(c => c.id === result!.id ? result! : c));
-          toast({ title: "Client Updated", description: `${result.name}'s information has been updated.` });
-        } else {
-          toast({ title: "Error", description: "Failed to update client.", variant: "destructive" });
-        }
-      } else { // New client
-        const newClientData = { ...data, status: data.status || 'Deal Done' };
-        result = await createClient(newClientData as CreateClientData);
-        if (result) {
-          setClients(prev => [result!, ...prev]);
-          toast({ title: "Client Added", description: `${result.name} has been added.` });
-        } else {
-          toast({ title: "Error", description: "Failed to create client.", variant: "destructive" });
-        }
-      }
-      if (result) {
-        setIsFormOpen(false);
-        setSelectedClientForEdit(null);
-      }
-    });
-  };
-
-  const handleDeleteClient = async (clientId: string) => {
-    startTransition(async () => {
-      const { success } = await deleteClient(clientId);
-      if (success) {
-        setClients(prev => prev.filter(l => l.id !== clientId));
-        toast({ title: "Client Deleted" });
-      } else {
-        toast({ title: "Error", description: "Failed to delete client.", variant: "destructive" });
-      }
-    });
-  };
-
-  const statusFilters = useMemo((): ClientStatusFilterItem[] => {
-    const counts: Record<string, number> = {};
-    ACTIVE_CLIENT_STATUS_OPTIONS.forEach(status => counts[status] = 0);
-    
-    clients.forEach(client => {
-      if (counts[client.status] !== undefined) {
-        counts[client.status]++;
-      }
-    });
-
-    const filters: ClientStatusFilterItem[] = [{ label: 'Show all', count: clients.length, value: 'all' }];
-    ACTIVE_CLIENT_STATUS_OPTIONS.forEach(status => {
-       filters.push({ label: status, count: counts[status] || 0, value: status });
-    });
-    return filters;
-  }, [clients]);
-
   const allFilteredClients = useMemo(() => {
     let clientsToDisplay = [...clients];
-    
-    if (activeFilter !== 'all') {
-      clientsToDisplay = clientsToDisplay.filter(client => client.status === activeFilter);
-    }
-    
-    const today = startOfDay(new Date());
-    switch(quickFilter) {
-      case 'Assigned today':
-        clientsToDisplay = clientsToDisplay.filter(client => isSameDay(parseISO(client.createdAt), today));
-        break;
-      case 'Followed today':
-        clientsToDisplay = clientsToDisplay.filter(client => {
-            if (!client.lastCommentDate) return false;
-            const [day, month, year] = client.lastCommentDate.split('-').map(Number);
-            return isSameDay(new Date(year, month - 1, day), today);
-        });
-        break;
-      case 'Not followed today':
-        clientsToDisplay = clientsToDisplay.filter(client => {
-            if (!client.lastCommentDate) return true;
-            const [day, month, year] = client.lastCommentDate.split('-').map(Number);
-            return !isSameDay(new Date(year, month - 1, day), today);
-        });
-        break;
-      case 'Unattended':
-        clientsToDisplay = clientsToDisplay.filter(client => !client.assignedTo);
-        break;
-      case 'Show all':
-      default:
-        break;
-    }
     
     if (searchTerm) {
       const lowercasedTerm = searchTerm.toLowerCase();
@@ -178,7 +77,7 @@ export default function ClientsListPage() {
       });
     }
     return clientsToDisplay;
-  }, [clients, activeFilter, sortConfig, searchTerm, quickFilter]);
+  }, [clients, sortConfig, searchTerm]);
 
   const paginatedClients = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
@@ -197,36 +96,22 @@ export default function ClientsListPage() {
   };
 
   if (isLoading) {
-    return <PageHeader title="Clients" description="Manage all your existing clients." icon={Briefcase} />;
+    return <PageHeader title="Inactive Clients" description="Manage your inactive clients." icon={Archive} />;
   }
 
   return (
     <>
       <PageHeader
-        title="Clients"
-        description="Manage all your existing clients."
-        icon={Briefcase}
+        title="Inactive Clients"
+        description="Manage your inactive clients. These clients can be reactivated at any time."
+        icon={Archive}
         actions={
           <div className="flex items-center gap-2">
-             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Filter className="mr-2 h-4 w-4" /> Filter
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {['Assigned today', 'Followed today', 'Not followed today', 'Unattended', 'Show all'].map(item => (
-                  <DropdownMenuItem key={item} onSelect={() => setQuickFilter(item)}>
-                    {item}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+             <Button variant="outline" size="sm" onClick={() => toast({ title: "Coming Soon!", description: "Filters for inactive clients will be added in a future update." })}>
+              <Filter className="mr-2 h-4 w-4" /> Filter
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setIsSearchOpen(true)}>
               <Search className="mr-2 h-4 w-4" /> Search
-            </Button>
-            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={handleAddClient} disabled={isPending}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Add Client
             </Button>
              <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -281,30 +166,10 @@ export default function ClientsListPage() {
           </div>
         }
       />
-      <div className="mb-4">
-        <div className="flex flex-wrap gap-2 items-center">
-          {statusFilters.map(filter => (
-            <Button
-              key={filter.value}
-              variant={activeFilter === filter.value ? 'secondary' : 'ghost'}
-              size="sm"
-              onClick={() => setActiveFilter(filter.value)}
-              className={`py-1 px-3 h-auto text-xs rounded-full ${activeFilter === filter.value ? 'border-b-2 border-primary font-semibold' : 'text-muted-foreground'}`}
-            >
-              {filter.label}
-              <Badge variant={activeFilter === filter.value ? 'default' : 'secondary'} className="ml-2 rounded-sm px-1.5 py-0.5 text-[10px] h-4 leading-none">
-                {filter.count}
-              </Badge>
-            </Button>
-          ))}
-        </div>
-      </div>
       
       <LeadsTable
         items={paginatedClients}
-        viewType="client"
-        onEdit={(client) => { setSelectedClientForEdit(client); setIsFormOpen(true); }}
-        onDelete={handleDeleteClient}
+        viewType="client" // Uses the client view, links to /clients/[id] which handles both active/inactive
         sortConfig={sortConfig}
         requestSort={requestSort}
         columnVisibility={columnVisibility}
@@ -312,7 +177,7 @@ export default function ClientsListPage() {
 
        <div className="flex items-center justify-between pt-4">
         <div className="text-sm text-muted-foreground">
-          Showing {paginatedClients.length} of {allFilteredClients.length} clients.
+          Showing {paginatedClients.length} of {allFilteredClients.length} inactive clients.
         </div>
         <div className="flex items-center space-x-2">
           <Button variant="outline" size="sm" onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))} disabled={currentPage === 1}>
@@ -323,20 +188,12 @@ export default function ClientsListPage() {
           </Button>
         </div>
       </div>
-
-      {isFormOpen && (
-        <ClientForm
-          isOpen={isFormOpen}
-          onClose={() => setIsFormOpen(false)}
-          onSubmit={handleFormSubmit}
-          client={selectedClientForEdit}
-        />
-      )}
+      
        {isSearchOpen && (
         <AlertDialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Search Clients</AlertDialogTitle>
+              <AlertDialogTitle>Search Inactive Clients</AlertDialogTitle>
               <AlertDialogDescription>
                 Search by name, email, or phone number.
               </AlertDialogDescription>
@@ -345,7 +202,7 @@ export default function ClientsListPage() {
               <Label htmlFor="search-input" className="sr-only">Search</Label>
               <Input 
                 id="search-input"
-                placeholder="e.g. Green Valley Society, john@example.com, 987..."
+                placeholder="e.g. Old Project Inc, old@example.com, 987..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />

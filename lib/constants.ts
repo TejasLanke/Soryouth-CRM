@@ -22,8 +22,10 @@ import {
   Notebook,
   ClipboardList,
   ClipboardEdit,
+  BadgeAlert,
   MapPinnedIcon,
   BarChart3,
+  Archive,
 } from 'lucide-react';
 import { format, parseISO, addDays, subDays } from 'date-fns';
 
@@ -36,6 +38,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/clients-list', label: 'Clients', icon: Briefcase },
   { href: '/proposals', label: 'Proposals', icon: FileText },
   { href: '/dropped-leads-list', label: 'Dropped Leads', icon: UserX },
+  { href: '/inactive-clients', label: 'Inactive Clients', icon: BadgeAlert },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
 ];
 
@@ -57,6 +60,7 @@ export const CLIENT_TYPES = ['Individual/Bungalow', 'Housing Society', 'Commerci
 export const LEAD_STATUS_OPTIONS = ['New', 'Fresher', 'Requirement', 'Site Visit', 'Quotation Send', 'Follow-up', 'On Hold', 'Lost'] as const;
 export const ACTIVE_LEAD_STATUS_OPTIONS = ['New', 'Fresher', 'Requirement', 'Site Visit', 'Quotation Send', 'Follow-up', 'On Hold'] as const;
 export const CLIENT_STATUS_OPTIONS = ['Fresher', 'Deal Done', 'Installer', 'On Hold', 'Inactive'] as const;
+export const ACTIVE_CLIENT_STATUS_OPTIONS = ['Fresher', 'Deal Done', 'Installer', 'On Hold'] as const;
 export const LEAD_PRIORITY_OPTIONS = ['Hot', 'High', 'Medium', 'Average', 'Low'] as const;
 export const CLIENT_PRIORITY_OPTIONS = ['Hot', 'Average'] as const;
 export const LEAD_SOURCE_OPTIONS = ['Facebook', 'Website', 'Referral', 'Cold Call', 'Walk-in', 'Other', 'OWN Reference'] as const;
@@ -88,12 +92,6 @@ export const MOCK_LEADS: Lead[] = [
     lastCommentText: 'Not answering', lastCommentDate: format(subDays(new Date(), 1), 'dd-MM-yyyy'),
     kilowatt: 5, clientType: 'Individual/Bungalow', nextFollowUpDate: format(addDays(new Date(), 7), 'yyyy-MM-dd'), nextFollowUpTime: '14:30',
     address: '456 Oak Ave, Mumbai', priority: 'Medium', electricityBillUrl: '/mock-bills/jane-bill.jpg', followupCount: 5,
-  },
-   {
-    id: 'lead4', name: 'Lost Cause Ltd', email: 'lost.cause@example.com', phone: '555-0000',
-    status: 'Lost', source: 'Facebook', dropReason: 'Not Interested',
-    createdAt: new Date(Date.now() - 259200000).toISOString(), updatedAt: new Date(Date.now() - 86400000).toISOString(),
-    kilowatt: 0, clientType: 'Other', priority: 'Low', assignedTo: 'System', createdBy: 'System', followupCount: 0,
   },
 ];
 
@@ -147,7 +145,7 @@ export const MOCK_DOCUMENTS: Document[] = [
 ];
 
 export const MOCK_COMMUNICATIONS: Communication[] = [
-    { id: 'c1', leadId: 'lead1', type: 'Email', subject: 'Introductory Email', content: 'Sent initial contact email.', direction: 'Outgoing', timestamp: new Date(Date.now() - 86400000 * 2).toISOString(), recordedBy: 'System' }, { id: 'c2', clientId: 'client1', type: 'Call', content: 'Follow-up call regarding their solar needs. They are interested.', direction: 'Outgoing', timestamp: new Date(Date.now() - 86400000).toISOString(), recordedBy: 'Sales Rep A' },
+    { id: 'c1', leadId: 'leadId1', type: 'Email', subject: 'Introductory Email', content: 'Sent initial contact email.', direction: 'Outgoing', timestamp: new Date(Date.now() - 86400000 * 2).toISOString(), recordedBy: 'System' }, { id: 'c2', clientId: 'client1', type: 'Call', content: 'Follow-up call regarding their solar needs. They are interested.', direction: 'Outgoing', timestamp: new Date(Date.now() - 86400000).toISOString(), recordedBy: 'Sales Rep A' },
 ];
 
 export const EXPENSE_CATEGORIES = ['Travel', 'Food', 'Supplies', 'Utilities', 'Software', 'Training', 'Marketing', 'Other'] as const;

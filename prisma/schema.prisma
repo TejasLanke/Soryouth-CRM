@@ -35,6 +35,32 @@ model Lead {
   followUps FollowUp[]
 }
 
+model DroppedLead {
+  id                 String     @id @default(cuid())
+  name               String
+  email              String?
+  phone              String?
+  status             String     // Will always be 'Lost'
+  source             String?
+  assignedTo         String?
+  createdBy          String?
+  createdAt          DateTime   // The original creation date
+  updatedAt          DateTime   // The original updated date
+  lastCommentText    String?
+  lastCommentDate    DateTime?
+  nextFollowUpDate   DateTime?
+  nextFollowUpTime   String?
+  kilowatt           Float?
+  address            String?
+  priority           String?
+  clientType         String?
+  electricityBillUrl String?
+  dropReason         String
+  dropComment        String?
+  droppedAt          DateTime   @default(now())
+  followUps          FollowUp[]
+}
+
 model Client {
   id                 String    @id @default(cuid())
   name               String
@@ -80,4 +106,7 @@ model FollowUp {
   
   client                   Client?   @relation(fields: [clientId], references: [id], onDelete: Cascade)
   clientId                 String?
+
+  droppedLead              DroppedLead? @relation(fields: [droppedLeadId], references: [id], onDelete: Cascade)
+  droppedLeadId            String?
 }

@@ -1,48 +1,56 @@
 
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { LeadsTable } from '@/app/(app)/leads/leads-table';
-import { MOCK_LEADS, DROP_REASON_OPTIONS } from '@/lib/constants';
-import { Search, Settings2, ListFilter, UserX } from 'lucide-react'; // Filter icon imported as ListFilter
+import { DROP_REASON_OPTIONS } from '@/lib/constants';
+import { Settings2, UserX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { Lead, DropReasonType, DropReasonFilterItem, LeadSortConfig } from '@/types';
+import type { DroppedLead, DropReasonType, DropReasonFilterItem, DroppedLeadSortConfig } from '@/types';
 import { Badge } from '@/components/ui/badge';
-import { format, parseISO } from 'date-fns';
+import { getDroppedLeads } from './actions';
+import { useToast } from '@/hooks/use-toast';
 
 export default function DroppedLeadsListPage() {
-  const allLeads: Lead[] = MOCK_LEADS;
-  const initialDroppedLeads = allLeads.filter(lead => lead.status === 'Lost');
-  
-  // Note: We don't typically edit or add "dropped" leads directly from this list.
-  // This page is primarily for viewing. Actions like "restore lead" could be added.
-  // const [droppedLeads, setDroppedLeads] = useState<Lead[]>(initialDroppedLeads); 
+  const [droppedLeads, setDroppedLeads] = useState<DroppedLead[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<DropReasonType | 'all'>('all');
-  const [sortConfig, setSortConfig] = useState<LeadSortConfig | null>(null);
+  const [sortConfig, setSortConfig] = useState<DroppedLeadSortConfig | null>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    async function fetchDroppedLeads() {
+        setIsLoading(true);
+        const leads = await getDroppedLeads();
+        setDroppedLeads(leads);
+        setIsLoading(false);
+    }
+    fetchDroppedLeads();
+  }, []);
 
   const dropReasonFilters = useMemo((): DropReasonFilterItem[] => {
     const counts: Record<string, number> = {};
     DROP_REASON_OPTIONS.forEach(reason => counts[reason] = 0);
     
-    initialDroppedLeads.forEach(lead => {
-      if (lead.dropReason && counts[lead.dropReason] !== undefined) {
+    droppedLeads.forEach(lead => {
+      if (counts[lead.dropReason] !== undefined) {
         counts[lead.dropReason]++;
       }
     });
 
-    const filters: DropReasonFilterItem[] = [{ label: 'Show all', count: initialDroppedLeads.length, value: 'all' }];
+    const filters: DropReasonFilterItem[] = [{ label: 'Show all', count: droppedLeads.length, value: 'all' }];
     DROP_REASON_OPTIONS.forEach(reason => {
-      if (counts[reason] > 0 || initialDroppedLeads.some(l => l.dropReason === reason)) {
+      if (counts[reason] > 0 || droppedLeads.some(l => l.dropReason === reason)) {
         filters.push({ label: reason, count: counts[reason] || 0, value: reason });
       }
     });
     return filters;
-  }, [initialDroppedLeads]);
+  }, [droppedLeads]);
 
   const sortedAndFilteredLeads = useMemo(() => {
     let leadsToDisplay = activeFilter === 'all' 
-      ? initialDroppedLeads
-      : initialDroppedLeads.filter(lead => lead.dropReason === activeFilter);
+      ? droppedLeads
+      : droppedLeads.filter(lead => lead.dropReason === activeFilter);
 
     if (sortConfig !== null) {
       leadsToDisplay = [...leadsToDisplay].sort((a, b) => {
@@ -53,9 +61,9 @@ export default function DroppedLeadsListPage() {
         if (aValue === undefined) return sortConfig.direction === 'ascending' ? 1 : -1;
         if (bValue === undefined) return sortConfig.direction === 'ascending' ? -1 : 1;
         
-        if (sortConfig.key === 'createdAt' || sortConfig.key === 'updatedAt') {
-          const dateA = aValue ? parseISO(aValue as string).getTime() : 0;
-          const dateB = bValue ? parseISO(bValue as string).getTime() : 0;
+        if (sortConfig.key === 'createdAt' || sortConfig.key === 'droppedAt') {
+          const dateA = aValue ? new Date(aValue as string).getTime() : 0;
+          const dateB = bValue ? new Date(bValue as string).getTime() : 0;
           if (dateA < dateB) return sortConfig.direction === 'ascending' ? -1 : 1;
           if (dateA > dateB) return sortConfig.direction === 'ascending' ? 1 : -1;
           return 0;
@@ -71,15 +79,19 @@ export default function DroppedLeadsListPage() {
       });
     }
     return leadsToDisplay;
-  }, [initialDroppedLeads, activeFilter, sortConfig]);
+  }, [droppedLeads, activeFilter, sortConfig]);
 
-  const requestSort = (key: keyof Lead) => {
+  const requestSort = (key: keyof DroppedLead) => {
     let direction: 'ascending' | 'descending' = 'ascending';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
       direction = 'descending';
     }
     setSortConfig({ key, direction });
   };
+  
+  if (isLoading) {
+    return <PageHeader title="Dropped Leads" description="Loading dropped leads..." icon={UserX} />;
+  }
 
   return (
     <>
@@ -89,14 +101,7 @@ export default function DroppedLeadsListPage() {
         icon={UserX}
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="h-8 px-3">
-              <Search className="mr-1.5 h-3.5 w-3.5" /> Search
-            </Button>
-             <Button variant="outline" size="sm" className="h-8 px-3">
-                <CheckboxIcon className="mr-1.5 h-3.5 w-3.5" /> 
-                <ListFilter className="ml-1 h-3.5 w-3.5" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toast({ title: "Coming soon!"})}>
               <Settings2 className="h-4 w-4" />
             </Button>
           </div>
@@ -133,10 +138,3 @@ export default function DroppedLeadsListPage() {
     </>
   );
 }
-
-const CheckboxIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-    <polyline points="9 12 12 15 15 9"></polyline>
-  </svg>
-);

@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 import type { Client, FollowUp, AddActivityData, CreateClientData, LeadStatusType } from '@/types';
 import { revalidatePath } from 'next/cache';
 import { format, parseISO } from 'date-fns';
+import { ACTIVE_CLIENT_STATUS_OPTIONS } from '@/lib/constants';
 
 // Helper to map Prisma client to frontend Client type
 function mapPrismaClientToClientType(prismaClient: any): Client {
@@ -23,7 +24,7 @@ function mapPrismaClientToClientType(prismaClient: any): Client {
     address: prismaClient.address ?? undefined,
     clientType: prismaClient.clientType ?? undefined,
     electricityBillUrl: prismaClient.electricityBillUrl ?? undefined,
-    followUpCount: prismaClient.followUps?.length ?? 0,
+    followupCount: prismaClient.followUps?.length ?? 0,
     lastCommentText: prismaClient.followUps?.[0]?.comment ?? undefined,
     lastCommentDate: prismaClient.followUps?.[0]?.createdAt ? format(prismaClient.followUps[0].createdAt, 'dd-MM-yyyy') : undefined,
     nextFollowUpDate: prismaClient.nextFollowUpDate ? format(prismaClient.nextFollowUpDate, 'yyyy-MM-dd') : undefined,
@@ -52,9 +53,14 @@ function mapPrismaFollowUpToFollowUpType(prismaFollowUp: any): FollowUp {
   } as FollowUp;
 }
 
-export async function getClients(): Promise<Client[]> {
+export async function getActiveClients(): Promise<Client[]> {
   try {
     const clientsFromDb = await prisma.client.findMany({
+      where: {
+        status: {
+          in: [...ACTIVE_CLIENT_STATUS_OPTIONS],
+        },
+      },
       orderBy: { createdAt: 'desc' },
       include: {
         followUps: {
@@ -65,7 +71,28 @@ export async function getClients(): Promise<Client[]> {
     });
     return clientsFromDb.map(mapPrismaClientToClientType);
   } catch (error) {
-    console.error("Failed to fetch clients:", error);
+    console.error("Failed to fetch active clients:", error);
+    return [];
+  }
+}
+
+export async function getInactiveClients(): Promise<Client[]> {
+  try {
+    const clientsFromDb = await prisma.client.findMany({
+      where: {
+        status: 'Inactive',
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        followUps: {
+          orderBy: { createdAt: 'desc' },
+          take: 1
+        }
+      }
+    });
+    return clientsFromDb.map(mapPrismaClientToClientType);
+  } catch (error) {
+    console.error("Failed to fetch inactive clients:", error);
     return [];
   }
 }
@@ -112,10 +139,10 @@ export async function createClient(data: CreateClientData): Promise<Client | nul
     }
 }
 
-export async function updateClient(id: string, data: Partial<Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'followUpCount'>>): Promise<Client | null> {
+export async function updateClient(id: string, data: Partial<Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'followupCount'>>): Promise<Client | null> {
     try {
         const prismaData: any = {};
-        const fieldsToIgnore = ['id', 'createdAt', 'updatedAt', 'followUpCount', 'lastCommentText', 'lastCommentDate', 'nextFollowUpDate', 'nextFollowUpTime'];
+        const fieldsToIgnore = ['id', 'createdAt', 'updatedAt', 'followupCount', 'lastCommentText', 'lastCommentDate', 'nextFollowUpDate', 'nextFollowUpTime'];
         
         for (const key in data) {
             if (Object.prototype.hasOwnProperty.call(data, key)) {
@@ -138,6 +165,7 @@ export async function updateClient(id: string, data: Partial<Omit<Client, 'id' |
         });
 
         revalidatePath('/clients-list');
+        revalidatePath('/inactive-clients');
         revalidatePath(`/clients/${id}`);
         return mapPrismaClientToClientType(updatedClientFromDb);
     } catch (error) {
@@ -151,6 +179,7 @@ export async function deleteClient(id: string): Promise<{ success: boolean }> {
   try {
     await prisma.client.delete({ where: { id } });
     revalidatePath('/clients-list');
+    revalidatePath('/inactive-clients');
     return { success: true };
   } catch (error) {
     console.error("Failed to delete client:", error);
@@ -249,6 +278,8 @@ export async function convertClientToLead(clientId: string): Promise<{ success: 
         leadStatus = 'On Hold';
     } else if (client.status === 'Fresher') {
         leadStatus = 'Fresher';
+    } else if (client.status === 'Inactive') {
+        leadStatus = 'Follow-up'; // Reactivating an inactive client as a lead
     }
 
     const newLead = await prisma.$transaction(async (tx) => {
@@ -269,8 +300,8 @@ export async function convertClientToLead(clientId: string): Promise<{ success: 
           electricityBillUrl: client.electricityBillUrl,
           nextFollowUpDate: client.nextFollowUpDate,
           nextFollowUpTime: client.nextFollowUpTime,
-          lastCommentText: client.followUps[0]?.comment ?? null,
-          lastCommentDate: client.followUps[0]?.createdAt ?? null,
+          lastCommentText: client.followUps[0]?.comment ?? `Reactivated from Client (Status: ${client.status})`,
+          lastCommentDate: client.followUps[0]?.createdAt ?? new Date(),
         },
       });
 
@@ -293,6 +324,7 @@ export async function convertClientToLead(clientId: string): Promise<{ success: 
 
     revalidatePath('/leads-list');
     revalidatePath('/clients-list');
+    revalidatePath('/inactive-clients');
     revalidatePath(`/clients/${clientId}`);
 
     return { success: true, leadId: newLead.id };

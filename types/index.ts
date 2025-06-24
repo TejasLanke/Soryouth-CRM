@@ -21,7 +21,7 @@ export interface Lead {
   name: string;
   email?: string | null;
   phone?: string | null;
-  status: LeadStatusType ;
+  status: LeadStatusType;
   source?: LeadSourceOptionType | null;
   assignedTo?: UserOptionType | null;
   createdBy?: UserOptionType | null;
@@ -41,6 +41,12 @@ export interface Lead {
 }
 export type CreateLeadData = Omit<Lead, 'id' | 'createdAt' | 'updatedAt' | 'followupCount'>;
 
+export interface DroppedLead extends Omit<Lead, 'status' | 'updatedAt'> {
+  status: 'Lost';
+  dropReason: DropReasonType;
+  dropComment?: string | null;
+  droppedAt: string;
+}
 
 export interface Client {
   id: string;
@@ -57,7 +63,7 @@ export interface Client {
   address?: string | null;
   clientType?: ClientType | null;
   electricityBillUrl?: string | null;
-  followUpCount?: number;
+  followupCount?: number;
   lastCommentText?: string | null;
   lastCommentDate?: string | null;
   nextFollowUpDate?: string | null;
@@ -150,10 +156,11 @@ export interface DropReasonFilterItem {
   value: DropReasonType | 'all';
 }
 
+export type Item = Lead | Client | DroppedLead;
 export type GenericSortConfig<T extends Item> = { key: keyof T; direction: 'ascending' | 'descending' };
 export type LeadSortConfig = GenericSortConfig<Lead>;
 export type ClientSortConfig = GenericSortConfig<Client>;
-type Item = Lead | Client;
+export type DroppedLeadSortConfig = GenericSortConfig<DroppedLead>;
 
 
 export type FollowUpType = typeof FOLLOW_UP_TYPES[number];
@@ -163,6 +170,7 @@ export interface FollowUp {
   id: string;
   leadId?: string;
   clientId?: string;
+  droppedLeadId?: string;
   type: FollowUpType;
   date: string; // ISO string for the activity date
   time?: string; // HH:MM
@@ -177,7 +185,7 @@ export interface FollowUp {
   taskTime?: string; // HH:MM for the task due time
 }
 
-export type AddActivityData = Omit<FollowUp, 'id' | 'createdAt'> & {
+export type AddActivityData = Omit<FollowUp, 'id' | 'createdAt' | 'droppedLeadId'> & {
   priority?: LeadPriorityType | ClientPriorityType;
 };
 

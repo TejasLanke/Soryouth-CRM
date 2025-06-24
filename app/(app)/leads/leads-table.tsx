@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Lead, Client } from '@/types';
+import type { Lead, Client, DroppedLead } from '@/types';
 import React from 'react';
 import Link from 'next/link';
 import {
@@ -35,17 +35,16 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Card, CardContent } from '@/components/ui/card';
 import { format, parseISO, isValid } from 'date-fns';
-import type { LeadSortConfig, ClientSortConfig } from '@/types';
+import type { LeadSortConfig, ClientSortConfig, DroppedLeadSortConfig } from '@/types';
 
-type Item = Lead | Client;
-type GenericSortConfig<T extends Item> = { key: keyof T; direction: 'ascending' | 'descending' };
+type Item = Lead | Client | DroppedLead;
 
 interface LeadsTableProps<T extends Item> {
   items: T[];
   viewType: 'active' | 'dropped' | 'client';
   onEdit?: (item: T) => void;
   onDelete?: (itemId: string) => void;
-  sortConfig?: GenericSortConfig<T> | null;
+  sortConfig?: { key: keyof T; direction: 'ascending' | 'descending' } | null;
   requestSort?: (key: keyof T) => void;
   columnVisibility?: Record<string, boolean>;
 }
@@ -65,7 +64,7 @@ const formatDate = (dateString?: string | null) => {
 
 export function LeadsTable<T extends Item>({ items, viewType, onEdit, onDelete, sortConfig, requestSort, columnVisibility }: LeadsTableProps<T>) {
 
-  const getSourceBadgeVariant = (source?: string) => {
+  const getSourceBadgeVariant = (source?: string | null) => {
     if (!source) return 'outline';
     const lowerSource = source.toLowerCase();
     if (lowerSource.includes('facebook')) return 'default';
@@ -96,8 +95,9 @@ export function LeadsTable<T extends Item>({ items, viewType, onEdit, onDelete, 
   );
 
   const renderRow = (item: T, index: number) => {
-    const href = viewType === 'client' ? `/clients/${item.id}` : `/leads/${item.id}`;
-    const leadItem = viewType !== 'client' ? (item as Lead) : undefined;
+    const href = viewType === 'client' ? `/clients/${item.id}` :
+                 viewType === 'dropped' ? `/dropped-leads/${item.id}` :
+                 `/leads/${item.id}`;
     
     return (
      <TableRow key={item.id} className="hover:bg-muted/20">
@@ -111,13 +111,14 @@ export function LeadsTable<T extends Item>({ items, viewType, onEdit, onDelete, 
       </TableCell>
       {(!columnVisibility || columnVisibility.email) && <TableCell className="py-3 text-xs">{item.email || '-'}</TableCell>}
       {(!columnVisibility || columnVisibility.phone) && <TableCell className="py-3">{item.phone || '-'}</TableCell>}
-      {(!columnVisibility || columnVisibility.status) && <TableCell className="py-3"><Badge variant="secondary" className="capitalize">{item.status}</Badge></TableCell>}
+      {(!columnVisibility || columnVisibility.status) && <TableCell className="py-3"><Badge variant={item.status === 'Lost' ? 'destructive' : 'secondary'} className="capitalize">{item.status}</Badge></TableCell>}
+      {viewType === 'dropped' && (!columnVisibility || columnVisibility.dropReason) && <TableCell className="py-3 text-xs">{(item as DroppedLead).dropReason || '-'}</TableCell>}
       {(!columnVisibility || columnVisibility.lastCommentText) && <TableCell className="py-3 text-xs"><div>{item.lastCommentText || '-'}</div>{item.lastCommentDate && <div className="text-muted-foreground">{formatDate(item.lastCommentDate)}</div>}</TableCell>}
       {(viewType === 'active' || viewType === 'client') && (!columnVisibility || columnVisibility.nextFollowUpDate) && <TableCell className="py-3 text-xs">{(item as Lead | Client).nextFollowUpDate ? `${formatDate((item as Lead | Client).nextFollowUpDate)} ${(item as Lead | Client).nextFollowUpTime || ''}`.trim() : '-'}</TableCell>}
       {(!columnVisibility || columnVisibility.followupCount) && <TableCell className="py-3 text-center">{item.followupCount || 0}</TableCell>}
       {viewType === 'active' && (!columnVisibility || columnVisibility.calls) && <TableCell className="py-3 text-center">{0}</TableCell>}
       {(!columnVisibility || columnVisibility.kilowatt) && <TableCell className="py-3">{item.kilowatt !== undefined ? `${item.kilowatt} kW` : '-'}</TableCell>}
-      {viewType === 'active' && (!columnVisibility || columnVisibility.source) && <TableCell className="py-3">{leadItem?.source ? <Badge variant={getSourceBadgeVariant(leadItem.source)}>{leadItem.source}</Badge> : '-'}</TableCell>}
+      {viewType === 'active' && (!columnVisibility || columnVisibility.source) && <TableCell className="py-3">{(item as Lead).source ? <Badge variant={getSourceBadgeVariant((item as Lead).source)}>{(item as Lead).source}</Badge> : '-'}</TableCell>}
       {(!columnVisibility || columnVisibility.priority) && <TableCell className="py-3">{item.priority ? <Badge variant={item.priority === 'Hot' || item.priority === 'High' ? 'destructive' : item.priority === 'Medium' ? 'secondary' : 'outline'} className="capitalize">{item.priority}</Badge> : '-'}</TableCell>}
       {(!columnVisibility || columnVisibility.assignedTo) && <TableCell className="py-3">{item.assignedTo || '-'}</TableCell>}
       
@@ -177,6 +178,7 @@ export function LeadsTable<T extends Item>({ items, viewType, onEdit, onDelete, 
                 {(!columnVisibility || columnVisibility.email) && renderHeaderCell('Email', 'email')}
                 {(!columnVisibility || columnVisibility.phone) && renderHeaderCell('Mobile no.', 'phone')}
                 {(!columnVisibility || columnVisibility.status) && renderHeaderCell('Stage', 'status')}
+                {viewType === 'dropped' && (!columnVisibility || columnVisibility.dropReason) && renderHeaderCell('Drop Reason', 'dropReason')}
                 {(!columnVisibility || columnVisibility.lastCommentText) && renderHeaderCell('Last comment', 'lastCommentText')}
                 {(viewType === 'active' || viewType === 'client') && (!columnVisibility || columnVisibility.nextFollowUpDate) && renderHeaderCell('Next follow-up', 'nextFollowUpDate')}
                 {(!columnVisibility || columnVisibility.followupCount) && renderHeaderCell('Followups', 'followupCount')}
