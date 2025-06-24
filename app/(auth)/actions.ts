@@ -1,0 +1,97 @@
+
+'use server';
+
+import { z } from 'zod';
+import prisma from '@/lib/prisma';
+import { createSession, deleteSession, hashPassword, comparePassword } from '@/lib/auth';
+import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
+
+const loginSchema = z.object({
+  email: z.string().email({ message: "Invalid email address." }),
+  password: z.string().min(1, { message: "Password is required." }),
+});
+
+const signupSchema = z.object({
+  name: z.string().min(2, { message: "Name must be at least 2 characters." }),
+  email: z.string().email({ message: "Invalid email address." }),
+  phone: z.string().min(10, { message: "Phone number must be at least 10 digits." }),
+  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+});
+
+export async function login(prevState: any, formData: FormData) {
+  const validatedFields = loginSchema.safeParse(Object.fromEntries(formData.entries()));
+
+  if (!validatedFields.success) {
+    return { error: 'Invalid email or password.' };
+  }
+
+  const { email, password } = validatedFields.data;
+
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      return { error: 'Invalid email or password.' };
+    }
+
+    const passwordsMatch = await comparePassword(password, user.password);
+    if (!passwordsMatch) {
+      return { error: 'Invalid email or password.' };
+    }
+    
+    await createSession(user.id, user.name, user.email);
+    
+  } catch (error) {
+    console.error(error);
+    return { error: 'An unexpected error occurred. Please try again.' };
+  }
+
+  redirect('/dashboard');
+}
+
+export async function signup(prevState: any, formData: FormData) {
+  const userCount = await prisma.user.count();
+  if (userCount > 0) {
+      return { error: "Self-registration is disabled. Please contact an administrator to create an account." };
+  }
+
+  const validatedFields = signupSchema.safeParse(Object.fromEntries(formData.entries()));
+
+  if (!validatedFields.success) {
+      const errorMessages = validatedFields.error.errors.map(e => e.message).join(', ');
+      return { error: `Invalid fields: ${errorMessages}` };
+  }
+
+  const { name, email, phone, password } = validatedFields.data;
+
+  try {
+      const existingUser = await prisma.user.findUnique({ where: { email } });
+      if (existingUser) {
+          return { error: 'User with this email already exists.' };
+      }
+
+      const hashedPassword = await hashPassword(password);
+      
+      await prisma.user.create({
+          data: {
+              name,
+              email,
+              phone,
+              password: hashedPassword,
+              role: 'Admin', // The first user is always an Admin
+          },
+      });
+  } catch (error) {
+      console.error(error);
+      return { error: 'Could not create user. Please try again.' };
+  }
+  
+  revalidatePath('/login');
+  return { success: true, message: `Admin account for '${name}' created successfully. Please login.` };
+}
+
+export async function logout() {
+  await deleteSession();
+  revalidatePath('/', 'layout');
+  redirect('/login');
+}

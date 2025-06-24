@@ -1,5 +1,5 @@
 
-import type { NavItem, Lead, Client, Proposal, Document, Communication, DocumentType, ClientType, LeadStatusType, LeadPriorityType, ClientStatusType, ClientPriorityType, UserOptionType, DropReasonType, Expense, Survey } from '@/types';
+import type { NavItem, Lead, Client, Proposal, Document, Communication, DocumentType, ClientType, LeadStatusType, LeadPriorityType, ClientStatusType, ClientPriorityType, UserOptionType, DropReasonType, Expense, Survey, UserRole } from '@/types';
 import {
   LayoutDashboard,
   UsersRound,
@@ -22,10 +22,10 @@ import {
   Notebook,
   ClipboardList,
   ClipboardEdit,
-  BadgeAlert,
   MapPinnedIcon,
   BarChart3,
   Archive,
+  Users,
 } from 'lucide-react';
 import { format, parseISO, addDays, subDays } from 'date-fns';
 
@@ -38,8 +38,9 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/clients-list', label: 'Clients', icon: Briefcase },
   { href: '/proposals', label: 'Proposals', icon: FileText },
   { href: '/dropped-leads-list', label: 'Dropped Leads', icon: UserX },
-  { href: '/inactive-clients', label: 'Inactive Clients', icon: BadgeAlert },
+  { href: '/inactive-clients', label: 'Inactive Clients', icon: Archive },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
+  { href: '/users', label: 'Manage Users', icon: Users },
 ];
 
 // Secondary Navigation for tools/other sections, in user profile dropdown
@@ -56,6 +57,7 @@ export const TOOLS_NAV_ITEMS: NavItem[] = [
   { href: '/automation', label: 'Automation Scripts', icon: TerminalSquare },
 ];
 
+export const USER_ROLES = ['Admin', 'TechnoSales', 'Designing', 'Procurement', 'ProjectManager', 'LiasoningExecutive', 'OperationAndMaintainance'] as const;
 export const CLIENT_TYPES = ['Individual/Bungalow', 'Housing Society', 'Commercial', 'Industrial', 'Other'] as const;
 export const LEAD_STATUS_OPTIONS = ['New', 'Fresher', 'Requirement', 'Site Visit', 'Quotation Send', 'Follow-up', 'On Hold', 'Lost'] as const;
 export const ACTIVE_LEAD_STATUS_OPTIONS = ['New', 'Fresher', 'Requirement', 'Site Visit', 'Quotation Send', 'Follow-up', 'On Hold'] as const;

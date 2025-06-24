@@ -1,5 +1,5 @@
 
-import type { LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, LEAD_SOURCE_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES, EXPENSE_CATEGORIES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS, SURVEY_STATUS_OPTIONS, SURVEY_TYPE_OPTIONS, METER_PHASES, CONSUMER_LOAD_TYPES, ROOF_TYPES, DISCOM_OPTIONS, CLIENT_STATUS_OPTIONS, CLIENT_PRIORITY_OPTIONS } from '@/lib/constants';
+import type { LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, LEAD_SOURCE_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES, EXPENSE_CATEGORIES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS, SURVEY_STATUS_OPTIONS, SURVEY_TYPE_OPTIONS, METER_PHASES, CONSUMER_LOAD_TYPES, ROOF_TYPES, DISCOM_OPTIONS, CLIENT_STATUS_OPTIONS, CLIENT_PRIORITY_OPTIONS, USER_ROLES } from '@/lib/constants';
 
 // Deriving types from the const arrays ensures type safety and single source of truth
 export type LeadStatusType = typeof LEAD_STATUS_OPTIONS[number];
@@ -13,8 +13,19 @@ export type DCRStatus = typeof DCR_STATUSES[number];
 export type ModuleWattage = typeof MODULE_WATTAGE_OPTIONS[number];
 export type ClientStatusType = typeof CLIENT_STATUS_OPTIONS[number];
 export type ClientPriorityType = typeof CLIENT_PRIORITY_OPTIONS[number];
+export type UserRole = typeof USER_ROLES[number];
+
 
 export type AnyStatusType = LeadStatusType | ClientStatusType;
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: UserRole;
+  createdAt: string;
+}
 
 export interface Lead {
   id: string;
