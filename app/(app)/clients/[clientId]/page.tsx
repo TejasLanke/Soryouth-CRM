@@ -16,7 +16,6 @@ import { USER_OPTIONS, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, CLIENT_STATUS_OPTION
 import type { Client, UserOptionType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateClientData, ClientStatusType, ClientPriorityType, Proposal } from '@/types';
 import { format, parseISO, isValid } from 'date-fns';
 import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, UserCircle2, FileText, ShoppingCart, Loader2, Save, Send, Video, Building, Repeat, UserX, IndianRupee } from 'lucide-react';
-import { ProposalForm } from '@/app/(app)/proposals/proposal-form';
 import { DocumentCreationDialog } from '@/app/(app)/documents/document-creation-dialog';
 import { useToast } from "@/hooks/use-toast";
 import { getClientById, updateClient, addClientActivity, getActivitiesForClient, convertClientToLead } from '@/app/(app)/clients-list/actions';
@@ -26,6 +25,8 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ProposalPreviewDialog } from '@/app/(app)/proposals/proposal-preview-dialog';
+import { ProposalForm } from '@/app/(app)/proposals/proposal-form';
+import { TemplateSelectionDialog } from '@/app/(app)/proposals/template-selection-dialog';
 
 
 const ActivityIcon = ({ type, className }: { type: string, className?: string }) => {
@@ -60,6 +61,8 @@ export default function ClientDetailsPage() {
   const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
   const [documentTypeToCreate, setDocumentTypeToCreate] = useState<'Purchase Order' | null>(null);
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
+  const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [proposals, setProposals] = useState<Proposal[]>([]);
 
   const [activityType, setActivityType] = useState<FollowUpType>(FOLLOW_UP_TYPES[0]);
@@ -68,6 +71,7 @@ export default function ClientDetailsPage() {
   const [activityStatus, setActivityStatus] = useState<FollowUpStatus>(FOLLOW_UP_STATUSES[0]);
   const [activityClientStage, setActivityClientStage] = useState<ClientStatusType | undefined>();
   const [activityComment, setActivityComment] = useState('');
+
   
   const [taskForUser, setTaskForUser] = useState<UserOptionType | undefined>(USER_OPTIONS[0]);
   const [taskDate, setTaskDate] = useState('');
@@ -135,11 +139,26 @@ export default function ClientDetailsPage() {
           description: `Proposal ${data.proposalNumber} has been saved.`,
         });
         await fetchProposals();
+        if(result.pdfUrl) {
+          setSelectedProposalForPreview(result);
+          setIsPreviewOpen(true);
+        }
       } else {
         toast({ title: "Error", description: "Could not save proposal to database.", variant: "destructive" });
       }
     });
     setIsProposalFormOpen(false);
+    setSelectedTemplateId(null);
+  };
+
+  const handleCreateNewProposal = () => {
+      setIsTemplateDialogOpen(true);
+  };
+
+  const handleTemplateSelected = (templateId: string) => {
+      setSelectedTemplateId(templateId);
+      setIsTemplateDialogOpen(false);
+      setIsProposalFormOpen(true);
   };
 
   const handleSaveActivity = () => {
@@ -454,7 +473,7 @@ export default function ClientDetailsPage() {
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
-                <Button onClick={() => setIsProposalFormOpen(true)} className="w-full" size="sm"><FileText className="mr-2 h-4 w-4" /> Create Proposal</Button>
+                <Button onClick={handleCreateNewProposal} className="w-full" size="sm"><FileText className="mr-2 h-4 w-4" /> Create Proposal</Button>
                 <Button onClick={() => { setDocumentTypeToCreate('Purchase Order'); setIsDocumentDialogOpen(true); }} className="w-full" variant="outline" size="sm"><ShoppingCart className="mr-2 h-4 w-4" /> Create Purchase Order</Button>
               </CardContent>
             </Card>
@@ -502,33 +521,6 @@ export default function ClientDetailsPage() {
                 <Button onClick={handleSaveActivity} className="w-full bg-green-600 hover:bg-green-700" disabled={isFormPending}>
                   {isFormPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null} Save
                 </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader><CardTitle>Proposal History ({proposals.length})</CardTitle></CardHeader>
-              <CardContent>
-                {proposals.length > 0 ? (
-                  <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-                    {proposals.map(proposal => (
-                      <div key={proposal.id} onClick={() => { setSelectedProposalForPreview(proposal); setIsPreviewOpen(true); }} className="flex items-center justify-between p-3 border rounded-md cursor-pointer hover:bg-muted/50">
-                        <div className="flex items-center gap-3">
-                          <FileText className="h-5 w-5 text-muted-foreground" />
-                          <div>
-                            <p className="font-semibold text-sm">{proposal.proposalNumber}</p>
-                            <p className="text-xs text-muted-foreground">Capacity: {proposal.capacity} kW</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                           <p className="font-semibold text-sm flex items-center"><IndianRupee className="h-4 w-4 mr-0.5" />{proposal.finalAmount.toLocaleString('en-IN')}</p>
-                           <p className="text-xs text-muted-foreground">{format(parseISO(proposal.proposalDate), 'dd MMM yyyy')}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                   <p className="text-sm text-center text-muted-foreground py-6">No proposals created for this client yet.</p>
-                )}
               </CardContent>
             </Card>
 
@@ -609,10 +601,52 @@ export default function ClientDetailsPage() {
               <CardHeader className="pb-2 pt-4"><CardTitle className="text-md">Notes</CardTitle></CardHeader>
               <CardContent><Textarea placeholder="Add notes here..." className="min-h-[100px] bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800" /></CardContent>
             </Card>
+            
+            <Card>
+              <CardHeader><CardTitle>Proposal History ({proposals.length})</CardTitle></CardHeader>
+              <CardContent>
+                {proposals.length > 0 ? (
+                  <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                    {proposals.map(proposal => (
+                      <div key={proposal.id} onClick={() => { setSelectedProposalForPreview(proposal); setIsPreviewOpen(true); }} className="flex items-center justify-between p-3 border rounded-md cursor-pointer hover:bg-muted/50">
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="font-semibold text-sm">{proposal.proposalNumber}</p>
+                            <p className="text-xs text-muted-foreground">Capacity: {proposal.capacity} kW</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                           <p className="font-semibold text-sm flex items-center"><IndianRupee className="h-4 w-4 mr-0.5" />{proposal.finalAmount.toLocaleString('en-IN')}</p>
+                           <p className="text-xs text-muted-foreground">{format(parseISO(proposal.proposalDate), 'dd MMM yyyy')}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                   <p className="text-sm text-center text-muted-foreground py-6">No proposals created for this client yet.</p>
+                )}
+              </CardContent>
+            </Card>
+
           </div>
         </div>
       </div>
-      {isProposalFormOpen && client && (<ProposalForm isOpen={isProposalFormOpen} onClose={() => setIsProposalFormOpen(false)} onSubmit={handleProposalSubmit} clients={[client]} leads={[]} />)}
+      {isProposalFormOpen && client && (
+        <ProposalForm
+            isOpen={isProposalFormOpen}
+            onClose={() => { setIsProposalFormOpen(false); setSelectedTemplateId(null); }}
+            onSubmit={handleProposalSubmit}
+            clients={[client]}
+            leads={[]}
+            templateId={selectedTemplateId}
+        />
+      )}
+      <TemplateSelectionDialog
+        isOpen={isTemplateDialogOpen}
+        onClose={() => setIsTemplateDialogOpen(false)}
+        onSelect={handleTemplateSelected}
+      />
       {isDocumentDialogOpen && documentTypeToCreate === 'Purchase Order' && client && (<DocumentCreationDialog isOpen={isDocumentDialogOpen} onClose={() => setIsDocumentDialogOpen(false)} documentType="Purchase Order" />)}
       {isEditFormOpen && client && (<ClientForm isOpen={isEditFormOpen} onClose={() => setIsEditFormOpen(false)} onSubmit={handleEditFormSubmit} client={client}/>)}
       {isPreviewOpen && selectedProposalForPreview && (

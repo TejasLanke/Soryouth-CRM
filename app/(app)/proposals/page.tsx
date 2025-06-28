@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -94,6 +95,10 @@ export default function ProposalsListPage() {
     if (result) {
       toast({ title: "Proposal Saved", description: `Proposal ${result.proposalNumber} has been successfully saved.` });
       await fetchAllData();
+      if(result.pdfUrl) {
+          setSelectedProposalForPreview(result);
+          setIsPreviewOpen(true);
+      }
     } else {
       toast({ title: "Error", description: "Failed to save the proposal.", variant: "destructive" });
     }
@@ -101,10 +106,6 @@ export default function ProposalsListPage() {
     setIsFormOpen(false);
     setSelectedProposalForEdit(null);
     setSelectedTemplateId(null);
-    if (result && result.pdfUrl) {
-        setSelectedProposalForPreview(result);
-        setIsPreviewOpen(true);
-    }
   };
 
   const handleEditProposal = (proposal: Proposal) => {
@@ -125,7 +126,7 @@ export default function ProposalsListPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 pt-6">
         {list.map(proposal => {
           const customerLink = proposal.clientId
-            ? `/proposals/${proposal.clientId}`
+            ? `/clients/${proposal.clientId}`
             : proposal.leadId
             ? `/leads/${proposal.leadId}`
             : '#';

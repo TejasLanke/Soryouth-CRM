@@ -30,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useTransition } from 'react';
 import { CLIENT_TYPES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS, LEAD_STATUS_OPTIONS } from '@/lib/constants';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon, IndianRupee, ChevronsUpDown, Check, X, Loader2 } from 'lucide-react';
@@ -41,7 +41,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import { useToast } from '@/hooks/use-toast';
-import { ProposalPreviewDialog } from './proposal-preview-dialog'; // Import the new preview dialog
 
 export const proposalSchema = z.object({
   clientId: z.string().optional(),
@@ -62,7 +61,6 @@ export const proposalSchema = z.object({
   ratePerWatt: z.coerce.number().positive({ message: 'Rate per Watt (₹) must be a positive number.' }),
   subsidyAmount: z.coerce.number().min(0, { message: 'Subsidy amount cannot be negative.' }).optional(),
   
-  // New schema fields
   unitRate: z.coerce.number().optional(),
   requiredSpace: z.coerce.number().optional(),
   generationPerDay: z.coerce.number().optional(),
@@ -115,10 +113,7 @@ const initialFormStateForUseForm: ProposalFormValues = {
 };
 
 export function ProposalForm({ isOpen, onClose, onSubmit, proposal, templateId, clients = [], leads = [] }: ProposalFormProps) {
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string | null>(null);
-  const [generatedDocxUrl, setGeneratedDocxUrl] = useState<string | null>(null);
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isGenerating, startGenerationTransition] = useTransition();
   const { toast } = useToast();
   
   const form = useForm<ProposalFormValues>({
@@ -281,78 +276,72 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, templateId, 
 
   const isDcrDisabled = watchedClientType === 'Commercial' || watchedClientType === 'Industrial';
 
-  const handleFormSubmit = async (values: ProposalFormValues) => {
-    setIsGenerating(true);
-    let finalClientId = values.clientId;
-    if (isNewClientMode) {
-      finalClientId = `client-new-${Date.now()}`;
-    }
-
-    const currentTemplateId = proposal?.templateId || templateId;
-    if (!currentTemplateId) {
-      toast({ title: "Error", description: "No template selected.", variant: "destructive" });
-      setIsGenerating(false);
-      return;
-    }
-
-    const submissionData: Proposal = {
-      id: proposal?.id || `prop${Date.now()}`,
-      ...values,
-      clientId: finalClientId,
-      leadId: values.leadId,
-      templateId: currentTemplateId,
-      capacity: parseFloat(values.capacity as any) || 0,
-      ratePerWatt: parseFloat(values.ratePerWatt as any) || 0,
-      inverterRating: Number(values.inverterRating) || 0,
-      inverterQty: Number(values.inverterQty) || 1,
-      baseAmount: calculatedValues.baseAmount,
-      cgstAmount: calculatedValues.cgstAmount,
-      sgstAmount: calculatedValues.sgstAmount,
-      subtotalAmount: calculatedValues.baseAmount + calculatedValues.cgstAmount + calculatedValues.sgstAmount,
-      finalAmount: calculatedValues.finalAmount,
-      subsidyAmount: parseFloat(values.subsidyAmount as any) || 0,
-      unitRate: values.unitRate,
-      requiredSpace: calculatedAdditionalValues.requiredSpace,
-      generationPerDay: calculatedAdditionalValues.generationPerDay,
-      generationPerYear: calculatedAdditionalValues.generationPerYear,
-      savingsPerYear: calculatedAdditionalValues.savingsPerYear,
-      laKitQty: calculatedAdditionalValues.laKitQty,
-      acdbDcdbQty: calculatedAdditionalValues.acdbDcdbQty,
-      earthingKitQty: calculatedAdditionalValues.earthingKitQty,
-      createdAt: proposal?.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    
-    try {
-      const response = await fetch('/api/proposals/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ templateId: currentTemplateId, data: submissionData }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok || result.error) {
-        throw new Error(result.error || 'Failed to generate proposal.');
+  const handleFormSubmit = (values: ProposalFormValues) => {
+    startGenerationTransition(async () => {
+      let finalClientId = values.clientId;
+      if (isNewClientMode) {
+        finalClientId = `client-new-${Date.now()}`;
       }
 
-      setGeneratedPdfUrl(result.pdfUrl);
-      setGeneratedDocxUrl(result.docxUrl);
-      setIsPreviewOpen(true);
-      
-      const finalSubmissionData = {
-          ...submissionData,
-          pdfUrl: result.pdfUrl,
-          docxUrl: result.docxUrl
-      };
-      onSubmit(finalSubmissionData);
+      const currentTemplateId = proposal?.templateId || templateId;
+      if (!currentTemplateId) {
+        toast({ title: "Error", description: "No template selected.", variant: "destructive" });
+        return;
+      }
 
-    } catch (error) {
-      console.error("Failed to generate proposal:", error);
-      toast({ title: "Error Generating Proposal", description: (error as Error).message, variant: "destructive"});
-    } finally {
-      setIsGenerating(false);
-    }
+      const submissionData: Proposal = {
+        id: proposal?.id || `prop${Date.now()}`,
+        ...values,
+        clientId: finalClientId,
+        leadId: values.leadId,
+        templateId: currentTemplateId,
+        capacity: parseFloat(values.capacity as any) || 0,
+        ratePerWatt: parseFloat(values.ratePerWatt as any) || 0,
+        inverterRating: Number(values.inverterRating) || 0,
+        inverterQty: Number(values.inverterQty) || 1,
+        baseAmount: calculatedValues.baseAmount,
+        cgstAmount: calculatedValues.cgstAmount,
+        sgstAmount: calculatedValues.sgstAmount,
+        subtotalAmount: calculatedValues.baseAmount + calculatedValues.cgstAmount + calculatedValues.sgstAmount,
+        finalAmount: calculatedValues.finalAmount,
+        subsidyAmount: parseFloat(values.subsidyAmount as any) || 0,
+        unitRate: values.unitRate,
+        requiredSpace: calculatedAdditionalValues.requiredSpace,
+        generationPerDay: calculatedAdditionalValues.generationPerDay,
+        generationPerYear: calculatedAdditionalValues.generationPerYear,
+        savingsPerYear: calculatedAdditionalValues.savingsPerYear,
+        laKitQty: calculatedAdditionalValues.laKitQty,
+        acdbDcdbQty: calculatedAdditionalValues.acdbDcdbQty,
+        earthingKitQty: calculatedAdditionalValues.earthingKitQty,
+        createdAt: proposal?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      
+      try {
+        const response = await fetch('/api/proposals/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ templateId: currentTemplateId, data: submissionData }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || result.error) {
+          throw new Error(result.error || 'Failed to generate proposal.');
+        }
+        
+        const finalSubmissionData = {
+            ...submissionData,
+            pdfUrl: result.pdfUrl,
+            docxUrl: result.docxUrl
+        };
+        onSubmit(finalSubmissionData);
+
+      } catch (error) {
+        console.error("Failed to generate proposal:", error);
+        toast({ title: "Error Generating Proposal", description: (error as Error).message, variant: "destructive"});
+      }
+    });
   };
 
   return (
@@ -482,12 +471,6 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, templateId, 
         </Form>
       </DialogContent>
     </Dialog>
-    <ProposalPreviewDialog 
-      isOpen={isPreviewOpen} 
-      onClose={() => setIsPreviewOpen(false)} 
-      pdfUrl={generatedPdfUrl}
-      docxUrl={generatedDocxUrl}
-    />
     </>
   );
 }
