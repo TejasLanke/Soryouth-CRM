@@ -13,11 +13,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { USER_OPTIONS, LEAD_SOURCE_OPTIONS, LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, CLIENT_TYPES, DROP_REASON_OPTIONS } from '@/lib/constants';
-import type { Lead, UserOptionType, LeadSourceOptionType, LeadStatusType, LeadPriorityType, ClientType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateLeadData, AnyStatusType, DropReasonType } from '@/types';
+import type { Lead, UserOptionType, LeadSourceOptionType, LeadStatusType, LeadPriorityType, ClientType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateLeadData, AnyStatusType, DropReasonType, Proposal } from '@/types';
 import { format, parseISO, isValid } from 'date-fns';
-import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, UserCircle2, FileText, ShoppingCart, Loader2, Save, Send, Video, Building, Repeat, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, UserCircle2, FileText, ShoppingCart, Loader2, Save, Send, Video, Building, Repeat, Trash2, IndianRupee } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { getActivitiesForLead, getLeadById, updateLead, addActivity, convertToClient, dropLead } from '@/app/(app)/leads-list/actions';
+import { getLeadById, updateLead, addActivity, convertToClient, dropLead, getActivitiesForLead } from '@/app/(app)/leads-list/actions';
+import { getProposalsForLead, createOrUpdateProposal } from '@/app/(app)/proposals/actions';
 import { LeadForm } from '@/app/(app)/leads/lead-form';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -26,6 +27,10 @@ import { Form, FormControl, FormField, FormItem, FormMessage } from '@/component
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
+import { ProposalPreviewDialog } from '@/app/(app)/proposals/proposal-preview-dialog';
+import { ProposalForm } from '@/app/(app)/proposals/proposal-form';
+import { TemplateSelectionDialog } from '@/app/(app)/proposals/template-selection-dialog';
+
 
 const dropLeadSchema = z.object({
   dropReason: z.enum(DROP_REASON_OPTIONS, { required_error: "Drop reason is required." }),
@@ -62,6 +67,10 @@ export default function LeadDetailsPage() {
 
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
   const [isDropDialogOpen, setIsDropDialogOpen] = useState(false);
+  const [isProposalFormOpen, setIsProposalFormOpen] = useState(false);
+  const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [proposals, setProposals] = useState<Proposal[]>([]);
 
   const [activityType, setActivityType] = useState<FollowUpType>(FOLLOW_UP_TYPES[0]);
   const [activityDate, setActivityDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -75,9 +84,19 @@ export default function LeadDetailsPage() {
   const [taskDate, setTaskDate] = useState('');
   const [taskTime, setTaskTime] = useState('');
 
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [selectedProposalForPreview, setSelectedProposalForPreview] = useState<Proposal | null>(null);
+
   const dropForm = useForm<DropLeadFormValues>({
     resolver: zodResolver(dropLeadSchema),
   });
+
+  const fetchProposals = async () => {
+    if (leadId) {
+      const fetchedProposals = await getProposalsForLead(leadId);
+      setProposals(fetchedProposals);
+    }
+  };
 
   useEffect(() => {
     if (leadId) {
@@ -100,7 +119,6 @@ export default function LeadDetailsPage() {
           });
         }
       };
-      fetchLeadDetails();
       
       const fetchActivities = async () => {
         setActivitiesLoading(true);
@@ -108,10 +126,14 @@ export default function LeadDetailsPage() {
         setActivities(fetchedActivities);
         setActivitiesLoading(false);
       };
+
+      fetchLeadDetails();
       fetchActivities();
+      fetchProposals();
     } else {
       setLead(null);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leadId, toast]);
 
   useEffect(() => {
@@ -120,6 +142,37 @@ export default function LeadDetailsPage() {
         setActivityPriority(lead.priority as LeadPriorityType || undefined);
     }
   }, [lead]);
+
+  const handleProposalSubmit = async (data: Proposal) => {
+    startFormTransition(async () => {
+      const result = await createOrUpdateProposal(data);
+      if (result) {
+        toast({
+          title: "Proposal History Updated",
+          description: `Proposal ${data.proposalNumber} has been saved.`,
+        });
+        await fetchProposals(); 
+        if(result.pdfUrl) {
+          setSelectedProposalForPreview(result);
+          setIsPreviewOpen(true);
+        }
+      } else {
+        toast({ title: "Error", description: "Could not save the proposal to the database.", variant: "destructive" });
+      }
+    });
+    setIsProposalFormOpen(false);
+    setSelectedTemplateId(null);
+  };
+  
+  const handleCreateNewProposal = () => {
+      setIsTemplateDialogOpen(true);
+  };
+
+  const handleTemplateSelected = (templateId: string) => {
+      setSelectedTemplateId(templateId);
+      setIsTemplateDialogOpen(false);
+      setIsProposalFormOpen(true);
+  };
 
   const handleSaveActivity = () => {
     if (!lead) return;
@@ -402,7 +455,9 @@ export default function LeadDetailsPage() {
                 <CardTitle className="text-md">Communication</CardTitle>
               </CardHeader>
               <CardContent className="flex justify-around items-center">
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" disabled><Phone className="h-5 w-5" /></Button>
+                <Button asChild variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" disabled={!lead.phone}>
+                  <a href={lead.phone ? `tel:${lead.phone}` : undefined}><Phone className="h-5 w-5" /></a>
+                </Button>
                 <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" disabled><MessageSquare className="h-5 w-5" /></Button>
                 <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" disabled><Mail className="h-5 w-5" /></Button>
                 <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" disabled><MessageCircle className="h-5 w-5" /></Button>
@@ -492,7 +547,7 @@ export default function LeadDetailsPage() {
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
-                <Button className="w-full" variant="outline" size="sm" onClick={() => toast({ title: "Coming Soon", description: "Create proposals after converting lead to client."})}><FileText className="mr-2 h-4 w-4" /> Create Proposal</Button>
+                <Button className="w-full" variant="outline" size="sm" onClick={handleCreateNewProposal}><FileText className="mr-2 h-4 w-4" /> Create Proposal</Button>
                 <Button className="w-full" variant="outline" size="sm" disabled><ShoppingCart className="mr-2 h-4 w-4" /> Create Purchase Order</Button>
               </CardContent>
             </Card>
@@ -624,10 +679,59 @@ export default function LeadDetailsPage() {
               <CardHeader className="pb-2 pt-4"><CardTitle className="text-md">Notes</CardTitle></CardHeader>
               <CardContent><Textarea placeholder="Add notes here..." className="min-h-[100px] bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800" /></CardContent>
             </Card>
+            <Card>
+              <CardHeader><CardTitle>Proposal History ({proposals.length})</CardTitle></CardHeader>
+              <CardContent>
+                {proposals.length > 0 ? (
+                  <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                    {proposals.map(proposal => (
+                      <div key={proposal.id} onClick={() => { setSelectedProposalForPreview(proposal); setIsPreviewOpen(true); }} className="flex items-center justify-between p-3 border rounded-md cursor-pointer hover:bg-muted/50">
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="font-semibold text-sm">{proposal.proposalNumber}</p>
+                            <p className="text-xs text-muted-foreground">Capacity: {proposal.capacity} kW</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                           <p className="font-semibold text-sm flex items-center"><IndianRupee className="h-4 w-4 mr-0.5" />{proposal.finalAmount.toLocaleString('en-IN')}</p>
+                           <p className="text-xs text-muted-foreground">{format(parseISO(proposal.proposalDate), 'dd MMM yyyy')}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                   <p className="text-sm text-center text-muted-foreground py-6">No proposals created for this lead yet.</p>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
       {isEditFormOpen && lead && (<LeadForm isOpen={isEditFormOpen} onClose={() => setIsEditFormOpen(false)} onSubmit={handleEditFormSubmit} lead={lead} formMode="detail"/>)}
+      {isProposalFormOpen && lead && (
+          <ProposalForm 
+            isOpen={isProposalFormOpen} 
+            onClose={() => { setIsProposalFormOpen(false); setSelectedTemplateId(null); }} 
+            onSubmit={handleProposalSubmit} 
+            clients={[]} 
+            leads={[lead]}
+            templateId={selectedTemplateId} 
+          />
+      )}
+      <TemplateSelectionDialog
+        isOpen={isTemplateDialogOpen}
+        onClose={() => setIsTemplateDialogOpen(false)}
+        onSelect={handleTemplateSelected}
+      />
+      {isPreviewOpen && selectedProposalForPreview && (
+        <ProposalPreviewDialog
+          isOpen={isPreviewOpen}
+          onClose={() => setIsPreviewOpen(false)}
+          pdfUrl={selectedProposalForPreview.pdfUrl || null}
+          docxUrl={selectedProposalForPreview.docxUrl || null}
+        />
+      )}
     </div>
   );
 }

@@ -3,19 +3,21 @@
 import React, { useState, useMemo, useEffect, useTransition } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { LeadsTable } from '@/app/(app)/leads/leads-table'; // Reusing this for consistent display
-import { ACTIVE_CLIENT_STATUS_OPTIONS } from '@/lib/constants';
-import { Filter, Search, PlusCircle, Settings2, ListFilter, Rows, Briefcase } from 'lucide-react';
+import { ACTIVE_CLIENT_STATUS_OPTIONS, CLIENT_TYPES, USER_OPTIONS } from '@/lib/constants';
+import { Filter, Search, PlusCircle, Settings2, ListFilter, Rows, Briefcase, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ClientForm } from '@/app/(app)/clients/client-form';
 import { useToast } from "@/hooks/use-toast";
-import type { Lead, Client, ClientStatusFilterItem, ClientSortConfig, ClientStatusType, CreateClientData } from '@/types';
+import type { Lead, Client, ClientStatusFilterItem, ClientSortConfig, ClientStatusType, CreateClientData, ClientType, UserOptionType } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO, startOfDay, isSameDay } from 'date-fns';
-import { getActiveClients, createClient, updateClient, deleteClient } from './actions';
+import { getActiveClients, createClient, updateClient, deleteClient, bulkUpdateClients } from './actions';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuCheckboxItem, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 const allColumns: Record<string, string> = {
     email: 'Email',
@@ -45,17 +47,30 @@ export default function ClientsListPage() {
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
+  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
+  const [isAssignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [isStageDialogOpen, setStageDialogOpen] = useState(false);
+  const [isTypeDialogOpen, setTypeDialogOpen] = useState(false);
+  const [assignToUser, setAssignToUser] = useState<UserOptionType | ''>('');
+  const [updateStageTo, setUpdateStageTo] = useState<ClientStatusType | ''>('');
+  const [updateTypeTo, setUpdateTypeTo] = useState<ClientType | ''>('');
+
+
   const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({
     email: true, phone: true, status: true, lastCommentText: false,
     nextFollowUpDate: true,
     followupCount: true, kilowatt: true, priority: true, assignedTo: true,
   });
 
+  const refreshClients = async () => {
+    const allClients = await getActiveClients();
+    setClients(allClients);
+  };
+
   useEffect(() => {
     async function fetchClients() {
       setIsLoading(true);
-      const allClients = await getActiveClients();
-      setClients(allClients);
+      await refreshClients();
       setIsLoading(false);
     }
     fetchClients();
@@ -103,6 +118,38 @@ export default function ClientsListPage() {
       } else {
         toast({ title: "Error", description: "Failed to delete client.", variant: "destructive" });
       }
+    });
+  };
+  
+  const handleBulkUpdate = (action: 'assign' | 'stage' | 'type') => {
+    startTransition(async () => {
+        let data = {};
+        let successMessage = '';
+        if (action === 'assign' && assignToUser) {
+            data = { assignedTo: assignToUser };
+            successMessage = `Assigned to ${assignToUser}.`;
+        } else if (action === 'stage' && updateStageTo) {
+            data = { status: updateStageTo };
+            successMessage = `Stage updated to ${updateStageTo}.`;
+        } else if (action === 'type' && updateTypeTo) {
+            data = { clientType: updateTypeTo };
+            successMessage = `Client Type updated to ${updateTypeTo}.`;
+        } else {
+            toast({ title: "No Selection", description: "Please select a value.", variant: "destructive" });
+            return;
+        }
+
+        const result = await bulkUpdateClients(selectedClientIds, data);
+        if (result.success) {
+            toast({ title: "Bulk Update Successful", description: `${result.count} clients updated. ${successMessage}` });
+            await refreshClients();
+            setSelectedClientIds([]);
+            setAssignDialogOpen(false);
+            setStageDialogOpen(false);
+            setTypeDialogOpen(false);
+        } else {
+            toast({ title: "Error", description: result.message || "Failed to update clients.", variant: "destructive" });
+        }
     });
   };
 
@@ -208,23 +255,43 @@ export default function ClientsListPage() {
         icon={Briefcase}
         actions={
           <div className="flex items-center gap-2">
-             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Filter className="mr-2 h-4 w-4" /> Filter
+            {selectedClientIds.length > 0 ? (
+                 <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground whitespace-nowrap">{selectedClientIds.length} selected</span>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          Actions <ChevronDown className="ml-2 h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onSelect={() => setAssignDialogOpen(true)}>Assign clients</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setStageDialogOpen(true)}>Update stage</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setTypeDialogOpen(true)}>Update Client Type</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            ) : (
+              <>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Filter className="mr-2 h-4 w-4" /> Filter
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {['Assigned today', 'Followed today', 'Not followed today', 'Unattended', 'Show all'].map(item => (
+                      <DropdownMenuItem key={item} onSelect={() => setQuickFilter(item)}>
+                        {item}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button variant="outline" size="sm" onClick={() => setIsSearchOpen(true)}>
+                  <Search className="mr-2 h-4 w-4" /> Search
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {['Assigned today', 'Followed today', 'Not followed today', 'Unattended', 'Show all'].map(item => (
-                  <DropdownMenuItem key={item} onSelect={() => setQuickFilter(item)}>
-                    {item}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button variant="outline" size="sm" onClick={() => setIsSearchOpen(true)}>
-              <Search className="mr-2 h-4 w-4" /> Search
-            </Button>
+              </>
+            )}
             <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={handleAddClient} disabled={isPending}>
               <PlusCircle className="mr-2 h-4 w-4" /> Add Client
             </Button>
@@ -308,6 +375,8 @@ export default function ClientsListPage() {
         sortConfig={sortConfig}
         requestSort={requestSort}
         columnVisibility={columnVisibility}
+        selectedIds={selectedClientIds}
+        setSelectedIds={setSelectedClientIds}
       />
 
        <div className="flex items-center justify-between pt-4">
@@ -357,6 +426,73 @@ export default function ClientsListPage() {
           </AlertDialogContent>
         </AlertDialog>
       )}
+
+      {/* Bulk Action Dialogs */}
+      <Dialog open={isAssignDialogOpen} onOpenChange={setAssignDialogOpen}>
+          <DialogContent>
+              <DialogHeader>
+                  <DialogTitle>Assign Selected Clients</DialogTitle>
+                  <DialogDescription>Assign the {selectedClientIds.length} selected clients to a user.</DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                  <Label htmlFor="assign-user">Assign to</Label>
+                  <Select value={assignToUser} onValueChange={(v) => setAssignToUser(v as UserOptionType)}>
+                      <SelectTrigger><SelectValue placeholder="Select a user" /></SelectTrigger>
+                      <SelectContent>
+                          {USER_OPTIONS.map(user => <SelectItem key={user} value={user}>{user}</SelectItem>)}
+                      </SelectContent>
+                  </Select>
+              </div>
+              <DialogFooter>
+                  <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={() => handleBulkUpdate('assign')} disabled={isPending || !assignToUser}>Update</Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isStageDialogOpen} onOpenChange={setStageDialogOpen}>
+          <DialogContent>
+              <DialogHeader>
+                  <DialogTitle>Update Stage for Selected Clients</DialogTitle>
+                  <DialogDescription>Change the stage for the {selectedClientIds.length} selected clients.</DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                  <Label htmlFor="update-stage">New Stage</Label>
+                  <Select value={updateStageTo} onValueChange={(v) => setUpdateStageTo(v as ClientStatusType)}>
+                      <SelectTrigger><SelectValue placeholder="Select a stage" /></SelectTrigger>
+                      <SelectContent>
+                          {ACTIVE_CLIENT_STATUS_OPTIONS.map(stage => <SelectItem key={stage} value={stage}>{stage}</SelectItem>)}
+                      </SelectContent>
+                  </Select>
+              </div>
+              <DialogFooter>
+                  <Button variant="outline" onClick={() => setStageDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={() => handleBulkUpdate('stage')} disabled={isPending || !updateStageTo}>Update</Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
+
+       <Dialog open={isTypeDialogOpen} onOpenChange={setTypeDialogOpen}>
+          <DialogContent>
+              <DialogHeader>
+                  <DialogTitle>Update Client Type</DialogTitle>
+                  <DialogDescription>Change the type for the {selectedClientIds.length} selected clients.</DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                  <Label htmlFor="update-type">New Client Type</Label>
+                  <Select value={updateTypeTo} onValueChange={(v) => setUpdateTypeTo(v as ClientType)}>
+                      <SelectTrigger><SelectValue placeholder="Select a type" /></SelectTrigger>
+                      <SelectContent>
+                          {CLIENT_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                      </SelectContent>
+                  </Select>
+              </div>
+              <DialogFooter>
+                  <Button variant="outline" onClick={() => setTypeDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={() => handleBulkUpdate('type')} disabled={isPending || !updateTypeTo}>Update</Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
     </>
   );
 }

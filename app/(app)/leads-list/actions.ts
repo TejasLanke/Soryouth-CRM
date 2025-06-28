@@ -2,7 +2,7 @@
 'use server';
 
 import prisma from '@/lib/prisma';
-import type { Lead, FollowUp, AddActivityData, CreateLeadData, Client, DropReasonType } from '@/types';
+import type { Lead, FollowUp, AddActivityData, CreateLeadData, Client, DropReasonType, LeadSourceOptionType, UserOptionType, LeadStatusType } from '@/types';
 import { revalidatePath } from 'next/cache';
 import { format, parseISO } from 'date-fns';
 
@@ -330,7 +330,7 @@ export async function dropLead(leadId: string, dropReason: DropReasonType, dropC
                     name: leadToDrop.name,
                     email: leadToDrop.email,
                     phone: leadToDrop.phone,
-                    status: leadToDrop.status || 'Dropped',
+                    status: 'Lost',
                     source: leadToDrop.source,
                     assignedTo: leadToDrop.assignedTo,
                     createdBy: leadToDrop.createdBy,
@@ -374,5 +374,53 @@ export async function dropLead(leadId: string, dropReason: DropReasonType, dropC
     } catch (error) {
         console.error(`Failed to drop lead ${leadId}:`, error);
         return { success: false, message: "An unexpected error occurred while dropping the lead." };
+    }
+}
+
+export async function bulkUpdateLeads(
+  leadIds: string[],
+  data: Partial<Pick<Lead, 'status' | 'source' | 'assignedTo'>>
+): Promise<{ success: boolean; count: number; message?: string }> {
+  if (leadIds.length === 0) {
+    return { success: false, count: 0, message: 'No leads selected.' };
+  }
+  try {
+    const result = await prisma.lead.updateMany({
+      where: {
+        id: { in: leadIds },
+      },
+      data,
+    });
+    revalidatePath('/leads-list');
+    return { success: true, count: result.count };
+  } catch (error) {
+    console.error('Failed to bulk update leads:', error);
+    return { success: false, count: 0, message: 'An unexpected error occurred during bulk update.' };
+  }
+}
+
+export async function bulkDropLeads(leadIds: string[], dropReason: DropReasonType, dropComment?: string): Promise<{ success: boolean, count: number, message?: string }> {
+    if (leadIds.length === 0) {
+        return { success: false, count: 0, message: 'No leads selected.' };
+    }
+    
+    let droppedCount = 0;
+    try {
+      for (const leadId of leadIds) {
+        // Reusing the single dropLead logic in a loop
+        const result = await dropLead(leadId, dropReason, dropComment);
+        if (result.success) {
+          droppedCount++;
+        }
+      }
+      
+      // Revalidation is already handled inside dropLead, but an extra one here doesn't hurt.
+      revalidatePath('/leads-list');
+      revalidatePath('/dropped-leads-list');
+      
+      return { success: true, count: droppedCount, message: `${droppedCount} leads dropped successfully.` };
+    } catch (error) {
+        console.error(`Failed to drop leads:`, error);
+        return { success: false, count: 0, message: 'An unexpected error occurred while dropping leads.' };
     }
 }

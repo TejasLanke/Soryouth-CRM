@@ -1,5 +1,4 @@
-
-import type { NavItem, Lead, Client, Proposal, Document, Communication, DocumentType, ClientType, LeadStatusType, LeadPriorityType, ClientStatusType, ClientPriorityType, UserOptionType, DropReasonType, Expense, Survey, UserRole } from '@/types';
+import type { NavItem, Lead, Client, Proposal, Document, Communication, DocumentType, ClientType, LeadStatusType, LeadPriorityType, ClientStatusType, ClientPriorityType, UserOptionType, DropReasonType, Expense, Survey, UserRole, Template } from '@/types';
 import {
   LayoutDashboard,
   UsersRound,
@@ -26,10 +25,11 @@ import {
   BarChart3,
   Archive,
   Users,
+  ClipboardPaste,
 } from 'lucide-react';
 import { format, parseISO, addDays, subDays } from 'date-fns';
 
-export const APP_NAME = "Soryouth";
+export const APP_NAME = "Solaris";
 
 // Primary CRM Navigation for the main sidebar
 export const NAV_ITEMS: NavItem[] = [
@@ -41,6 +41,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/inactive-clients', label: 'Inactive Clients', icon: Archive },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
   { href: '/users', label: 'Manage Users', icon: Users },
+  { href: '/manage-templates', label: 'Manage Templates', icon: ClipboardPaste },
 ];
 
 // Secondary Navigation for tools/other sections, in user profile dropdown
@@ -112,7 +113,6 @@ export const MOCK_CLIENTS: Client[] = [
   },
 ];
 
-
 const calculateFinancialsAndSubsidy = (ratePerWatt: number, capacity: number, clientType: ClientType): Pick<Proposal, 'baseAmount' | 'cgstAmount' | 'sgstAmount' | 'subtotalAmount' | 'finalAmount' | 'subsidyAmount'> => {
   const baseAmount = ratePerWatt * capacity * 1000;
   const cgstAmount = baseAmount * 0.069;
@@ -138,20 +138,14 @@ export const MOCK_PROPOSALS: Proposal[] = [
   },
 ];
 
+
 export const DOCUMENT_TYPES_CONFIG: Array<{ type: DocumentType; icon: React.ComponentType<{ className?: string }>; description: string }> = [
   { type: 'Work Completion Report', icon: CheckSquare, description: 'Reports confirming project completion.' }, { type: 'Purchase Order', icon: FileText, description: 'Purchase orders for goods or services.' }, { type: 'Annexure I', icon: FileSignature, description: 'Annexure I documents for compliance.' }, { type: 'DCR Declaration', icon: Edit, description: 'Declarations related to domestic content requirement.' }, { type: 'Net Metering Agreement', icon: Eye, description: 'Agreements for net metering services.' }, { type: 'Warranty Certificate', icon: Award, description: 'Certificates for product/service warranties.' },
 ];
 
-export const MOCK_DOCUMENTS: Document[] = [
-  { id: 'd1', title: 'Work Completion for Project Sunbeam', type: 'Work Completion Report', relatedClientId: 'client2', createdAt: new Date().toISOString(), relatedProposalId: 'prop2' }, { id: 'd2', title: 'Purchase Order PO-2024-050', type: 'Purchase Order', relatedLeadId: 'lead1', createdAt: new Date(Date.now() - 172800000).toISOString() },
-];
-
-export const MOCK_COMMUNICATIONS: Communication[] = [
-    { id: 'c1', leadId: 'leadId1', type: 'Email', subject: 'Introductory Email', content: 'Sent initial contact email.', direction: 'Outgoing', timestamp: new Date(Date.now() - 86400000 * 2).toISOString(), recordedBy: 'System' }, { id: 'c2', clientId: 'client1', type: 'Call', content: 'Follow-up call regarding their solar needs. They are interested.', direction: 'Outgoing', timestamp: new Date(Date.now() - 86400000).toISOString(), recordedBy: 'Sales Rep A' },
-];
-
+export const MOCK_DOCUMENTS: Document[] = [];
+export const MOCK_COMMUNICATIONS: Communication[] = [];
 export const EXPENSE_CATEGORIES = ['Travel', 'Food', 'Supplies', 'Utilities', 'Software', 'Training', 'Marketing', 'Other'] as const;
-
 export const MOCK_EXPENSES: Expense[] = [];
 export const SURVEY_STATUS_OPTIONS = ['Scheduled', 'In Progress', 'Completed', 'Cancelled', 'On Hold'] as const;
 export const SURVEY_TYPE_OPTIONS = ['Commercial', 'Residential', 'Industrial', 'Agricultural', 'Other'] as const;
@@ -161,3 +155,44 @@ export const METER_PHASES = ['Single Phase', 'Three Phase', 'Not Applicable'] as
 export const CONSUMER_LOAD_TYPES = ['LT', 'HT'] as const;
 export const ROOF_TYPES = ['Metal', 'RCC', 'Asbestos', 'Other'] as const;
 export const DISCOM_OPTIONS = ['MSEDCL', 'Adani Electricity', 'Tata Power', 'Torrent Power', 'Other'] as const;
+
+export const PLACEHOLDER_DEFINITIONS = {
+  'Client Details': [
+    { placeholder: '{{name}}', description: 'The full name of the client or company.' },
+    { placeholder: '{{contact_person}}', description: 'The name of the main contact person.' },
+    { placeholder: '{{location}}', description: 'The primary address of the client/site.' },
+    { placeholder: '{{client_type}}', description: 'Type of client (e.g., Residential).' },
+  ],
+  'Proposal Details': [
+    { placeholder: '{{proposal_number}}', description: 'The unique identification number for the proposal.' },
+    { placeholder: '{{proposal_date}}', description: 'The date the proposal was created (e.g., 27 Jun, 2024).' },
+    { placeholder: '{{capacity}}', description: 'The system capacity in kilowatts (kW).' },
+    { placeholder: '{{module_type}}', description: 'The type of solar module used (e.g., Mono PERC).' },
+    { placeholder: '{{module_wattage}}', description: 'The wattage of a single module (e.g., 545 W).' },
+    { placeholder: '{{inverter_rating}}', description: 'The rating of the inverter in kW.' },
+    { placeholder: '{{inverter_qty}}', description: 'The quantity of inverters.' },
+  ],
+  'Financials': [
+    { placeholder: '{{rate_per_watt}}', description: 'The cost per watt in rupees.' },
+    { placeholder: '{{base_amount}}', description: 'The total amount before taxes (e.g., 2,00,000.00).' },
+    { placeholder: '{{cgst_amount}}', description: 'The calculated CGST amount.' },
+    { placeholder: '{{sgst_amount}}', description: 'The calculated SGST amount.' },
+    { placeholder: '{{final_amount}}', description: 'The total final amount including taxes.' },
+    { placeholder: '{{subsidy_amount}}', description: 'The applicable subsidy amount.' },
+  ],
+  'System Output & Savings': [
+    { placeholder: '{{required_space}}', description: 'Calculated required area in Sq. Ft. (Capacity x 80).' },
+    { placeholder: '{{generation_per_day}}', description: 'Estimated daily power generation in Units (Capacity x 4).' },
+    { placeholder: '{{generation_per_year}}', description: 'Estimated yearly power generation in Units.' },
+    { placeholder: '{{unit_rate}}', description: 'The rate per unit of electricity (₹).' },
+    { placeholder: '{{savings_per_year}}', description: 'Estimated yearly savings in rupees.' },
+  ],
+  'Quantities': [
+    { placeholder: '{{la_kit_qty}}', description: 'Quantity of Lightning Arrester kits.' },
+    { placeholder: '{{acdb_dcdb_qty}}', description: 'Quantity of ACDB/DCDB boxes.' },
+    { placeholder: '{{earthing_kit_qty}}', description: 'Quantity of Earthing kits.' },
+  ],
+  'Date & Time': [
+     { placeholder: '{{date_today}}', description: 'The current date when the document is generated.' },
+  ],
+};

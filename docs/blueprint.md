@@ -1,4 +1,4 @@
-# **App Name**: Solaris CRM
+# **App Name**: Soryouth CRM
 
 ## Core Features:
 

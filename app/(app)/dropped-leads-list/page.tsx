@@ -1,15 +1,17 @@
 
 'use client';
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useTransition } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { LeadsTable } from '@/app/(app)/leads/leads-table';
 import { DROP_REASON_OPTIONS } from '@/lib/constants';
-import { Settings2, UserX } from 'lucide-react';
+import { Settings2, UserX, ChevronDown, Repeat } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { DroppedLead, DropReasonType, DropReasonFilterItem, DroppedLeadSortConfig } from '@/types';
 import { Badge } from '@/components/ui/badge';
-import { getDroppedLeads } from './actions';
+import { getDroppedLeads, bulkReactivateLeads } from './actions';
 import { useToast } from '@/hooks/use-toast';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 export default function DroppedLeadsListPage() {
   const [droppedLeads, setDroppedLeads] = useState<DroppedLead[]>([]);
@@ -17,16 +19,36 @@ export default function DroppedLeadsListPage() {
   const [activeFilter, setActiveFilter] = useState<DropReasonType | 'all'>('all');
   const [sortConfig, setSortConfig] = useState<DroppedLeadSortConfig | null>(null);
   const { toast } = useToast();
+  const [isPending, startTransition] = useTransition();
 
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+
+  const refreshDroppedLeads = async () => {
+    const leads = await getDroppedLeads();
+    setDroppedLeads(leads);
+  };
+  
   useEffect(() => {
     async function fetchDroppedLeads() {
         setIsLoading(true);
-        const leads = await getDroppedLeads();
-        setDroppedLeads(leads);
+        await refreshDroppedLeads();
         setIsLoading(false);
     }
     fetchDroppedLeads();
   }, []);
+
+  const handleBulkReactivate = () => {
+    startTransition(async () => {
+        const result = await bulkReactivateLeads(selectedLeadIds);
+        if (result.success) {
+            toast({ title: "Leads Reactivated", description: `${result.count} leads have been moved back to the active leads list.` });
+            await refreshDroppedLeads();
+            setSelectedLeadIds([]);
+        } else {
+            toast({ title: "Error", description: result.message || "Failed to reactivate leads.", variant: "destructive" });
+        }
+    });
+  };
 
   const dropReasonFilters = useMemo((): DropReasonFilterItem[] => {
     const counts: Record<string, number> = {};
@@ -101,6 +123,29 @@ export default function DroppedLeadsListPage() {
         icon={UserX}
         actions={
           <div className="flex items-center gap-2">
+            {selectedLeadIds.length > 0 && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Repeat className="mr-2 h-4 w-4" /> Activate Leads ({selectedLeadIds.length})
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will reactivate {selectedLeadIds.length} lead(s) and move them back to the active leads list.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleBulkReactivate} disabled={isPending}>
+                        {isPending ? "Reactivating..." : "Yes, Reactivate"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toast({ title: "Coming soon!"})}>
               <Settings2 className="h-4 w-4" />
             </Button>
@@ -131,10 +176,9 @@ export default function DroppedLeadsListPage() {
         viewType="dropped"
         sortConfig={sortConfig}
         requestSort={requestSort}
+        selectedIds={selectedLeadIds}
+        setSelectedIds={setSelectedLeadIds}
       />
-       <div className="mt-8">
-        <img src="https://placehold.co/1200x300.png" data-ai-hint="dropped leads list" alt="Dropped Leads" className="w-full rounded-lg object-cover"/>
-      </div>
     </>
   );
 }

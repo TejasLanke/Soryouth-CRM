@@ -157,3 +157,30 @@ export async function reactivateLead(droppedLeadId: string): Promise<{ success: 
         return { success: false, message: 'An unexpected error occurred during reactivation.' };
     }
 }
+
+
+export async function bulkReactivateLeads(leadIds: string[]): Promise<{ success: boolean, count: number, message?: string }> {
+    if (leadIds.length === 0) {
+        return { success: false, count: 0, message: 'No leads selected.' };
+    }
+    
+    let reactivatedCount = 0;
+    try {
+      for (const leadId of leadIds) {
+        // Reusing the single reactivateLead logic in a loop
+        const result = await reactivateLead(leadId);
+        if (result.success) {
+          reactivatedCount++;
+        }
+      }
+      
+      // Revalidation is already handled inside reactivateLead, but an extra one here doesn't hurt.
+      revalidatePath('/leads-list');
+      revalidatePath('/dropped-leads-list');
+      
+      return { success: true, count: reactivatedCount, message: `${reactivatedCount} leads reactivated successfully.` };
+    } catch (error) {
+        console.error(`Failed to reactivate leads:`, error);
+        return { success: false, count: 0, message: 'An unexpected error occurred while reactivating leads.' };
+    }
+}

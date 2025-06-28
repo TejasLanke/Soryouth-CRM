@@ -47,6 +47,8 @@ interface LeadsTableProps<T extends Item> {
   sortConfig?: { key: keyof T; direction: 'ascending' | 'descending' } | null;
   requestSort?: (key: keyof T) => void;
   columnVisibility?: Record<string, boolean>;
+  selectedIds: string[];
+  setSelectedIds: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
 const formatDate = (dateString?: string | null) => {
@@ -62,7 +64,7 @@ const formatDate = (dateString?: string | null) => {
   }
 };
 
-export function LeadsTable<T extends Item>({ items, viewType, onEdit, onDelete, sortConfig, requestSort, columnVisibility }: LeadsTableProps<T>) {
+export function LeadsTable<T extends Item>({ items, viewType, onEdit, onDelete, sortConfig, requestSort, columnVisibility, selectedIds, setSelectedIds }: LeadsTableProps<T>) {
 
   const getSourceBadgeVariant = (source?: string | null) => {
     if (!source) return 'outline';
@@ -80,6 +82,16 @@ export function LeadsTable<T extends Item>({ items, viewType, onEdit, onDelete, 
     return sortConfig.direction === 'ascending' ?
       <ArrowUpDown className="ml-1 h-3 w-3 transform rotate-0 text-primary" /> :
       <ArrowUpDown className="ml-1 h-3 w-3 transform rotate-180 text-primary" />;
+  };
+
+  const handleSelectAll = (checked: boolean | 'indeterminate') => {
+    setSelectedIds(checked === true ? items.map((item) => item.id) : []);
+  };
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    setSelectedIds((prev) =>
+      checked ? [...prev, id] : prev.filter((selectedId) => selectedId !== id)
+    );
   };
 
   const renderHeaderCell = (label: string, sortKey: string) => (
@@ -100,9 +112,14 @@ export function LeadsTable<T extends Item>({ items, viewType, onEdit, onDelete, 
                  `/leads/${item.id}`;
     
     return (
-     <TableRow key={item.id} className="hover:bg-muted/20">
+     <TableRow key={item.id} className="hover:bg-muted/20" data-state={selectedIds.includes(item.id) ? 'selected' : undefined}>
       <TableCell>
-        <Checkbox id={`select-lead-${item.id}`} aria-label={`Select lead ${item.name}`} />
+        <Checkbox 
+          id={`select-lead-${item.id}`} 
+          aria-label={`Select lead ${item.name}`} 
+          checked={selectedIds.includes(item.id)}
+          onCheckedChange={(checked) => handleSelectOne(item.id, !!checked)}
+        />
       </TableCell>
       <TableCell className="font-medium py-3">
         <Link href={href} className="hover:underline text-primary">
@@ -172,7 +189,14 @@ export function LeadsTable<T extends Item>({ items, viewType, onEdit, onDelete, 
             <TableHeader>
               <TableRow className="bg-muted/30 hover:bg-muted/40">
                 <TableHead className="w-[50px] text-muted-foreground">
-                  <Checkbox id="selectAll" aria-label="Select all items" />
+                  <Checkbox
+                    id="selectAll"
+                    aria-label="Select all items"
+                    checked={
+                      items.length > 0 && selectedIds.length === items.length
+                    }
+                    onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                  />
                 </TableHead>
                 {renderHeaderCell('Name', 'name')}
                 {(!columnVisibility || columnVisibility.email) && renderHeaderCell('Email', 'email')}

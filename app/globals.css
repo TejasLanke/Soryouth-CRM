@@ -88,6 +88,65 @@
     @apply bg-background text-foreground;
     /* font-feature-settings: "rlig" 1, "calt" 1; */ /* Already in default Inter example, PT Sans might not need this explicitly */
   }
+  /* Tiptap Editor Styles */
+  .ProseMirror {
+    > * + * {
+      margin-top: 0.75em;
+    }
+    ul,
+    ol {
+      padding: 0 1rem;
+      list-style-position: inside;
+    }
+    ul {
+        list-style-type: disc;
+    }
+    ol {
+        list-style-type: decimal;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      line-height: 1.1;
+      font-weight: bold;
+    }
+    h2 {
+        font-size: 1.5em;
+    }
+    h3 {
+        font-size: 1.25em;
+    }
+    code {
+      background-color: hsla(var(--foreground), 0.1);
+      color: hsl(var(--foreground));
+      padding: 0.2em 0.4em;
+      border-radius: 0.25em;
+    }
+    pre {
+      background: hsl(var(--foreground));
+      color: hsl(var(--background));
+      font-family: 'JetBrainsMono', monospace;
+      padding: 0.75rem 1rem;
+      border-radius: 0.5rem;
+      code {
+        color: inherit;
+        padding: 0;
+        background: none;
+        font-size: 0.8rem;
+      }
+    }
+    img {
+      max-width: 100%;
+      height: auto;
+    }
+    blockquote {
+      padding-left: 1rem;
+      border-left: 2px solid hsl(var(--border));
+    }
+    hr {
+      border: none;
+      border-top: 2px solid hsl(var(--border));
+      margin: 2rem 0;
+    }
+  }
 }
 
 @layer utilities {

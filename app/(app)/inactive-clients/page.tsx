@@ -3,16 +3,19 @@
 import React, { useState, useMemo, useEffect, useTransition } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { LeadsTable } from '@/app/(app)/leads/leads-table'; // Reusing this for consistent display
-import { Filter, Search, Settings2, ListFilter, Rows, Archive } from 'lucide-react';
+import { Filter, Search, Settings2, ListFilter, Rows, Archive, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
-import type { Client, ClientSortConfig } from '@/types';
+import type { Client, ClientSortConfig, UserOptionType, ClientStatusType } from '@/types';
 import { Badge } from '@/components/ui/badge';
-import { getInactiveClients } from '@/app/(app)/clients-list/actions';
+import { getInactiveClients, bulkUpdateClients } from '@/app/(app)/clients-list/actions';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuCheckboxItem, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { USER_OPTIONS, ACTIVE_CLIENT_STATUS_OPTIONS } from '@/lib/constants';
 
 const allColumns: Record<string, string> = {
     email: 'Email',
@@ -33,9 +36,16 @@ export default function InactiveClientsListPage() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<ClientSortConfig | null>(null);
-  
+  const [isPending, startTransition] = useTransition();
+
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
+
+  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
+  const [isAssignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [isStatusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [assignToUser, setAssignToUser] = useState<UserOptionType | ''>('');
+  const [updateStatusTo, setUpdateStatusTo] = useState<ClientStatusType | ''>('');
 
   const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({
     email: true, phone: true, status: true, lastCommentText: true,
@@ -43,15 +53,48 @@ export default function InactiveClientsListPage() {
     followupCount: true, kilowatt: true, priority: true, assignedTo: true,
   });
 
+  const refreshClients = async () => {
+      const inactiveClients = await getInactiveClients();
+      setClients(inactiveClients);
+  };
+
   useEffect(() => {
     async function fetchClients() {
       setIsLoading(true);
-      const inactiveClients = await getInactiveClients();
-      setClients(inactiveClients);
+      await refreshClients();
       setIsLoading(false);
     }
     fetchClients();
   }, []);
+  
+  const handleBulkUpdate = (action: 'assign' | 'status') => {
+    startTransition(async () => {
+        let data: Partial<Pick<Client, 'assignedTo' | 'status'>> = {};
+        let successMessage = '';
+
+        if (action === 'assign' && assignToUser) {
+            data = { assignedTo: assignToUser };
+            successMessage = `Assigned to ${assignToUser}.`;
+        } else if (action === 'status' && updateStatusTo) {
+            data = { status: updateStatusTo };
+            successMessage = `Status updated to ${updateStatusTo}. Clients are now active.`;
+        } else {
+            toast({ title: "No Selection", description: "Please select a value.", variant: "destructive" });
+            return;
+        }
+
+        const result = await bulkUpdateClients(selectedClientIds, data);
+        if (result.success) {
+            toast({ title: "Bulk Update Successful", description: `${result.count} clients updated. ${successMessage}` });
+            await refreshClients();
+            setSelectedClientIds([]);
+            setAssignDialogOpen(false);
+            setStatusDialogOpen(false);
+        } else {
+            toast({ title: "Error", description: result.message || "Failed to update clients.", variant: "destructive" });
+        }
+    });
+  };
 
   const allFilteredClients = useMemo(() => {
     let clientsToDisplay = [...clients];
@@ -107,12 +150,35 @@ export default function InactiveClientsListPage() {
         icon={Archive}
         actions={
           <div className="flex items-center gap-2">
-             <Button variant="outline" size="sm" onClick={() => toast({ title: "Coming Soon!", description: "Filters for inactive clients will be added in a future update." })}>
-              <Filter className="mr-2 h-4 w-4" /> Filter
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setIsSearchOpen(true)}>
-              <Search className="mr-2 h-4 w-4" /> Search
-            </Button>
+            {selectedClientIds.length > 0 ? (
+                 <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground whitespace-nowrap">{selectedClientIds.length} selected</span>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          Actions <ChevronDown className="ml-2 h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onSelect={() => setAssignDialogOpen(true)}>Assign Clients</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setStatusDialogOpen(true)}>Update Client Status</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem disabled>Send SMS</DropdownMenuItem>
+                        <DropdownMenuItem disabled>Send Whatsapp</DropdownMenuItem>
+                        <DropdownMenuItem disabled>Send Email</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            ) : (
+                <>
+                  <Button variant="outline" size="sm" onClick={() => toast({ title: "Coming Soon!", description: "Filters for inactive clients will be added in a future update." })}>
+                    <Filter className="mr-2 h-4 w-4" /> Filter
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setIsSearchOpen(true)}>
+                    <Search className="mr-2 h-4 w-4" /> Search
+                  </Button>
+                </>
+            )}
              <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-9 w-9">
@@ -173,6 +239,8 @@ export default function InactiveClientsListPage() {
         sortConfig={sortConfig}
         requestSort={requestSort}
         columnVisibility={columnVisibility}
+        selectedIds={selectedClientIds}
+        setSelectedIds={setSelectedClientIds}
       />
 
        <div className="flex items-center justify-between pt-4">
@@ -214,6 +282,51 @@ export default function InactiveClientsListPage() {
           </AlertDialogContent>
         </AlertDialog>
       )}
+
+      {/* Bulk Action Dialogs */}
+      <Dialog open={isAssignDialogOpen} onOpenChange={setAssignDialogOpen}>
+          <DialogContent>
+              <DialogHeader>
+                  <DialogTitle>Assign Selected Clients</DialogTitle>
+                  <DialogDescription>Assign the {selectedClientIds.length} selected clients to a user.</DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                  <Label htmlFor="assign-user">Assign to</Label>
+                  <Select value={assignToUser} onValueChange={(v) => setAssignToUser(v as UserOptionType)}>
+                      <SelectTrigger><SelectValue placeholder="Select a user" /></SelectTrigger>
+                      <SelectContent>
+                          {USER_OPTIONS.map(user => <SelectItem key={user} value={user}>{user}</SelectItem>)}
+                      </SelectContent>
+                  </Select>
+              </div>
+              <DialogFooter>
+                  <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={() => handleBulkUpdate('assign')} disabled={isPending || !assignToUser}>Update</Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isStatusDialogOpen} onOpenChange={setStatusDialogOpen}>
+          <DialogContent>
+              <DialogHeader>
+                  <DialogTitle>Update Status for Selected Clients</DialogTitle>
+                  <DialogDescription>Change the stage for the {selectedClientIds.length} selected clients to reactivate them.</DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                  <Label htmlFor="update-status">New Stage</Label>
+                  <Select value={updateStatusTo} onValueChange={(v) => setUpdateStatusTo(v as ClientStatusType)}>
+                      <SelectTrigger><SelectValue placeholder="Select a stage to activate" /></SelectTrigger>
+                      <SelectContent>
+                          {ACTIVE_CLIENT_STATUS_OPTIONS.map(stage => <SelectItem key={stage} value={stage}>{stage}</SelectItem>)}
+                      </SelectContent>
+                  </Select>
+              </div>
+              <DialogFooter>
+                  <Button variant="outline" onClick={() => setStatusDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={() => handleBulkUpdate('status')} disabled={isPending || !updateStatusTo}>Update</Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
     </>
   );
 }

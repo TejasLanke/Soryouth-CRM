@@ -13,17 +13,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { USER_OPTIONS, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, CLIENT_STATUS_OPTIONS, CLIENT_PRIORITY_OPTIONS } from '@/lib/constants';
-import type { Client, UserOptionType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateClientData, ClientStatusType, ClientPriorityType } from '@/types';
+import type { Client, UserOptionType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateClientData, ClientStatusType, ClientPriorityType, Proposal } from '@/types';
 import { format, parseISO, isValid } from 'date-fns';
-import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, UserCircle2, FileText, ShoppingCart, Loader2, Save, Send, Video, Building, Repeat, UserX } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, UserCircle2, FileText, ShoppingCart, Loader2, Save, Send, Video, Building, Repeat, UserX, IndianRupee } from 'lucide-react';
 import { ProposalForm } from '@/app/(app)/proposals/proposal-form';
 import { DocumentCreationDialog } from '@/app/(app)/documents/document-creation-dialog';
 import { useToast } from "@/hooks/use-toast";
 import { getClientById, updateClient, addClientActivity, getActivitiesForClient, convertClientToLead } from '@/app/(app)/clients-list/actions';
+import { getProposalsForClient, createOrUpdateProposal } from '@/app/(app)/proposals/actions';
 import { ClientForm } from '@/app/(app)/clients/client-form';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { ProposalPreviewDialog } from '@/app/(app)/proposals/proposal-preview-dialog';
+
 
 const ActivityIcon = ({ type, className }: { type: string, className?: string }) => {
   const defaultClassName = "h-4 w-4";
@@ -57,6 +60,7 @@ export default function ClientDetailsPage() {
   const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
   const [documentTypeToCreate, setDocumentTypeToCreate] = useState<'Purchase Order' | null>(null);
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
+  const [proposals, setProposals] = useState<Proposal[]>([]);
 
   const [activityType, setActivityType] = useState<FollowUpType>(FOLLOW_UP_TYPES[0]);
   const [activityDate, setActivityDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -68,6 +72,16 @@ export default function ClientDetailsPage() {
   const [taskForUser, setTaskForUser] = useState<UserOptionType | undefined>(USER_OPTIONS[0]);
   const [taskDate, setTaskDate] = useState('');
   const [taskTime, setTaskTime] = useState('');
+
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [selectedProposalForPreview, setSelectedProposalForPreview] = useState<Proposal | null>(null);
+
+  const fetchProposals = async () => {
+    if (clientId) {
+      const fetchedProposals = await getProposalsForClient(clientId);
+      setProposals(fetchedProposals);
+    }
+  };
 
   useEffect(() => {
     if (clientId) {
@@ -89,7 +103,6 @@ export default function ClientDetailsPage() {
           });
         }
       };
-      fetchClientDetails();
       
       const fetchActivities = async () => {
         setActivitiesLoading(true);
@@ -97,10 +110,14 @@ export default function ClientDetailsPage() {
         setActivities(fetchedActivities);
         setActivitiesLoading(false);
       };
+
+      fetchClientDetails();
       fetchActivities();
+      fetchProposals();
     } else {
       setClient(null);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, toast]);
 
   useEffect(() => {
@@ -108,6 +125,22 @@ export default function ClientDetailsPage() {
         setActivityClientStage(client.status as ClientStatusType);
     }
   }, [client]);
+
+  const handleProposalSubmit = async (data: Proposal) => {
+    startFormTransition(async () => {
+      const result = await createOrUpdateProposal(data);
+      if (result) {
+        toast({
+          title: "Proposal History Updated",
+          description: `Proposal ${data.proposalNumber} has been saved.`,
+        });
+        await fetchProposals();
+      } else {
+        toast({ title: "Error", description: "Could not save proposal to database.", variant: "destructive" });
+      }
+    });
+    setIsProposalFormOpen(false);
+  };
 
   const handleSaveActivity = () => {
     if (!client) return;
@@ -340,7 +373,9 @@ export default function ClientDetailsPage() {
                 <CardTitle className="text-md">Communication</CardTitle>
               </CardHeader>
               <CardContent className="flex justify-around items-center">
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" disabled><Phone className="h-5 w-5" /></Button>
+                <Button asChild variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" disabled={!client.phone}>
+                  <a href={client.phone ? `tel:${client.phone}` : undefined}><Phone className="h-5 w-5" /></a>
+                </Button>
                 <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" disabled><MessageSquare className="h-5 w-5" /></Button>
                 <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" disabled><Mail className="h-5 w-5" /></Button>
                 <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" disabled><MessageCircle className="h-5 w-5" /></Button>
@@ -378,7 +413,7 @@ export default function ClientDetailsPage() {
                  {client.status === 'Inactive' && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="secondary" size="sm" className="w-full" disabled={isStatusChanging}>
+                      <Button variant="outline" size="sm" className="w-full" disabled={isStatusChanging}>
                         <UserCircle2 className="mr-2 h-4 w-4" /> Make Active
                       </Button>
                     </AlertDialogTrigger>
@@ -471,6 +506,33 @@ export default function ClientDetailsPage() {
             </Card>
 
             <Card>
+              <CardHeader><CardTitle>Proposal History ({proposals.length})</CardTitle></CardHeader>
+              <CardContent>
+                {proposals.length > 0 ? (
+                  <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                    {proposals.map(proposal => (
+                      <div key={proposal.id} onClick={() => { setSelectedProposalForPreview(proposal); setIsPreviewOpen(true); }} className="flex items-center justify-between p-3 border rounded-md cursor-pointer hover:bg-muted/50">
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="font-semibold text-sm">{proposal.proposalNumber}</p>
+                            <p className="text-xs text-muted-foreground">Capacity: {proposal.capacity} kW</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                           <p className="font-semibold text-sm flex items-center"><IndianRupee className="h-4 w-4 mr-0.5" />{proposal.finalAmount.toLocaleString('en-IN')}</p>
+                           <p className="text-xs text-muted-foreground">{format(parseISO(proposal.proposalDate), 'dd MMM yyyy')}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                   <p className="text-sm text-center text-muted-foreground py-6">No proposals created for this client yet.</p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
               <CardHeader><CardTitle>Activity History ({client.followupCount || 0})</CardTitle></CardHeader>
               <CardContent>
                 {isActivitiesLoading ? (
@@ -550,9 +612,17 @@ export default function ClientDetailsPage() {
           </div>
         </div>
       </div>
-      {isProposalFormOpen && client && (<ProposalForm isOpen={isProposalFormOpen} onClose={() => setIsProposalFormOpen(false)} onSubmit={() => {}} initialData={{ clientId: client.id, name: client.name, clientType: client.clientType || 'Other' }} />)}
+      {isProposalFormOpen && client && (<ProposalForm isOpen={isProposalFormOpen} onClose={() => setIsProposalFormOpen(false)} onSubmit={handleProposalSubmit} clients={[client]} leads={[]} />)}
       {isDocumentDialogOpen && documentTypeToCreate === 'Purchase Order' && client && (<DocumentCreationDialog isOpen={isDocumentDialogOpen} onClose={() => setIsDocumentDialogOpen(false)} documentType="Purchase Order" />)}
       {isEditFormOpen && client && (<ClientForm isOpen={isEditFormOpen} onClose={() => setIsEditFormOpen(false)} onSubmit={handleEditFormSubmit} client={client}/>)}
+      {isPreviewOpen && selectedProposalForPreview && (
+        <ProposalPreviewDialog
+          isOpen={isPreviewOpen}
+          onClose={() => setIsPreviewOpen(false)}
+          pdfUrl={selectedProposalForPreview.pdfUrl || null}
+          docxUrl={selectedProposalForPreview.docxUrl || null}
+        />
+      )}
     </div>
   );
 }

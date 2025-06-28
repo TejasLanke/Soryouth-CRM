@@ -86,8 +86,10 @@ export type CreateClientData = Omit<Client, 'id' | 'createdAt' | 'updatedAt' | '
 export interface Proposal {
   id: string;
   proposalNumber: string;
-  clientId: string; // Proposals are linked to Clients
-  name: string;
+  clientId?: string;
+  leadId?: string;
+  templateId?: string;
+  name: string; 
   clientType: ClientType;
   contactPerson: string;
   location: string;
@@ -107,6 +109,18 @@ export interface Proposal {
   subsidyAmount: number;
   createdAt: string;
   updatedAt?: string;
+  pdfUrl?: string | null;
+  docxUrl?: string | null;
+
+  // Additional Fields
+  requiredSpace?: number;
+  generationPerDay?: number;
+  generationPerYear?: number;
+  unitRate?: number;
+  savingsPerYear?: number;
+  laKitQty?: number;
+  acdbDcdbQty?: number;
+  earthingKitQty?: number;
 }
 
 export type DocumentType =
@@ -123,7 +137,7 @@ export interface Document {
   title: string;
   type: DocumentType;
   relatedLeadId?: string;
-  relatedClientId?: string; // Can be related to a client now
+  relatedClientId?: string; 
   relatedProposalId?: string;
   createdAt: string;
   filePath?: string;
@@ -131,8 +145,8 @@ export interface Document {
 
 export interface Communication {
   id: string;
-  leadId?: string; // Optional
-  clientId?: string; // Optional
+  leadId?: string; 
+  clientId?: string; 
   type: 'Email' | 'Call' | 'SMS' | 'Meeting' | 'System Alert';
   subject?: string;
   content: string;
@@ -183,17 +197,17 @@ export interface FollowUp {
   clientId?: string;
   droppedLeadId?: string;
   type: FollowUpType;
-  date: string; // ISO string for the activity date
-  time?: string; // HH:MM
+  date: string; 
+  time?: string;
   status: FollowUpStatus;
   leadStageAtTimeOfFollowUp?: AnyStatusType;
   comment?: string;
   createdBy?: UserOptionType;
-  createdAt: string; // ISO string for when the record was created
+  createdAt: string; 
   followupOrTask: 'Followup' | 'Task';
   taskForUser?: UserOptionType;
-  taskDate?: string; // ISO string for the task due date
-  taskTime?: string; // HH:MM for the task due time
+  taskDate?: string; 
+  taskTime?: string; 
 }
 
 export type AddActivityData = Omit<FollowUp, 'id' | 'createdAt' | 'droppedLeadId'> & {
@@ -203,7 +217,7 @@ export type AddActivityData = Omit<FollowUp, 'id' | 'createdAt' | 'droppedLeadId
 
 export interface Task {
   id: string;
-  entityId: string; // leadId or clientId
+  entityId: string; 
   entityType: 'lead' | 'client';
   assignedTo: UserOptionType;
   dueDate: string;
@@ -231,7 +245,6 @@ export interface Expense {
   reviewedAt?: string;
 }
 
-// Survey Related Types
 export type SurveyStatusType = typeof SURVEY_STATUS_OPTIONS[number];
 export type SurveyTypeOption = typeof SURVEY_TYPE_OPTIONS[number];
 
@@ -240,13 +253,13 @@ export interface Survey {
   surveyNumber: string;
   clientName: string;
   location: string;
-  surveyDate: string; // ISO string
+  surveyDate: string; 
   surveyorName: UserOptionType;
   status: SurveyStatusType;
   type: SurveyTypeOption;
   notes?: string;
-  createdAt: string; // ISO string
-  updatedAt: string; // ISO string
+  createdAt: string; 
+  updatedAt: string; 
 }
 
 export interface SurveySortConfig {
@@ -260,8 +273,7 @@ export interface SurveyStatusFilterItem {
   value: SurveyStatusType | 'all';
 }
 
-// Site Survey Form Types
-export type ConsumerCategoryType = ClientType; // Reusing ClientType as they are similar
+export type ConsumerCategoryType = ClientType;
 export type MeterPhaseType = typeof METER_PHASES[number];
 export type ConsumerLoadType = typeof CONSUMER_LOAD_TYPES[number];
 export type RoofType = typeof ROOF_TYPES[number];
@@ -269,7 +281,7 @@ export type DiscomType = typeof DISCOM_OPTIONS[number];
 
 export interface SiteSurveyData {
   consumerName: string;
-  date: string; // ISO string for date
+  date: string; 
   consumerCategory: ConsumerCategoryType;
   location: string;
   numberOfMeters: number;
@@ -288,5 +300,16 @@ export interface SiteSurveyData {
 }
 
 export type SiteSurveyFormValues = Omit<SiteSurveyData, 'electricityBillFile'> & {
-  electricityBillFile?: FileList | null; // For react-hook-form
+  electricityBillFile?: FileList | null;
 };
+
+export interface Template {
+  id: string;
+  name: string;
+  type: 'Proposal' | 'Document';
+  originalDocxPath: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CreateTemplateData = Omit<Template, 'id' | 'createdAt' | 'updatedAt'>;

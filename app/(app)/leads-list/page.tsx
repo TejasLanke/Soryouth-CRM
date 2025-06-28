@@ -3,20 +3,27 @@
 import React, { useState, useMemo, useEffect, useTransition } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { LeadsTable } from '@/app/(app)/leads/leads-table';
-import { ACTIVE_LEAD_STATUS_OPTIONS, LEAD_SOURCE_OPTIONS } from '@/lib/constants';
-import { Filter, Search, Upload, PlusCircle, Settings2, ListChecks, ListFilter, Rows } from 'lucide-react';
+import { ACTIVE_LEAD_STATUS_OPTIONS, LEAD_SOURCE_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS } from '@/lib/constants';
+import { Filter, Search, Upload, PlusCircle, Settings2, ListChecks, ListFilter, Rows, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LeadForm } from '@/app/(app)/leads/lead-form';
 import { LeadSettingsDialog } from '@/app/(app)/leads/lead-settings-dialog';
 import { useToast } from "@/hooks/use-toast";
-import type { Lead, LeadStatusType, StatusFilterItem, LeadSortConfig, CreateLeadData } from '@/types';
+import type { Lead, LeadStatusType, StatusFilterItem, LeadSortConfig, CreateLeadData, UserOptionType, LeadSourceOptionType, DropReasonType } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO, startOfDay, isSameDay } from 'date-fns';
-import { getLeads, createLead, updateLead, deleteLead } from './actions';
+import { getLeads, createLead, updateLead, deleteLead, bulkUpdateLeads, bulkDropLeads } from './actions';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuCheckboxItem, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Form, FormControl, FormMessage, FormField, FormItem } from '@/components/ui/form';
 
 const allColumns: Record<string, string> = {
     email: 'Email',
@@ -32,6 +39,11 @@ const allColumns: Record<string, string> = {
     assignedTo: 'Assigned To',
 };
 
+const dropLeadSchema = z.object({
+  dropReason: z.enum(DROP_REASON_OPTIONS, { required_error: "Drop reason is required." }),
+  dropComment: z.string().optional(),
+});
+type DropLeadFormValues = z.infer<typeof dropLeadSchema>;
 
 export default function LeadsListPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -49,6 +61,20 @@ export default function LeadsListPage() {
 
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
+
+  // State for bulk actions
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+  const [isAssignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [isStageDialogOpen, setStageDialogOpen] = useState(false);
+  const [isSourceDialogOpen, setSourceDialogOpen] = useState(false);
+  const [isDropDialogOpen, setDropDialogOpen] = useState(false);
+  const [assignToUser, setAssignToUser] = useState<UserOptionType | ''>('');
+  const [updateStageTo, setUpdateStageTo] = useState<LeadStatusType | ''>('');
+  const [updateSourceTo, setUpdateSourceTo] = useState<LeadSourceOptionType | ''>('');
+
+  const dropForm = useForm<DropLeadFormValues>({
+    resolver: zodResolver(dropLeadSchema),
+  });
 
   const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({
     email: true,
@@ -78,6 +104,12 @@ export default function LeadsListPage() {
   const handleAddLead = () => {
     setSelectedLeadForEdit(null);
     setIsFormOpen(true);
+  };
+  
+  const refreshLeads = async () => {
+    const fetchedLeads = await getLeads();
+    const activeLeads = fetchedLeads.filter(lead => lead.status !== 'Lost');
+    setLeads(activeLeads);
   };
 
   const handleFormSubmit = async (leadData: CreateLeadData | Lead) => {
@@ -232,13 +264,59 @@ export default function LeadsListPage() {
 
   const totalPages = Math.ceil(allFilteredLeads.length / pageSize);
 
-
   const requestSort = (key: keyof Lead) => {
     let direction: 'ascending' | 'descending' = 'ascending';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
       direction = 'descending';
     }
     setSortConfig({ key, direction });
+  };
+  
+  const handleBulkUpdate = (action: 'assign' | 'stage' | 'source') => {
+    startTransition(async () => {
+        let data = {};
+        let successMessage = '';
+        if (action === 'assign' && assignToUser) {
+            data = { assignedTo: assignToUser };
+            successMessage = `Assigned to ${assignToUser}.`;
+        } else if (action === 'stage' && updateStageTo) {
+            data = { status: updateStageTo };
+            successMessage = `Stage updated to ${updateStageTo}.`;
+        } else if (action === 'source' && updateSourceTo) {
+            data = { source: updateSourceTo };
+            successMessage = `Source updated to ${updateSourceTo}.`;
+        } else {
+            toast({ title: "No Selection", description: "Please select a value.", variant: "destructive" });
+            return;
+        }
+
+        const result = await bulkUpdateLeads(selectedLeadIds, data);
+        if (result.success) {
+            toast({ title: "Bulk Update Successful", description: `${result.count} leads updated. ${successMessage}` });
+            await refreshLeads();
+            setSelectedLeadIds([]);
+            setAssignDialogOpen(false);
+            setStageDialogOpen(false);
+            setSourceDialogOpen(false);
+        } else {
+            toast({ title: "Error", description: result.message || "Failed to update leads.", variant: "destructive" });
+        }
+    });
+  };
+  
+  const handleBulkDrop = (values: DropLeadFormValues) => {
+    startTransition(async () => {
+        const result = await bulkDropLeads(selectedLeadIds, values.dropReason, values.dropComment);
+        if (result.success) {
+            toast({ title: "Bulk Drop Successful", description: `${result.count} leads were dropped.` });
+            await refreshLeads();
+            setSelectedLeadIds([]);
+            setDropDialogOpen(false);
+            dropForm.reset();
+        } else {
+            toast({ title: "Error", description: result.message || "Failed to drop leads.", variant: "destructive" });
+        }
+    });
   };
 
   if (isLoading) {
@@ -259,26 +337,51 @@ export default function LeadsListPage() {
         icon={ListChecks}
         actions={
           <div className="flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Filter className="mr-2 h-4 w-4" /> Filter
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {['Assigned today', 'Followed today', 'Not followed today', 'Unattended', 'No stage', 'Duplicate', 'Show all'].map(item => (
-                  <DropdownMenuItem key={item} onSelect={() => setQuickFilter(item)} disabled={item === 'Duplicate'}>
-                    {item}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button variant="outline" size="sm" onClick={() => setIsSearchOpen(true)}>
-              <Search className="mr-2 h-4 w-4" /> Search
-            </Button>
-            <Button variant="outline" size="sm" disabled>
-              <Upload className="mr-2 h-4 w-4" /> Upload
-            </Button>
+            {selectedLeadIds.length > 0 ? (
+                 <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground whitespace-nowrap">{selectedLeadIds.length} selected</span>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          Actions <ChevronDown className="ml-2 h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onSelect={() => setAssignDialogOpen(true)}>Assign leads</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setStageDialogOpen(true)}>Update stage</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setSourceDialogOpen(true)}>Update source</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setDropDialogOpen(true)}>Drop leads</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem disabled>Send SMS</DropdownMenuItem>
+                        <DropdownMenuItem disabled>Send Whatsapp</DropdownMenuItem>
+                        <DropdownMenuItem disabled>Send Email</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            ) : (
+                <>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm">
+                        <Filter className="mr-2 h-4 w-4" /> Filter
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        {['Assigned today', 'Followed today', 'Not followed today', 'Unattended', 'No stage', 'Duplicate', 'Show all'].map(item => (
+                        <DropdownMenuItem key={item} onSelect={() => setQuickFilter(item)} disabled={item === 'Duplicate'}>
+                            {item}
+                        </DropdownMenuItem>
+                        ))}
+                    </DropdownMenuContent>
+                    </DropdownMenu>
+                    <Button variant="outline" size="sm" onClick={() => setIsSearchOpen(true)}>
+                    <Search className="mr-2 h-4 w-4" /> Search
+                    </Button>
+                    <Button variant="outline" size="sm" disabled>
+                    <Upload className="mr-2 h-4 w-4" /> Upload
+                    </Button>
+                </>
+            )}
             <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={handleAddLead} disabled={isPending}>
               <PlusCircle className="mr-2 h-4 w-4" /> Add Lead
             </Button>
@@ -364,12 +467,14 @@ export default function LeadsListPage() {
       
       <LeadsTable
         items={paginatedLeads}
-        onEdit={(item) => setSelectedLeadForEdit(item as Lead)}
+        onEdit={(item) => { setSelectedLeadForEdit(item as Lead); setIsFormOpen(true); }}
         onDelete={handleDeleteLead}
         sortConfig={sortConfig}
         requestSort={requestSort as (key: keyof Lead) => void}
         viewType="active"
         columnVisibility={columnVisibility}
+        selectedIds={selectedLeadIds}
+        setSelectedIds={setSelectedLeadIds}
       />
 
        <div className="flex items-center justify-between pt-4">
@@ -441,6 +546,115 @@ export default function LeadsListPage() {
           </AlertDialogContent>
         </AlertDialog>
       )}
+      
+      {/* Bulk Action Dialogs */}
+      <Dialog open={isAssignDialogOpen} onOpenChange={setAssignDialogOpen}>
+          <DialogContent>
+              <DialogHeader>
+                  <DialogTitle>Assign Selected Leads</DialogTitle>
+                  <DialogDescription>Assign the {selectedLeadIds.length} selected leads to a user.</DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                  <Label htmlFor="assign-user">Assign to</Label>
+                  <Select value={assignToUser} onValueChange={(v) => setAssignToUser(v as UserOptionType)}>
+                      <SelectTrigger><SelectValue placeholder="Select a user" /></SelectTrigger>
+                      <SelectContent>
+                          {USER_OPTIONS.map(user => <SelectItem key={user} value={user}>{user}</SelectItem>)}
+                      </SelectContent>
+                  </Select>
+              </div>
+              <DialogFooter>
+                  <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={() => handleBulkUpdate('assign')} disabled={isPending || !assignToUser}>Update</Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isStageDialogOpen} onOpenChange={setStageDialogOpen}>
+          <DialogContent>
+              <DialogHeader>
+                  <DialogTitle>Update Stage for Selected Leads</DialogTitle>
+                  <DialogDescription>Change the stage for the {selectedLeadIds.length} selected leads.</DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                  <Label htmlFor="update-stage">New Stage</Label>
+                  <Select value={updateStageTo} onValueChange={(v) => setUpdateStageTo(v as LeadStatusType)}>
+                      <SelectTrigger><SelectValue placeholder="Select a stage" /></SelectTrigger>
+                      <SelectContent>
+                          {ACTIVE_LEAD_STATUS_OPTIONS.map(stage => <SelectItem key={stage} value={stage}>{stage}</SelectItem>)}
+                      </SelectContent>
+                  </Select>
+              </div>
+              <DialogFooter>
+                  <Button variant="outline" onClick={() => setStageDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={() => handleBulkUpdate('stage')} disabled={isPending || !updateStageTo}>Update</Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
+
+       <Dialog open={isSourceDialogOpen} onOpenChange={setSourceDialogOpen}>
+          <DialogContent>
+              <DialogHeader>
+                  <DialogTitle>Update Source for Selected Leads</DialogTitle>
+                  <DialogDescription>Change the source for the {selectedLeadIds.length} selected leads.</DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                  <Label htmlFor="update-source">New Source</Label>
+                  <Select value={updateSourceTo} onValueChange={(v) => setUpdateSourceTo(v as LeadSourceOptionType)}>
+                      <SelectTrigger><SelectValue placeholder="Select a source" /></SelectTrigger>
+                      <SelectContent>
+                          {LEAD_SOURCE_OPTIONS.map(source => <SelectItem key={source} value={source}>{source}</SelectItem>)}
+                      </SelectContent>
+                  </Select>
+              </div>
+              <DialogFooter>
+                  <Button variant="outline" onClick={() => setSourceDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={() => handleBulkUpdate('source')} disabled={isPending || !updateSourceTo}>Update</Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDropDialogOpen} onOpenChange={setDropDialogOpen}>
+        <DialogContent>
+          <Form {...dropForm}>
+            <form onSubmit={dropForm.handleSubmit(handleBulkDrop)}>
+              <DialogHeader>
+                <DialogTitle>Drop Selected Leads</DialogTitle>
+                <DialogDescription>
+                  You are about to drop {selectedLeadIds.length} leads. Select a reason.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-4 space-y-4">
+                <FormField control={dropForm.control} name="dropReason"
+                  render={({ field }) => (
+                    <FormItem>
+                      <Label>Reason *</Label>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Select a drop reason" /></SelectTrigger></FormControl>
+                        <SelectContent>{DROP_REASON_OPTIONS.map(reason => <SelectItem key={reason} value={reason}>{reason}</SelectItem>)}</SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField control={dropForm.control} name="dropComment"
+                  render={({ field }) => (
+                    <FormItem>
+                      <Label>Comment (Optional)</Label>
+                      <FormControl><Textarea placeholder="Add an optional comment..." {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" type="button" onClick={() => setDropDialogOpen(false)} disabled={isPending}>Cancel</Button>
+                <Button type="submit" variant="destructive" disabled={isPending}>Drop Leads</Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

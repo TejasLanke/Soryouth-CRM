@@ -54,6 +54,7 @@ model Lead {
   followUpCount Int @default(0)
 
   followUps FollowUp[]
+  proposals      Proposal[]
 }
 
 model DroppedLead {
@@ -80,6 +81,7 @@ model DroppedLead {
   dropComment        String?
   droppedAt          DateTime   @default(now())
   followUps          FollowUp[]
+  
 }
 
 model Client {
@@ -105,6 +107,7 @@ model Client {
   electricityBillUrl String?
   followUpCount Int @default(0)
   followUps          FollowUp[]
+  proposals      Proposal[]
 }
 
 model FollowUp {
@@ -130,4 +133,54 @@ model FollowUp {
 
   droppedLead              DroppedLead? @relation(fields: [droppedLeadId], references: [id], onDelete: Cascade)
   droppedLeadId            String?
+}
+
+model Template {
+  id               String   @id @default(cuid())
+  name             String
+  type             String // "Proposal" or "Document"
+  originalDocxPath String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Proposal {
+  id                 String    @id @default(cuid())
+  proposalNumber     String    @unique
+  templateId         String?
+  name               String
+  clientType         String
+  contactPerson      String
+  location           String
+  capacity           Decimal
+  moduleType         String
+  moduleWattage      String
+  dcrStatus          String
+  inverterRating     Decimal
+  inverterQty        Int
+  ratePerWatt        Decimal
+  proposalDate       DateTime
+  baseAmount         Decimal
+  cgstAmount         Decimal
+  sgstAmount         Decimal
+  subtotalAmount     Decimal
+  finalAmount        Decimal
+  subsidyAmount      Decimal
+  pdfUrl             String?
+  docxUrl            String?
+  requiredSpace      Decimal?
+  generationPerDay   Decimal?
+  generationPerYear  Decimal?
+  unitRate           Decimal?
+  savingsPerYear     Decimal?
+  laKitQty           Int?
+  acdbDcdbQty        Int?
+  earthingKitQty     Int?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  
+  client             Client?   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientId           String?
+  lead               Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadId             String?
 }

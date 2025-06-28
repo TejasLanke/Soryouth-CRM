@@ -2,7 +2,7 @@
 'use server';
 
 import prisma from '@/lib/prisma';
-import type { Client, FollowUp, AddActivityData, CreateClientData, LeadStatusType } from '@/types';
+import type { Client, FollowUp, AddActivityData, CreateClientData, LeadStatusType, ClientType, ClientStatusType, UserOptionType } from '@/types';
 import { revalidatePath } from 'next/cache';
 import { format, parseISO } from 'date-fns';
 import { ACTIVE_CLIENT_STATUS_OPTIONS } from '@/lib/constants';
@@ -331,5 +331,28 @@ export async function convertClientToLead(clientId: string): Promise<{ success: 
   } catch (error) {
     console.error(`Failed to convert client ${clientId} to lead:`, error);
     return { success: false, message: 'An unexpected error occurred during conversion.' };
+  }
+}
+
+export async function bulkUpdateClients(
+  clientIds: string[],
+  data: Partial<Pick<Client, 'status' | 'assignedTo' | 'clientType'>>
+): Promise<{ success: boolean; count: number; message?: string }> {
+  if (clientIds.length === 0) {
+    return { success: false, count: 0, message: 'No clients selected.' };
+  }
+  try {
+    const result = await prisma.client.updateMany({
+      where: {
+        id: { in: clientIds },
+      },
+      data,
+    });
+    revalidatePath('/clients-list');
+    revalidatePath('/inactive-clients');
+    return { success: true, count: result.count };
+  } catch (error) {
+    console.error('Failed to bulk update clients:', error);
+    return { success: false, count: 0, message: 'An unexpected error occurred during bulk update.' };
   }
 }
