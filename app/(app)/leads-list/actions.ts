@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 import type { Lead, FollowUp, AddActivityData, CreateLeadData, Client, DropReasonType, LeadSourceOptionType, UserOptionType, LeadStatusType } from '@/types';
 import { revalidatePath } from 'next/cache';
 import { format, parseISO } from 'date-fns';
+import { verifySession } from '@/lib/auth';
 
 // Helper function to map Prisma lead to frontend Lead type
 function mapPrismaLeadToLeadType(prismaLead: any): Lead {
@@ -17,8 +18,8 @@ function mapPrismaLeadToLeadType(prismaLead: any): Lead {
     email: prismaLead.email ?? undefined,
     phone: prismaLead.phone ?? undefined,
     source: prismaLead.source ?? undefined,
-    assignedTo: prismaLead.assignedTo ?? undefined,
-    createdBy: prismaLead.createdBy ?? undefined,
+    assignedTo: prismaLead.assignedTo?.name ?? undefined,
+    createdBy: prismaLead.createdBy?.name ?? undefined,
     lastCommentText: prismaLead.lastCommentText ?? undefined,
     lastCommentDate: prismaLead.lastCommentDate ? format(prismaLead.lastCommentDate, 'dd-MM-yyyy') : undefined,
     nextFollowUpDate: prismaLead.nextFollowUpDate ? format(prismaLead.nextFollowUpDate, 'yyyy-MM-dd') : undefined,
@@ -45,10 +46,10 @@ function mapPrismaFollowUpToFollowUpType(prismaFollowUp: any): FollowUp {
     status: prismaFollowUp.status,
     leadStageAtTimeOfFollowUp: prismaFollowUp.leadStageAtTimeOfFollowUp ?? undefined,
     comment: prismaFollowUp.comment ?? undefined,
-    createdBy: prismaFollowUp.createdBy ?? undefined,
+    createdBy: prismaFollowUp.createdBy?.name ?? undefined,
     createdAt: prismaFollowUp.createdAt.toISOString(),
     followupOrTask: prismaFollowUp.followupOrTask,
-    taskForUser: prismaFollowUp.taskForUser ?? undefined,
+    taskForUser: prismaFollowUp.taskForUser?.name ?? undefined,
     taskDate: prismaFollowUp.taskDate?.toISOString() ?? undefined,
     taskTime: prismaFollowUp.taskTime ?? undefined,
   } as FollowUp;
@@ -62,7 +63,11 @@ export async function getLeads(): Promise<Lead[]> {
         createdAt: 'desc',
       },
       include: {
-        followUps: true
+        followUps: {
+          select: { id: true } // Only select ID to count them
+        },
+        createdBy: true,
+        assignedTo: true,
       }
     });
     return leadsFromDb.map(mapPrismaLeadToLeadType);
@@ -80,7 +85,11 @@ export async function getLeadById(id: string): Promise<Lead | null> {
   try {
     const leadFromDb = await prisma.lead.findUnique({
       where: { id },
-      include: { followUps: true }
+      include: { 
+        followUps: true,
+        createdBy: true,
+        assignedTo: true,
+      }
     });
 
     if (!leadFromDb) {
@@ -94,7 +103,19 @@ export async function getLeadById(id: string): Promise<Lead | null> {
 }
 
 export async function createLead(data: CreateLeadData): Promise<Lead | null> {
+  const session = await verifySession();
+  if (!session?.userId) {
+      console.error("Authentication error: No user session found.");
+      return null;
+  }
+  
   try {
+    let assignedToId: string | null = null;
+    if (data.assignedTo) {
+      const user = await prisma.user.findFirst({ where: { name: data.assignedTo }});
+      if (user) assignedToId = user.id;
+    }
+    
     const newLead = await prisma.lead.create({
       data: {
         name: data.name,
@@ -102,8 +123,6 @@ export async function createLead(data: CreateLeadData): Promise<Lead | null> {
         email: data.email || null,
         phone: data.phone || null,
         source: data.source || null,
-        assignedTo: data.assignedTo || null,
-        createdBy: data.createdBy || 'System', // Default createdBy
         lastCommentText: data.lastCommentText || null,
         lastCommentDate: data.lastCommentDate ? parseISO(data.lastCommentDate.split('-').reverse().join('-')) : null,
         nextFollowUpDate: data.nextFollowUpDate ? parseISO(data.nextFollowUpDate) : null,
@@ -114,6 +133,8 @@ export async function createLead(data: CreateLeadData): Promise<Lead | null> {
         dropReason: data.dropReason || null,
         clientType: data.clientType || null,
         electricityBillUrl: data.electricityBillUrl || null,
+        createdById: session.userId,
+        assignedToId: assignedToId,
       },
     });
     revalidatePath('/leads-list');
@@ -127,27 +148,36 @@ export async function createLead(data: CreateLeadData): Promise<Lead | null> {
 export async function updateLead(id: string, data: Partial<Omit<Lead, 'id' | 'createdAt' | 'updatedAt' | 'followupCount'>>): Promise<Lead | null> {
   try {
     const prismaData: any = {};
+    const fieldsToIgnore = ['id', 'createdAt', 'updatedAt', 'followupCount', 'createdBy', 'assignedTo'];
+
     for (const key in data) {
       if (Object.prototype.hasOwnProperty.call(data, key)) {
-        const typedKey = key as keyof Partial<Lead>;
-        if (['id', 'createdAt', 'updatedAt', 'followupCount'].includes(typedKey)) continue;
+         if (fieldsToIgnore.includes(key)) continue;
 
+        const typedKey = key as keyof typeof data;
+        
         if (typedKey === 'kilowatt') {
-          prismaData[typedKey] = data[typedKey] === undefined || data[typedKey] === null ? null : Number(data[typedKey]);
+            prismaData.kilowatt = data.kilowatt === undefined ? null : Number(data.kilowatt);
         } else if (typedKey === 'nextFollowUpDate' && data.nextFollowUpDate) {
            prismaData[typedKey] = parseISO(data.nextFollowUpDate);
         } else if (typedKey === 'lastCommentDate' && data.lastCommentDate) {
            prismaData[typedKey] = parseISO(data.lastCommentDate.split('-').reverse().join('-'));
         }
         else {
-          (prismaData as any)[typedKey] = (data as any)[typedKey] || null;
+          (prismaData as any)[typedKey] = (data as any)[typedKey] ?? null;
         }
       }
+    }
+
+    if (data.assignedTo) {
+        const user = await prisma.user.findFirst({ where: { name: data.assignedTo }});
+        prismaData.assignedToId = user ? user.id : null;
     }
 
     const updatedLeadFromDb = await prisma.lead.update({
       where: { id },
       data: prismaData,
+      include: { createdBy: true, assignedTo: true }
     });
     
     revalidatePath('/leads-list');
@@ -182,6 +212,7 @@ export async function getActivitiesForLead(leadId: string): Promise<FollowUp[]> 
     const activities = await prisma.followUp.findMany({
       where: { leadId },
       orderBy: { createdAt: 'desc' },
+      include: { createdBy: true, taskForUser: true }
     });
     return activities.map(mapPrismaFollowUpToFollowUpType);
   } catch (error) {
@@ -197,7 +228,20 @@ export async function addActivity(
     console.error("addActivity requires a leadId");
     return null;
   }
+  
+  const session = await verifySession();
+  if (!session?.userId) {
+    console.error("User must be logged in to add activity.");
+    return null;
+  }
+
   try {
+    let taskForUserId: string | null = null;
+    if (data.taskForUser) {
+        const user = await prisma.user.findFirst({ where: { name: data.taskForUser }});
+        if (user) taskForUserId = user.id;
+    }
+
     const result = await prisma.$transaction(async (tx) => {
       const newActivity = await tx.followUp.create({
         data: {
@@ -208,11 +252,11 @@ export async function addActivity(
           status: data.status,
           leadStageAtTimeOfFollowUp: data.leadStageAtTimeOfFollowUp || null,
           comment: data.comment || null,
-          createdBy: data.createdBy || 'System',
           followupOrTask: data.followupOrTask,
-          taskForUser: data.taskForUser || null,
           taskDate: data.taskDate ? parseISO(data.taskDate) : null,
           taskTime: data.taskTime || null,
+          createdById: session.userId,
+          taskForUserId: taskForUserId,
         },
       });
 
@@ -246,7 +290,14 @@ export async function addActivity(
     });
 
     revalidatePath(`/leads/${data.leadId}`);
-    return mapPrismaFollowUpToFollowUpType(result);
+    
+    // Fetch the newly created activity with its relations to return full data
+    const newActivityWithRelations = await prisma.followUp.findUnique({
+      where: { id: result.id },
+      include: { createdBy: true, taskForUser: true }
+    });
+    
+    return newActivityWithRelations ? mapPrismaFollowUpToFollowUpType(newActivityWithRelations) : null;
   } catch (error) {
     console.error('Failed to add activity:', error);
     return null;
@@ -274,13 +325,13 @@ export async function convertToClient(leadId: string): Promise<{ success: boolea
           phone: lead.phone,
           status: 'Fresher',
           priority: 'Average',
-          assignedTo: lead.assignedTo,
-          createdBy: lead.createdBy,
-          createdAt: lead.createdAt, // Preserve original creation date from the lead
+          createdAt: lead.createdAt,
           kilowatt: lead.kilowatt,
           address: lead.address,
           clientType: lead.clientType,
           electricityBillUrl: lead.electricityBillUrl,
+          createdById: lead.createdById,
+          assignedToId: lead.assignedToId,
         },
       });
 
@@ -290,7 +341,7 @@ export async function convertToClient(leadId: string): Promise<{ success: boolea
           where: { leadId: lead.id },
           data: {
             clientId: createdClient.id,
-            leadId: null, // Disassociate from the lead
+            leadId: null,
           },
         });
       }
@@ -332,8 +383,6 @@ export async function dropLead(leadId: string, dropReason: DropReasonType, dropC
                     phone: leadToDrop.phone,
                     status: 'Lost',
                     source: leadToDrop.source,
-                    assignedTo: leadToDrop.assignedTo,
-                    createdBy: leadToDrop.createdBy,
                     createdAt: leadToDrop.createdAt,
                     updatedAt: leadToDrop.updatedAt,
                     lastCommentText: leadToDrop.lastCommentText,
@@ -347,6 +396,8 @@ export async function dropLead(leadId: string, dropReason: DropReasonType, dropC
                     electricityBillUrl: leadToDrop.electricityBillUrl,
                     dropReason: dropReason,
                     dropComment: dropComment,
+                    createdById: leadToDrop.createdById,
+                    assignedToId: leadToDrop.assignedToId,
                 }
             });
             
@@ -384,12 +435,26 @@ export async function bulkUpdateLeads(
   if (leadIds.length === 0) {
     return { success: false, count: 0, message: 'No leads selected.' };
   }
+  
+  const updateData: any = {};
+  if (data.status) updateData.status = data.status;
+  if (data.source) updateData.source = data.source;
+  
+  if (data.assignedTo) {
+      const user = await prisma.user.findFirst({ where: { name: data.assignedTo }});
+      if (user) {
+          updateData.assignedToId = user.id;
+      } else {
+          return { success: false, count: 0, message: `User '${data.assignedTo}' not found.`};
+      }
+  }
+
   try {
     const result = await prisma.lead.updateMany({
       where: {
         id: { in: leadIds },
       },
-      data,
+      data: updateData,
     });
     revalidatePath('/leads-list');
     return { success: true, count: result.count };
@@ -407,14 +472,12 @@ export async function bulkDropLeads(leadIds: string[], dropReason: DropReasonTyp
     let droppedCount = 0;
     try {
       for (const leadId of leadIds) {
-        // Reusing the single dropLead logic in a loop
         const result = await dropLead(leadId, dropReason, dropComment);
         if (result.success) {
           droppedCount++;
         }
       }
       
-      // Revalidation is already handled inside dropLead, but an extra one here doesn't hurt.
       revalidatePath('/leads-list');
       revalidatePath('/dropped-leads-list');
       

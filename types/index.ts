@@ -1,17 +1,17 @@
-
-import type { LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, LEAD_SOURCE_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES, EXPENSE_CATEGORIES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS, SURVEY_STATUS_OPTIONS, SURVEY_TYPE_OPTIONS, METER_PHASES, CONSUMER_LOAD_TYPES, ROOF_TYPES, DISCOM_OPTIONS, CLIENT_STATUS_OPTIONS, CLIENT_PRIORITY_OPTIONS, USER_ROLES } from '@/lib/constants';
+import type { LEAD_PRIORITY_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES, EXPENSE_CATEGORIES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS, SURVEY_STATUS_OPTIONS, SURVEY_TYPE_OPTIONS, METER_PHASES, CONSUMER_LOAD_TYPES, ROOF_TYPES, DISCOM_OPTIONS, CLIENT_PRIORITY_OPTIONS, USER_ROLES } from '@/lib/constants';
 
 // Deriving types from the const arrays ensures type safety and single source of truth
-export type LeadStatusType = typeof LEAD_STATUS_OPTIONS[number];
+export type LeadStatusType = string;
+export type LeadSourceOptionType = string;
+export type ClientStatusType = string;
+
 export type LeadPriorityType = typeof LEAD_PRIORITY_OPTIONS[number];
-export type LeadSourceOptionType = typeof LEAD_SOURCE_OPTIONS[number];
 export type UserOptionType = typeof USER_OPTIONS[number];
 export type DropReasonType = typeof DROP_REASON_OPTIONS[number];
 export type ClientType = typeof CLIENT_TYPES[number];
 export type ModuleType = typeof MODULE_TYPES[number];
 export type DCRStatus = typeof DCR_STATUSES[number];
 export type ModuleWattage = typeof MODULE_WATTAGE_OPTIONS[number];
-export type ClientStatusType = typeof CLIENT_STATUS_OPTIONS[number];
 export type ClientPriorityType = typeof CLIENT_PRIORITY_OPTIONS[number];
 export type UserRole = typeof USER_ROLES[number];
 
@@ -34,8 +34,8 @@ export interface Lead {
   phone?: string | null;
   status: LeadStatusType;
   source?: LeadSourceOptionType | null;
-  assignedTo?: UserOptionType | null;
-  createdBy?: UserOptionType | null;
+  assignedTo?: string | null;
+  createdBy?: string | null;
   createdAt: string;
   updatedAt: string;
   lastCommentText?: string | null;
@@ -66,8 +66,8 @@ export interface Client {
   phone?: string | null;
   status: ClientStatusType;
   priority?: ClientPriorityType | null;
-  assignedTo?: UserOptionType | null;
-  createdBy?: UserOptionType | null;
+  assignedTo?: string | null;
+  createdBy?: string | null;
   createdAt: string;
   updatedAt: string;
   kilowatt?: number | null;
@@ -164,15 +164,15 @@ export interface NavItem {
 }
 
 export interface StatusFilterItem {
-  label: LeadStatusType | 'Show all';
+  label: string;
   count: number;
-  value: LeadStatusType | 'all';
+  value: string;
 }
 
 export interface ClientStatusFilterItem {
-  label: ClientStatusType | 'Show all';
+  label: string;
   count: number;
-  value: ClientStatusType | 'all';
+  value: string;
 }
 
 export interface DropReasonFilterItem {
@@ -202,15 +202,15 @@ export interface FollowUp {
   status: FollowUpStatus;
   leadStageAtTimeOfFollowUp?: AnyStatusType;
   comment?: string;
-  createdBy?: UserOptionType;
+  createdBy?: string;
   createdAt: string; 
   followupOrTask: 'Followup' | 'Task';
-  taskForUser?: UserOptionType;
+  taskForUser?: string;
   taskDate?: string; 
   taskTime?: string; 
 }
 
-export type AddActivityData = Omit<FollowUp, 'id' | 'createdAt' | 'droppedLeadId'> & {
+export type AddActivityData = Omit<FollowUp, 'id' | 'createdAt' | 'droppedLeadId' | 'createdBy'> & {
   priority?: LeadPriorityType | ClientPriorityType;
 };
 
@@ -313,3 +313,12 @@ export interface Template {
 }
 
 export type CreateTemplateData = Omit<Template, 'id' | 'createdAt' | 'updatedAt'>;
+
+export type SettingType = 'LEAD_STATUS' | 'LEAD_SOURCE' | 'CLIENT_STATUS';
+
+export interface CustomSetting {
+    id: string;
+    type: SettingType;
+    name: string;
+    createdAt: string;
+}

@@ -6,16 +6,17 @@ import { LeadsTable } from '@/app/(app)/leads/leads-table'; // Reusing this for 
 import { Filter, Search, Settings2, ListFilter, Rows, Archive, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from "@/hooks/use-toast";
-import type { Client, ClientSortConfig, UserOptionType, ClientStatusType } from '@/types';
+import type { Client, ClientSortConfig, ClientStatusType, User, CustomSetting } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { getInactiveClients, bulkUpdateClients } from '@/app/(app)/clients-list/actions';
+import { getUsers } from '@/app/(app)/users/actions';
+import { getClientStatuses } from '@/app/(app)/settings/actions';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuCheckboxItem, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { USER_OPTIONS, ACTIVE_CLIENT_STATUS_OPTIONS } from '@/lib/constants';
 
 const allColumns: Record<string, string> = {
     email: 'Email',
@@ -31,6 +32,8 @@ const allColumns: Record<string, string> = {
 
 export default function InactiveClientsListPage() {
   const [clients, setClients] = useState<Client[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [statuses, setStatuses] = useState<CustomSetting[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -44,7 +47,7 @@ export default function InactiveClientsListPage() {
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
   const [isAssignDialogOpen, setAssignDialogOpen] = useState(false);
   const [isStatusDialogOpen, setStatusDialogOpen] = useState(false);
-  const [assignToUser, setAssignToUser] = useState<UserOptionType | ''>('');
+  const [assignToUser, setAssignToUser] = useState<string>('');
   const [updateStatusTo, setUpdateStatusTo] = useState<ClientStatusType | ''>('');
 
   const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({
@@ -54,8 +57,14 @@ export default function InactiveClientsListPage() {
   });
 
   const refreshClients = async () => {
-      const inactiveClients = await getInactiveClients();
+      const [inactiveClients, allUsers, allStatuses] = await Promise.all([
+        getInactiveClients(),
+        getUsers(),
+        getClientStatuses()
+      ]);
       setClients(inactiveClients);
+      setUsers(allUsers);
+      setStatuses(allStatuses);
   };
 
   useEffect(() => {
@@ -292,10 +301,10 @@ export default function InactiveClientsListPage() {
               </DialogHeader>
               <div className="py-4">
                   <Label htmlFor="assign-user">Assign to</Label>
-                  <Select value={assignToUser} onValueChange={(v) => setAssignToUser(v as UserOptionType)}>
+                  <Select value={assignToUser} onValueChange={(v) => setAssignToUser(v)}>
                       <SelectTrigger><SelectValue placeholder="Select a user" /></SelectTrigger>
                       <SelectContent>
-                          {USER_OPTIONS.map(user => <SelectItem key={user} value={user}>{user}</SelectItem>)}
+                          {users.map(user => <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>)}
                       </SelectContent>
                   </Select>
               </div>
@@ -317,7 +326,7 @@ export default function InactiveClientsListPage() {
                   <Select value={updateStatusTo} onValueChange={(v) => setUpdateStatusTo(v as ClientStatusType)}>
                       <SelectTrigger><SelectValue placeholder="Select a stage to activate" /></SelectTrigger>
                       <SelectContent>
-                          {ACTIVE_CLIENT_STATUS_OPTIONS.map(stage => <SelectItem key={stage} value={stage}>{stage}</SelectItem>)}
+                          {statuses.filter(s => s.name !== 'Inactive').map(stage => <SelectItem key={stage.id} value={stage.name}>{stage.name}</SelectItem>)}
                       </SelectContent>
                   </Select>
               </div>

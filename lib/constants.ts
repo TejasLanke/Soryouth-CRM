@@ -1,4 +1,4 @@
-import type { NavItem, Lead, Client, Proposal, Document, Communication, DocumentType, ClientType, LeadStatusType, LeadPriorityType, ClientStatusType, ClientPriorityType, UserOptionType, DropReasonType, Expense, Survey, UserRole, Template } from '@/types';
+import type { NavItem, Lead, Client, Proposal, Document, Communication, DocumentType, ClientType, LeadPriorityType, ClientPriorityType, UserOptionType, DropReasonType, Expense, Survey, UserRole, Template } from '@/types';
 import {
   LayoutDashboard,
   UsersRound,
@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { format, parseISO, addDays, subDays } from 'date-fns';
 
-export const APP_NAME = "Solaris";
+export const APP_NAME = "Soryouth";
 
 // Primary CRM Navigation for the main sidebar
 export const NAV_ITEMS: NavItem[] = [
@@ -60,13 +60,8 @@ export const TOOLS_NAV_ITEMS: NavItem[] = [
 
 export const USER_ROLES = ['Admin', 'TechnoSales', 'Designing', 'Procurement', 'ProjectManager', 'LiasoningExecutive', 'OperationAndMaintainance'] as const;
 export const CLIENT_TYPES = ['Individual/Bungalow', 'Housing Society', 'Commercial', 'Industrial', 'Other'] as const;
-export const LEAD_STATUS_OPTIONS = ['New', 'Fresher', 'Requirement', 'Site Visit', 'Quotation Send', 'Follow-up', 'On Hold', 'Lost'] as const;
-export const ACTIVE_LEAD_STATUS_OPTIONS = ['New', 'Fresher', 'Requirement', 'Site Visit', 'Quotation Send', 'Follow-up', 'On Hold'] as const;
-export const CLIENT_STATUS_OPTIONS = ['Fresher', 'Deal Done', 'Installer', 'On Hold', 'Inactive'] as const;
-export const ACTIVE_CLIENT_STATUS_OPTIONS = ['Fresher', 'Deal Done', 'Installer', 'On Hold'] as const;
 export const LEAD_PRIORITY_OPTIONS = ['Hot', 'High', 'Medium', 'Average', 'Low'] as const;
 export const CLIENT_PRIORITY_OPTIONS = ['Hot', 'Average'] as const;
-export const LEAD_SOURCE_OPTIONS = ['Facebook', 'Website', 'Referral', 'Cold Call', 'Walk-in', 'Other', 'OWN Reference'] as const;
 export const USER_OPTIONS = ['Mayur', 'Sales Rep A', 'Sales Rep B', 'Admin', 'System', 'Kanchan Nikam', 'tejas', 'MAYUR', 'Prasad mudholkar', 'Ritesh'] as const;
 export const DROP_REASON_OPTIONS = [
     'Duplicate lead', 'Fake Lead', 'Not Feasible', 'Not Interested',
@@ -112,32 +107,6 @@ export const MOCK_CLIENTS: Client[] = [
     createdAt: subDays(new Date(), 80).toISOString(), updatedAt: subDays(new Date(), 1).toISOString(), followupCount: 15
   },
 ];
-
-const calculateFinancialsAndSubsidy = (ratePerWatt: number, capacity: number, clientType: ClientType): Pick<Proposal, 'baseAmount' | 'cgstAmount' | 'sgstAmount' | 'subtotalAmount' | 'finalAmount' | 'subsidyAmount'> => {
-  const baseAmount = ratePerWatt * capacity * 1000;
-  const cgstAmount = baseAmount * 0.069;
-  const sgstAmount = baseAmount * 0.069;
-  const subtotalAmount = baseAmount + cgstAmount + sgstAmount;
-  const finalAmountPreSubsidy = subtotalAmount;
-
-  let subsidyAmount = 0;
-  if (clientType === 'Housing Society') {
-    subsidyAmount = 18000 * capacity;
-  } else if (clientType === 'Individual/Bungalow') {
-    if (capacity === 1) subsidyAmount = 30000;
-    else if (capacity === 2) subsidyAmount = 60000;
-    else if (capacity >= 3) subsidyAmount = 78000;
-    else subsidyAmount = 0;
-  }
-  return { baseAmount, cgstAmount, sgstAmount, subtotalAmount, finalAmount: finalAmountPreSubsidy, subsidyAmount };
-};
-
-export const MOCK_PROPOSALS: Proposal[] = [
-  {
-    id: 'prop1', proposalNumber: 'P-2024-001', clientId: 'client1', name: 'Green Valley Society', clientType: 'Housing Society', contactPerson: 'Mr. Sharma', location: 'Pune, MH', capacity: 50, moduleType: 'Mono PERC', moduleWattage: '545', dcrStatus: 'DCR', inverterRating: 50, inverterQty: 2, ratePerWatt: 40, proposalDate: format(new Date(Date.now() - 86400000 * 7), 'yyyy-MM-dd'), ...calculateFinancialsAndSubsidy(40, 50, 'Housing Society'), createdAt: new Date(Date.now() - 86400000 * 7).toISOString(), updatedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-  },
-];
-
 
 export const DOCUMENT_TYPES_CONFIG: Array<{ type: DocumentType; icon: React.ComponentType<{ className?: string }>; description: string }> = [
   { type: 'Work Completion Report', icon: CheckSquare, description: 'Reports confirming project completion.' }, { type: 'Purchase Order', icon: FileText, description: 'Purchase orders for goods or services.' }, { type: 'Annexure I', icon: FileSignature, description: 'Annexure I documents for compliance.' }, { type: 'DCR Declaration', icon: Edit, description: 'Declarations related to domestic content requirement.' }, { type: 'Net Metering Agreement', icon: Eye, description: 'Agreements for net metering services.' }, { type: 'Warranty Certificate', icon: Award, description: 'Certificates for product/service warranties.' },

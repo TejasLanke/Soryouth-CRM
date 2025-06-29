@@ -3,16 +3,18 @@
 import React, { useState, useMemo, useEffect, useTransition } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { LeadsTable } from '@/app/(app)/leads/leads-table';
-import { ACTIVE_LEAD_STATUS_OPTIONS, LEAD_SOURCE_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS } from '@/lib/constants';
+import { DROP_REASON_OPTIONS } from '@/lib/constants';
 import { Filter, Search, Upload, PlusCircle, Settings2, ListChecks, ListFilter, Rows, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LeadForm } from '@/app/(app)/leads/lead-form';
-import { LeadSettingsDialog } from '@/app/(app)/leads/lead-settings-dialog';
+import { SettingsDialog } from '@/app/(app)/settings/settings-dialog';
 import { useToast } from "@/hooks/use-toast";
-import type { Lead, LeadStatusType, StatusFilterItem, LeadSortConfig, CreateLeadData, UserOptionType, LeadSourceOptionType, DropReasonType } from '@/types';
+import type { Lead, User, LeadStatusType, StatusFilterItem, LeadSortConfig, CreateLeadData, UserOptionType, LeadSourceOptionType, DropReasonType, CustomSetting } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO, startOfDay, isSameDay } from 'date-fns';
 import { getLeads, createLead, updateLead, deleteLead, bulkUpdateLeads, bulkDropLeads } from './actions';
+import { getUsers } from '@/app/(app)/users/actions';
+import { getLeadStatuses, getLeadSources } from '@/app/(app)/settings/actions';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuCheckboxItem, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
@@ -47,6 +49,9 @@ type DropLeadFormValues = z.infer<typeof dropLeadSchema>;
 
 export default function LeadsListPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [statuses, setStatuses] = useState<CustomSetting[]>([]);
+  const [sources, setSources] = useState<CustomSetting[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
@@ -68,7 +73,7 @@ export default function LeadsListPage() {
   const [isStageDialogOpen, setStageDialogOpen] = useState(false);
   const [isSourceDialogOpen, setSourceDialogOpen] = useState(false);
   const [isDropDialogOpen, setDropDialogOpen] = useState(false);
-  const [assignToUser, setAssignToUser] = useState<UserOptionType | ''>('');
+  const [assignToUser, setAssignToUser] = useState<string>('');
   const [updateStageTo, setUpdateStageTo] = useState<LeadStatusType | ''>('');
   const [updateSourceTo, setUpdateSourceTo] = useState<LeadSourceOptionType | ''>('');
 
@@ -90,15 +95,27 @@ export default function LeadsListPage() {
     assignedTo: true,
   });
 
+  const refreshData = async () => {
+    const [fetchedLeads, fetchedUsers, fetchedStatuses, fetchedSources] = await Promise.all([
+      getLeads(),
+      getUsers(),
+      getLeadStatuses(),
+      getLeadSources()
+    ]);
+    const activeLeads = fetchedLeads.filter(lead => lead.status !== 'Lost');
+    setLeads(activeLeads);
+    setUsers(fetchedUsers);
+    setStatuses(fetchedStatuses);
+    setSources(fetchedSources);
+  };
+
   useEffect(() => {
-    async function fetchLeads() {
+    async function fetchData() {
       setIsLoading(true);
-      const fetchedLeads = await getLeads();
-      const activeLeads = fetchedLeads.filter(lead => lead.status !== 'Lost');
-      setLeads(activeLeads);
+      await refreshData();
       setIsLoading(false);
     }
-    fetchLeads();
+    fetchData();
   }, []);
 
   const handleAddLead = () => {
@@ -106,19 +123,13 @@ export default function LeadsListPage() {
     setIsFormOpen(true);
   };
   
-  const refreshLeads = async () => {
-    const fetchedLeads = await getLeads();
-    const activeLeads = fetchedLeads.filter(lead => lead.status !== 'Lost');
-    setLeads(activeLeads);
-  };
-
   const handleFormSubmit = async (leadData: CreateLeadData | Lead) => {
     startTransition(async () => {
       let result;
       if ('id' in leadData && leadData.id) { // Existing lead
         result = await updateLead(leadData.id, leadData as Partial<Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>>);
         if (result) {
-          setLeads(prevLeads => prevLeads.map(l => l.id === result!.id ? result! : l));
+          await refreshData();
           toast({ title: "Lead Updated", description: `${result.name}'s information has been updated.` });
         } else {
           toast({ title: "Error", description: "Failed to update lead.", variant: "destructive" });
@@ -126,7 +137,7 @@ export default function LeadsListPage() {
       } else { // New lead
         result = await createLead(leadData as CreateLeadData);
         if (result) {
-          setLeads(prevLeads => [result!, ...prevLeads]);
+          await refreshData();
           toast({ title: "Lead Added", description: `${result.name} has been added to leads.` });
         } else {
           toast({ title: "Error", description: "Failed to create lead.", variant: "destructive" });
@@ -155,26 +166,22 @@ export default function LeadsListPage() {
     const activeLeads = leads;
     const counts: Record<string, number> = {};
     
-    // Initialize counts for all possible active statuses
-    ACTIVE_LEAD_STATUS_OPTIONS.forEach(status => counts[status] = 0);
+    statuses.forEach(status => counts[status.name] = 0);
     
-    // Count leads for each status
     activeLeads.forEach(lead => {
       if (counts[lead.status] !== undefined) {
         counts[lead.status]++;
       }
     });
 
-    // Create the filter items, starting with "Show all"
     const filters: StatusFilterItem[] = [{ label: 'Show all', count: activeLeads.length, value: 'all' }];
     
-    // Add a filter tab for each active status option
-    ACTIVE_LEAD_STATUS_OPTIONS.forEach(status => {
-       filters.push({ label: status, count: counts[status] || 0, value: status });
+    statuses.forEach(status => {
+       filters.push({ label: status.name, count: counts[status.name] || 0, value: status.name });
     });
 
     return filters;
-  }, [leads]);
+  }, [leads, statuses]);
 
   const allFilteredLeads = useMemo(() => {
     let leadsToDisplay = [...leads];
@@ -293,7 +300,7 @@ export default function LeadsListPage() {
         const result = await bulkUpdateLeads(selectedLeadIds, data);
         if (result.success) {
             toast({ title: "Bulk Update Successful", description: `${result.count} leads updated. ${successMessage}` });
-            await refreshLeads();
+            await refreshData();
             setSelectedLeadIds([]);
             setAssignDialogOpen(false);
             setStageDialogOpen(false);
@@ -309,7 +316,7 @@ export default function LeadsListPage() {
         const result = await bulkDropLeads(selectedLeadIds, values.dropReason, values.dropComment);
         if (result.success) {
             toast({ title: "Bulk Drop Successful", description: `${result.count} leads were dropped.` });
-            await refreshLeads();
+            await refreshData();
             setSelectedLeadIds([]);
             setDropDialogOpen(false);
             dropForm.reset();
@@ -393,6 +400,7 @@ export default function LeadsListPage() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                     <DropdownMenuLabel>View Options</DropdownMenuLabel>
+                     <DropdownMenuItem onSelect={() => setIsSettingsDialogOpen(true)}>Customize Settings</DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuSub>
                         <DropdownMenuSubTrigger>
@@ -510,17 +518,24 @@ export default function LeadsListPage() {
           onClose={() => setIsFormOpen(false)}
           onSubmit={handleFormSubmit}
           lead={selectedLeadForEdit}
-          formMode="active"
+          users={users}
+          statuses={statuses}
+          sources={sources}
         />
       )}
       {isSettingsDialogOpen && (
-        <LeadSettingsDialog
+        <SettingsDialog
           isOpen={isSettingsDialogOpen}
-          onClose={() => setIsSettingsDialogOpen(false)}
-          initialStatuses={[...ACTIVE_LEAD_STATUS_OPTIONS]}
-          initialSources={[...LEAD_SOURCE_OPTIONS]}
+          onClose={() => {
+            setIsSettingsDialogOpen(false);
+            refreshData();
+          }}
+          settingTypes={[
+            { title: 'Lead Stages', type: 'LEAD_STATUS' },
+            { title: 'Lead Sources', type: 'LEAD_SOURCE' },
+          ]}
         />
-      )}
+       )}
        {isSearchOpen && (
         <AlertDialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
           <AlertDialogContent>
@@ -556,10 +571,10 @@ export default function LeadsListPage() {
               </DialogHeader>
               <div className="py-4">
                   <Label htmlFor="assign-user">Assign to</Label>
-                  <Select value={assignToUser} onValueChange={(v) => setAssignToUser(v as UserOptionType)}>
+                  <Select value={assignToUser} onValueChange={(v) => setAssignToUser(v)}>
                       <SelectTrigger><SelectValue placeholder="Select a user" /></SelectTrigger>
                       <SelectContent>
-                          {USER_OPTIONS.map(user => <SelectItem key={user} value={user}>{user}</SelectItem>)}
+                          {users.map(user => <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>)}
                       </SelectContent>
                   </Select>
               </div>
@@ -581,7 +596,7 @@ export default function LeadsListPage() {
                   <Select value={updateStageTo} onValueChange={(v) => setUpdateStageTo(v as LeadStatusType)}>
                       <SelectTrigger><SelectValue placeholder="Select a stage" /></SelectTrigger>
                       <SelectContent>
-                          {ACTIVE_LEAD_STATUS_OPTIONS.map(stage => <SelectItem key={stage} value={stage}>{stage}</SelectItem>)}
+                          {statuses.map(stage => <SelectItem key={stage.id} value={stage.name}>{stage.name}</SelectItem>)}
                       </SelectContent>
                   </Select>
               </div>
@@ -603,7 +618,7 @@ export default function LeadsListPage() {
                   <Select value={updateSourceTo} onValueChange={(v) => setUpdateSourceTo(v as LeadSourceOptionType)}>
                       <SelectTrigger><SelectValue placeholder="Select a source" /></SelectTrigger>
                       <SelectContent>
-                          {LEAD_SOURCE_OPTIONS.map(source => <SelectItem key={source} value={source}>{source}</SelectItem>)}
+                          {sources.map(source => <SelectItem key={source.id} value={source.name}>{source.name}</SelectItem>)}
                       </SelectContent>
                   </Select>
               </div>

@@ -80,7 +80,7 @@ type ProposalFormValues = z.infer<typeof proposalSchema>;
 interface ProposalFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: Proposal) => void;
+  onSubmit: (data: Partial<Proposal>) => void;
   proposal?: Proposal | null;
   templateId?: string | null;
   clients: Client[];
@@ -123,26 +123,10 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, templateId, 
 
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
-  const [isNewClientMode, setIsNewClientMode] = useState(false);
-
-  const resetAndDisableFields = (isNew: boolean) => {
-    setIsNewClientMode(isNew);
-    if (isNew) {
-      setSelectedClientId(null);
-      setSelectedLeadId(null);
-      form.setValue("clientId", undefined);
-      form.setValue("leadId", undefined);
-      form.setValue("name", "");
-      form.setValue("clientType", "Individual/Bungalow");
-      form.setValue("contactPerson", "");
-      form.setValue("location", "");
-    }
-  }
 
   const handleClientSelect = (client: Client) => {
     setSelectedClientId(client.id);
     setSelectedLeadId(null);
-    setIsNewClientMode(false);
     form.setValue("clientId", client.id);
     form.setValue("leadId", undefined);
     form.setValue("name", client.name);
@@ -154,7 +138,6 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, templateId, 
   const handleLeadSelect = (lead: Lead) => {
     setSelectedLeadId(lead.id);
     setSelectedClientId(null);
-    setIsNewClientMode(false);
     form.setValue("leadId", lead.id);
     form.setValue("clientId", undefined);
     form.setValue("name", lead.name);
@@ -172,7 +155,6 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, templateId, 
         });
         setSelectedClientId(proposal.clientId || null);
         setSelectedLeadId(proposal.leadId || null);
-        setIsNewClientMode(false);
       } else { // Creating from scratch
         form.reset({
           ...initialFormStateForUseForm,
@@ -180,7 +162,6 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, templateId, 
         });
         setSelectedClientId(null);
         setSelectedLeadId(null);
-        setIsNewClientMode(true);
       }
     }
   }, [isOpen, proposal, form]);
@@ -278,34 +259,28 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, templateId, 
 
   const handleFormSubmit = (values: ProposalFormValues) => {
     startGenerationTransition(async () => {
-      let finalClientId = values.clientId;
-      if (isNewClientMode) {
-        finalClientId = `client-new-${Date.now()}`;
-      }
-
       const currentTemplateId = proposal?.templateId || templateId;
       if (!currentTemplateId) {
         toast({ title: "Error", description: "No template selected.", variant: "destructive" });
         return;
       }
+      
+      const allValues = { ...values };
 
-      const submissionData: Proposal = {
-        id: proposal?.id || `prop${Date.now()}`,
-        ...values,
-        clientId: finalClientId,
-        leadId: values.leadId,
+      const submissionData: Partial<Proposal> = {
+        ...allValues,
         templateId: currentTemplateId,
-        capacity: parseFloat(values.capacity as any) || 0,
-        ratePerWatt: parseFloat(values.ratePerWatt as any) || 0,
-        inverterRating: Number(values.inverterRating) || 0,
-        inverterQty: Number(values.inverterQty) || 1,
+        capacity: parseFloat(allValues.capacity as any) || 0,
+        ratePerWatt: parseFloat(allValues.ratePerWatt as any) || 0,
+        inverterRating: Number(allValues.inverterRating) || 0,
+        inverterQty: Number(allValues.inverterQty) || 1,
         baseAmount: calculatedValues.baseAmount,
         cgstAmount: calculatedValues.cgstAmount,
         sgstAmount: calculatedValues.sgstAmount,
         subtotalAmount: calculatedValues.baseAmount + calculatedValues.cgstAmount + calculatedValues.sgstAmount,
         finalAmount: calculatedValues.finalAmount,
-        subsidyAmount: parseFloat(values.subsidyAmount as any) || 0,
-        unitRate: values.unitRate,
+        subsidyAmount: parseFloat(allValues.subsidyAmount as any) || 0,
+        unitRate: allValues.unitRate,
         requiredSpace: calculatedAdditionalValues.requiredSpace,
         generationPerDay: calculatedAdditionalValues.generationPerDay,
         generationPerYear: calculatedAdditionalValues.generationPerYear,
@@ -313,9 +288,11 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, templateId, 
         laKitQty: calculatedAdditionalValues.laKitQty,
         acdbDcdbQty: calculatedAdditionalValues.acdbDcdbQty,
         earthingKitQty: calculatedAdditionalValues.earthingKitQty,
-        createdAt: proposal?.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
       };
+
+      if (proposal?.id) {
+        submissionData.id = proposal.id;
+      }
       
       try {
         const response = await fetch('/api/proposals/generate', {
@@ -382,11 +359,10 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, templateId, 
                     disabled={!!selectedClientId || (!!proposal && !!proposal.clientId)}
                 />
             </div>
-            <Button type="button" variant="link" onClick={() => resetAndDisableFields(true)} disabled={isNewClientMode}>Or, create a new client for this proposal</Button>
-
-            <FormField name="name" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Client/Company Name</FormLabel><FormControl><Input placeholder="Enter name" {...field} disabled={!isNewClientMode} /></FormControl><FormMessage /></FormItem> )}/>
+            
+            <FormField name="name" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Client/Company Name</FormLabel><FormControl><Input placeholder="Enter name" {...field} /></FormControl><FormMessage /></FormItem> )}/>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <FormField name="clientType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Client Type</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={!isNewClientMode}><FormControl><SelectTrigger><SelectValue placeholder="Select client type" /></SelectTrigger></FormControl><SelectContent>{CLIENT_TYPES.map(type => (<SelectItem key={type} value={type}>{type}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )}/>
+               <FormField name="clientType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Client Type</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select client type" /></SelectTrigger></FormControl><SelectContent>{CLIENT_TYPES.map(type => (<SelectItem key={type} value={type}>{type}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )}/>
                <FormField name="contactPerson" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Contact Person</FormLabel><FormControl><Input placeholder="Enter contact person" {...field} /></FormControl><FormMessage /></FormItem> )}/>
             </div>
             <FormField name="location" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Location / Site Address</FormLabel><FormControl><Textarea placeholder="Enter full site address" {...field} /></FormControl><FormMessage /></FormItem> )}/>

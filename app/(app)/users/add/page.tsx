@@ -9,11 +9,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from 'lucide-react';
-import React, { useEffect } from 'react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
+import React, { useEffect, useState, useActionState } from 'react';
 import { useRouter } from 'next/navigation';
 import { addUser } from '@/app/(app)/users/actions';
-import { useActionState } from 'react';
 import { USER_ROLES } from '@/lib/constants';
 import { PageHeader } from '@/components/page-header';
 import { UserPlus } from 'lucide-react';
@@ -32,6 +31,7 @@ function SubmitButton() {
 
 export default function AddUserPage() {
   const [state, formAction] = useActionState(addUser, initialState);
+  const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
 
@@ -79,7 +79,13 @@ export default function AddUserPage() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
-            <Input id="password" name="password" type="password" placeholder="••••••••" required />
+            <div className="relative">
+                <Input id="password" name="password" type={showPassword ? 'text' : 'password'} placeholder="••••••••" required />
+                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7" onClick={() => setShowPassword(!showPassword)}>
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    <span className="sr-only">{showPassword ? 'Hide password' : 'Show password'}</span>
+                </Button>
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="role">Role</Label>

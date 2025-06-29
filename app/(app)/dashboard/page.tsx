@@ -1,7 +1,6 @@
 
 'use client';
 
-import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
@@ -12,24 +11,21 @@ import {
   Clock, 
   BarChart3, 
   TrendingUp, 
-  PieChart as PieChartIcon, // Renamed to avoid conflict with Recharts' PieChart
+  PieChart as PieChartIcon,
   Users, 
   CalendarRange, 
   Sigma,
-  ListChecks
+  Loader2
 } from 'lucide-react';
-import { MOCK_LEADS, MOCK_PROPOSALS, USER_OPTIONS } from '@/lib/constants'; 
 import { useState, useEffect, useMemo } from 'react';
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from '@/components/ui/chart';
-import type { Lead, Proposal } from '@/types';
+import type { Lead, Client, DroppedLead, User } from '@/types';
+import { getLeads } from '@/app/(app)/leads-list/actions';
+import { getDroppedLeads } from '@/app/(app)/dropped-leads-list/actions';
+import { getActiveClients, getInactiveClients } from '@/app/(app)/clients-list/actions';
+import { getUsers } from '@/app/(app)/users/actions';
 
-// Helper function to count unique clients from proposals
-const countUniqueClients = (proposals: Proposal[]) => {
-  if (!proposals || proposals.length === 0) return 0;
-  const clientIds = new Set(proposals.map(p => p.clientId));
-  return clientIds.size;
-};
 
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
@@ -42,43 +38,51 @@ export default function DashboardOverviewPage() {
     dealsByUser: [] as { name: string; value: number; fill: string }[],
     leadsByUser: [] as { name: string; value: number; fill: string }[],
   });
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const leads = MOCK_LEADS;
-    const proposals = MOCK_PROPOSALS;
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const [activeLeads, droppedLeads, activeClients, inactiveClients, users] = await Promise.all([
+            getLeads(),
+            getDroppedLeads(),
+            getActiveClients(),
+            getInactiveClients(),
+            getUsers(),
+        ]);
+        
+        const userNames = users.map(u => u.name);
 
-    const dealsWonCount = leads.filter(lead => lead.status === 'Deal Done').length;
-    const leadsDroppedCount = leads.filter(lead => lead.status === 'Lost').length;
+        const leadsByUser = userNames.map((user, index) => ({
+            name: user,
+            value: activeLeads.filter(lead => lead.assignedTo === user).length,
+            fill: COLORS[index % COLORS.length],
+        })).filter(item => item.value > 0);
 
-    const dealsByUserData = USER_OPTIONS.map((user, index) => ({
-      name: user,
-      value: leads.filter(lead => lead.assignedTo === user && lead.status === 'Deal Done').length,
-      fill: COLORS[index % COLORS.length],
-    })).filter(item => item.value > 0);
+        const dealsByUser = userNames.map((user, index) => ({
+            name: user,
+            value: activeClients.filter(client => client.assignedTo === user).length,
+            fill: COLORS[index % COLORS.length],
+        })).filter(item => item.value > 0);
 
-    const leadsByUserData = USER_OPTIONS.map((user, index) => ({
-      name: user,
-      value: leads.filter(lead => lead.assignedTo === user).length,
-      fill: COLORS[index % COLORS.length],
-    })).filter(item => item.value > 0);
+        setDashboardData({
+            totalLeads: activeLeads.length,
+            totalClients: activeClients.length + inactiveClients.length,
+            dealsWon: activeClients.length,
+            leadsDropped: droppedLeads.length,
+            leadsByUser,
+            dealsByUser,
+        });
+      } catch (error) {
+        console.error("Failed to fetch dashboard data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-
-    setDashboardData({
-      totalLeads: leads.length,
-      totalClients: countUniqueClients(proposals),
-      dealsWon: dealsWonCount,
-      leadsDropped: leadsDroppedCount,
-      dealsByUser: dealsByUserData,
-      leadsByUser: leadsByUserData,
-    });
+    fetchData();
   }, []);
-
-  const topStats = [
-    { title: 'Total Leads', value: dashboardData.totalLeads.toString(), icon: UsersRound, dataAiHint: "total leads count" },
-    { title: 'Total Clients', value: dashboardData.totalClients.toString(), icon: Briefcase, dataAiHint: "total clients count" },
-    { title: 'Deals Won', value: dashboardData.dealsWon.toString(), icon: Award, dataAiHint: "deals won count" },
-    { title: 'Leads Dropped', value: dashboardData.leadsDropped.toString(), icon: UserX, dataAiHint: "leads dropped count" },
-  ];
 
   const [attendanceStatus, setAttendanceStatus] = useState('Not Punched In');
   const [isPunchedIn, setIsPunchedIn] = useState(false);
@@ -104,10 +108,27 @@ export default function DashboardOverviewPage() {
     return config;
   }, [dashboardData.leadsByUser]);
 
+  const topSalesPerformers = [...dashboardData.dealsByUser].sort((a,b) => b.value - a.value).slice(0, 3);
+  const topLeadHandlers = [...dashboardData.leadsByUser].sort((a,b) => b.value - a.value).slice(0, 3);
+
+  if (isLoading) {
+    return (
+        <div className="flex flex-1 items-center justify-center h-full">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <p className="ml-4 text-lg text-muted-foreground">Loading Dashboard Data...</p>
+        </div>
+    );
+  }
+
+  const topStats = [
+    { title: 'Active Leads', value: dashboardData.totalLeads.toString(), icon: UsersRound, dataAiHint: "total leads count" },
+    { title: 'Total Clients', value: dashboardData.totalClients.toString(), icon: Briefcase, dataAiHint: "total clients count" },
+    { title: 'Deals Won', value: dashboardData.dealsWon.toString(), icon: Award, dataAiHint: "deals won count" },
+    { title: 'Leads Dropped', value: dashboardData.leadsDropped.toString(), icon: UserX, dataAiHint: "leads dropped count" },
+  ];
+
   return (
     <>
-      {/* PageHeader is now in layout */}
-      {/* Top Stats Row */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
         {topStats.map((stat) => (
           <Card key={stat.title}>
@@ -122,7 +143,6 @@ export default function DashboardOverviewPage() {
         ))}
       </div>
 
-      {/* Second Row: Attendance & Leaderboards */}
       <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3 mb-8">
         <Card className="lg:col-span-1">
           <CardHeader>
@@ -144,16 +164,18 @@ export default function DashboardOverviewPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-primary" />
-              Sales Leaderboard (Count)
+              Deals Won Leaderboard
             </CardTitle>
             <CardDescription>Top performers by number of deals closed.</CardDescription>
           </CardHeader>
           <CardContent>
-            <ul className="space-y-2 text-sm">
-              <li className="flex justify-between"><span>1. Mayur S.</span> <span className="font-semibold">15 Deals</span></li>
-              <li className="flex justify-between"><span>2. Kanchan N.</span> <span className="font-semibold">12 Deals</span></li>
-              <li className="flex justify-between"><span>3. Sales Rep A</span> <span className="font-semibold">10 Deals</span></li>
-            </ul>
+            {topSalesPerformers.length > 0 ? (
+                <ul className="space-y-2 text-sm">
+                    {topSalesPerformers.map((user, index) => (
+                         <li key={user.name} className="flex justify-between"><span>{index + 1}. {user.name}</span> <span className="font-semibold">{user.value} Deals</span></li>
+                    ))}
+                </ul>
+            ) : <p className="text-sm text-muted-foreground">No deal data available.</p>}
           </CardContent>
         </Card>
         
@@ -161,21 +183,22 @@ export default function DashboardOverviewPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-primary" />
-               Sales Leaderboard (Value)
+               Lead Assignment Leaderboard
             </CardTitle>
-            <CardDescription>Top performers by total sales value.</CardDescription>
+            <CardDescription>Top users by number of assigned active leads.</CardDescription>
           </CardHeader>
           <CardContent>
-             <ul className="space-y-2 text-sm">
-              <li className="flex justify-between"><span>1. Mayur S.</span> <span className="font-semibold">₹5,50,000</span></li>
-              <li className="flex justify-between"><span>2. Kanchan N.</span> <span className="font-semibold">₹4,20,000</span></li>
-              <li className="flex justify-between"><span>3. Sales Rep B</span> <span className="font-semibold">₹3,80,000</span></li>
-            </ul>
+             {topLeadHandlers.length > 0 ? (
+                <ul className="space-y-2 text-sm">
+                    {topLeadHandlers.map((user, index) => (
+                        <li key={user.name} className="flex justify-between"><span>{index + 1}. {user.name}</span> <span className="font-semibold">{user.value} Leads</span></li>
+                    ))}
+                </ul>
+             ) : <p className="text-sm text-muted-foreground">No lead assignment data available.</p>}
           </CardContent>
         </Card>
       </div>
 
-      {/* Third Row: User-Specific Charts */}
       <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2 mb-8">
         <Card>
           <CardHeader>
@@ -209,9 +232,9 @@ export default function DashboardOverviewPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5 text-primary" />
-              Leads by User
+              Active Leads by User
             </CardTitle>
-            <CardDescription>Distribution of leads assigned to each user.</CardDescription>
+            <CardDescription>Distribution of active leads assigned to each user.</CardDescription>
           </CardHeader>
           <CardContent className="h-[300px]">
              {dashboardData.leadsByUser.length > 0 ? (
@@ -235,7 +258,6 @@ export default function DashboardOverviewPage() {
         </Card>
       </div>
       
-      {/* Fourth Row: Yearly Sales Charts */}
       <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
         <Card>
           <CardHeader>

@@ -1,4 +1,3 @@
-
 'use server';
 
 import prisma from '@/lib/prisma';
@@ -31,20 +30,31 @@ function mapPrismaProposalToProposalType(prismaProposal: any): Proposal {
   };
 }
 
-export async function createOrUpdateProposal(data: Proposal): Promise<Proposal | null> {
-    const { id, createdAt, updatedAt, ...proposalData } = data; // Exclude fields that shouldn't be in the update/create payload directly
+export async function createOrUpdateProposal(data: Partial<Proposal>): Promise<Proposal | null> {
+    const { id, createdAt, updatedAt, ...proposalData } = data;
 
     const dataToSave = {
       ...proposalData,
-      proposalDate: parseISO(proposalData.proposalDate), // Ensure date is a Date object for Prisma
+      proposalDate: proposalData.proposalDate ? parseISO(proposalData.proposalDate) : new Date(),
     };
+    
+    // Remove undefined fields so Prisma doesn't try to update them
+    Object.keys(dataToSave).forEach(key => dataToSave[key as keyof typeof dataToSave] === undefined && delete dataToSave[key as keyof typeof dataToSave]);
 
     try {
-        const savedProposal = await prisma.proposal.upsert({
-            where: { id },
-            update: dataToSave,
-            create: { id, ...dataToSave },
-        });
+        let savedProposal;
+        if (id) {
+            // Update existing proposal
+            savedProposal = await prisma.proposal.update({
+                where: { id },
+                data: dataToSave,
+            });
+        } else {
+            // Create new proposal
+            savedProposal = await prisma.proposal.create({
+                data: dataToSave as any, // Cast to any to satisfy Prisma's create type which expects all fields
+            });
+        }
 
         if (data.leadId) revalidatePath(`/leads/${data.leadId}`);
         if (data.clientId) revalidatePath(`/clients/${data.clientId}`);

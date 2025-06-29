@@ -12,13 +12,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { USER_OPTIONS, LEAD_SOURCE_OPTIONS, LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, CLIENT_TYPES, DROP_REASON_OPTIONS } from '@/lib/constants';
-import type { Lead, UserOptionType, LeadSourceOptionType, LeadStatusType, LeadPriorityType, ClientType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateLeadData, AnyStatusType, DropReasonType, Proposal } from '@/types';
+import { LEAD_SOURCE_OPTIONS, LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, CLIENT_TYPES, DROP_REASON_OPTIONS } from '@/lib/constants';
+import type { Lead, User, UserOptionType, LeadSourceOptionType, LeadStatusType, LeadPriorityType, ClientType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateLeadData, AnyStatusType, DropReasonType, Proposal } from '@/types';
 import { format, parseISO, isValid } from 'date-fns';
 import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, UserCircle2, FileText, ShoppingCart, Loader2, Save, Send, Video, Building, Repeat, Trash2, IndianRupee } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { getLeadById, updateLead, addActivity, convertToClient, dropLead, getActivitiesForLead } from '@/app/(app)/leads-list/actions';
 import { getProposalsForLead, createOrUpdateProposal } from '@/app/(app)/proposals/actions';
+import { getUsers } from '@/app/(app)/users/actions';
 import { LeadForm } from '@/app/(app)/leads/lead-form';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -58,6 +59,7 @@ export default function LeadDetailsPage() {
   const leadId = typeof params.leadId === 'string' ? params.leadId : null;
   const { toast } = useToast();
   const [lead, setLead] = useState<Lead | null | undefined>(undefined);
+  const [users, setUsers] = useState<User[]>([]);
   const [isFormPending, startFormTransition] = useTransition();
   const [isUpdating, startUpdateTransition] = useTransition();
   const [isDropping, startDropTransition] = useTransition();
@@ -80,7 +82,7 @@ export default function LeadDetailsPage() {
   const [activityPriority, setActivityPriority] = useState<LeadPriorityType | undefined>();
   const [activityComment, setActivityComment] = useState('');
   
-  const [taskForUser, setTaskForUser] = useState<UserOptionType | undefined>(USER_OPTIONS[0]);
+  const [taskForUser, setTaskForUser] = useState<string | undefined>(undefined);
   const [taskDate, setTaskDate] = useState('');
   const [taskTime, setTaskTime] = useState('');
 
@@ -103,11 +105,18 @@ export default function LeadDetailsPage() {
       const fetchLeadDetails = async () => {
         setLead(undefined);
         try {
-          const fetchedLead = await getLeadById(leadId);
+          const [fetchedLead, fetchedUsers] = await Promise.all([
+            getLeadById(leadId),
+            getUsers()
+          ]);
           setLead(fetchedLead);
+          setUsers(fetchedUsers);
           if (fetchedLead) {
             setActivityLeadStage(fetchedLead.status as LeadStatusType);
             setActivityPriority(fetchedLead.priority as LeadPriorityType || undefined);
+          }
+          if (fetchedUsers.length > 0) {
+            setTaskForUser(fetchedUsers[0].name);
           }
         } catch (error) {
           console.error("Failed to fetch lead details:", error);
@@ -143,7 +152,7 @@ export default function LeadDetailsPage() {
     }
   }, [lead]);
 
-  const handleProposalSubmit = async (data: Proposal) => {
+  const handleProposalSubmit = async (data: Partial<Proposal>) => {
     startFormTransition(async () => {
       const result = await createOrUpdateProposal(data);
       if (result) {
@@ -190,7 +199,6 @@ export default function LeadDetailsPage() {
         status: activityStatus,
         leadStageAtTimeOfFollowUp: activityLeadStage,
         comment: activityComment,
-        createdBy: 'Mayur',
         priority: activityPriority,
         ...(isTask && {
           taskForUser,
@@ -212,7 +220,9 @@ export default function LeadDetailsPage() {
           setLead(updatedLead);
         }
         setActivityComment('');
-        setTaskForUser(USER_OPTIONS[0]);
+        if (users.length > 0) {
+            setTaskForUser(users[0].name);
+        }
         setTaskDate('');
         setTaskTime('');
       } else {
@@ -590,7 +600,7 @@ export default function LeadDetailsPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
                         <div>
                             <Label htmlFor="taskForUser">Task for</Label>
-                            <Select value={taskForUser} onValueChange={(val) => setTaskForUser(val as UserOptionType)}><SelectTrigger id="taskForUser"><SelectValue placeholder="Select user" /></SelectTrigger><SelectContent>{USER_OPTIONS.map(user => <SelectItem key={user} value={user}>{user}</SelectItem>)}</SelectContent></Select>
+                            <Select value={taskForUser} onValueChange={(val) => setTaskForUser(val)}><SelectTrigger id="taskForUser"><SelectValue placeholder="Select user" /></SelectTrigger><SelectContent>{users.map(user => <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>)}</SelectContent></Select>
                         </div>
                         <div><Label htmlFor="taskDate">Task date</Label><Input type="date" id="taskDate" value={taskDate} onChange={e => setTaskDate(e.target.value)}/></div>
                         <div><Label htmlFor="taskTime">Task time</Label><Input type="time" id="taskTime" value={taskTime} onChange={e => setTaskTime(e.target.value)}/></div>
@@ -630,7 +640,7 @@ export default function LeadDetailsPage() {
                               )}
                               {activity.followupOrTask === 'Task' ? (
                                 <Badge className="bg-green-600 text-white border-transparent hover:bg-green-700">
-                                  Task Due: {activity.taskDate ? format(parseISO(activity.taskDate), 'dd-MM-yyyy') : ''} {activity.taskTime || ''}
+                                  Task For: {activity.taskForUser} Due: {activity.taskDate ? format(parseISO(activity.taskDate), 'dd-MM-yyyy') : ''} {activity.taskTime || ''}
                                 </Badge>
                               ) : (
                                 <Badge variant="outline" className="bg-slate-800 text-white border-transparent hover:bg-slate-700">Followup</Badge>
@@ -654,13 +664,13 @@ export default function LeadDetailsPage() {
                    <Avatar className="h-8 w-8"><AvatarImage src={`https://placehold.co/40x40.png?text=${lead.assignedTo?.charAt(0) || 'U'}`} data-ai-hint="user avatar" /><AvatarFallback>{lead.assignedTo?.charAt(0) || 'U'}</AvatarFallback></Avatar>
                    <Select
                       value={lead.assignedTo || ''}
-                      onValueChange={(value) => handleAttributeChange('assignedTo', value as UserOptionType)}
+                      onValueChange={(value) => handleAttributeChange('assignedTo', value)}
                       disabled={isUpdating}
                     >
                       <SelectTrigger className="h-9 text-sm flex-grow">
                         <SelectValue placeholder="Unassigned" />
                       </SelectTrigger>
-                      <SelectContent>{USER_OPTIONS.map(user => <SelectItem key={user} value={user} className="text-sm">{user}</SelectItem>)}</SelectContent>
+                      <SelectContent>{users.map(user => <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>)}</SelectContent>
                     </Select>
                 </div>
                 <p className="text-xs text-muted-foreground ml-10">Assigned to</p>
@@ -708,7 +718,7 @@ export default function LeadDetailsPage() {
           </div>
         </div>
       </div>
-      {isEditFormOpen && lead && (<LeadForm isOpen={isEditFormOpen} onClose={() => setIsEditFormOpen(false)} onSubmit={handleEditFormSubmit} lead={lead} formMode="detail"/>)}
+      {isEditFormOpen && lead && (<LeadForm isOpen={isEditFormOpen} onClose={() => setIsEditFormOpen(false)} onSubmit={handleEditFormSubmit} lead={lead} formMode="detail" users={users} />)}
       {isProposalFormOpen && lead && (
           <ProposalForm 
             isOpen={isProposalFormOpen} 

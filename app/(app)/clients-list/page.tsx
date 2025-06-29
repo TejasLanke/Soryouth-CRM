@@ -3,15 +3,18 @@
 import React, { useState, useMemo, useEffect, useTransition } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { LeadsTable } from '@/app/(app)/leads/leads-table'; // Reusing this for consistent display
-import { ACTIVE_CLIENT_STATUS_OPTIONS, CLIENT_TYPES, USER_OPTIONS } from '@/lib/constants';
+import { CLIENT_TYPES } from '@/lib/constants';
 import { Filter, Search, PlusCircle, Settings2, ListFilter, Rows, Briefcase, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ClientForm } from '@/app/(app)/clients/client-form';
 import { useToast } from "@/hooks/use-toast";
-import type { Lead, Client, ClientStatusFilterItem, ClientSortConfig, ClientStatusType, CreateClientData, ClientType, UserOptionType } from '@/types';
+import type { Client, ClientStatusFilterItem, ClientSortConfig, ClientStatusType, CreateClientData, ClientType, User, CustomSetting } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO, startOfDay, isSameDay } from 'date-fns';
 import { getActiveClients, createClient, updateClient, deleteClient, bulkUpdateClients } from './actions';
+import { getUsers } from '@/app/(app)/users/actions';
+import { getClientStatuses } from '@/app/(app)/settings/actions';
+import { SettingsDialog } from '@/app/(app)/settings/settings-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuCheckboxItem, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
@@ -33,8 +36,11 @@ const allColumns: Record<string, string> = {
 
 export default function ClientsListPage() {
   const [clients, setClients] = useState<Client[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [statuses, setStatuses] = useState<CustomSetting[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [selectedClientForEdit, setSelectedClientForEdit] = useState<Client | null>(null);
   const { toast } = useToast();
   const [activeFilter, setActiveFilter] = useState<ClientStatusType | 'all'>('all');
@@ -51,7 +57,7 @@ export default function ClientsListPage() {
   const [isAssignDialogOpen, setAssignDialogOpen] = useState(false);
   const [isStageDialogOpen, setStageDialogOpen] = useState(false);
   const [isTypeDialogOpen, setTypeDialogOpen] = useState(false);
-  const [assignToUser, setAssignToUser] = useState<UserOptionType | ''>('');
+  const [assignToUser, setAssignToUser] = useState<string>('');
   const [updateStageTo, setUpdateStageTo] = useState<ClientStatusType | ''>('');
   const [updateTypeTo, setUpdateTypeTo] = useState<ClientType | ''>('');
 
@@ -62,18 +68,24 @@ export default function ClientsListPage() {
     followupCount: true, kilowatt: true, priority: true, assignedTo: true,
   });
 
-  const refreshClients = async () => {
-    const allClients = await getActiveClients();
+  const refreshData = async () => {
+    const [allClients, allUsers, allStatuses] = await Promise.all([
+      getActiveClients(),
+      getUsers(),
+      getClientStatuses()
+    ]);
     setClients(allClients);
+    setUsers(allUsers);
+    setStatuses(allStatuses);
   };
 
   useEffect(() => {
-    async function fetchClients() {
+    async function fetchData() {
       setIsLoading(true);
-      await refreshClients();
+      await refreshData();
       setIsLoading(false);
     }
-    fetchClients();
+    fetchData();
   }, []);
 
   const handleAddClient = () => {
@@ -93,7 +105,7 @@ export default function ClientsListPage() {
           toast({ title: "Error", description: "Failed to update client.", variant: "destructive" });
         }
       } else { // New client
-        const newClientData = { ...data, status: data.status || 'Deal Done' };
+        const newClientData = { ...data, status: data.status || statuses[0]?.name || 'Fresher' };
         result = await createClient(newClientData as CreateClientData);
         if (result) {
           setClients(prev => [result!, ...prev]);
@@ -142,7 +154,7 @@ export default function ClientsListPage() {
         const result = await bulkUpdateClients(selectedClientIds, data);
         if (result.success) {
             toast({ title: "Bulk Update Successful", description: `${result.count} clients updated. ${successMessage}` });
-            await refreshClients();
+            await refreshData();
             setSelectedClientIds([]);
             setAssignDialogOpen(false);
             setStageDialogOpen(false);
@@ -155,7 +167,7 @@ export default function ClientsListPage() {
 
   const statusFilters = useMemo((): ClientStatusFilterItem[] => {
     const counts: Record<string, number> = {};
-    ACTIVE_CLIENT_STATUS_OPTIONS.forEach(status => counts[status] = 0);
+    statuses.forEach(status => counts[status.name] = 0);
     
     clients.forEach(client => {
       if (counts[client.status] !== undefined) {
@@ -164,11 +176,13 @@ export default function ClientsListPage() {
     });
 
     const filters: ClientStatusFilterItem[] = [{ label: 'Show all', count: clients.length, value: 'all' }];
-    ACTIVE_CLIENT_STATUS_OPTIONS.forEach(status => {
-       filters.push({ label: status, count: counts[status] || 0, value: status });
+    statuses.forEach(status => {
+       if (status.name !== 'Inactive') {
+         filters.push({ label: status.name, count: counts[status.name] || 0, value: status.name as ClientStatusType });
+       }
     });
     return filters;
-  }, [clients]);
+  }, [clients, statuses]);
 
   const allFilteredClients = useMemo(() => {
     let clientsToDisplay = [...clients];
@@ -243,6 +257,8 @@ export default function ClientsListPage() {
     setSortConfig({ key, direction });
   };
 
+  const activeStatusesForBulkUpdate = statuses.filter(s => s.name !== 'Inactive').map(s => s.name);
+
   if (isLoading) {
     return <PageHeader title="Clients" description="Manage all your existing clients." icon={Briefcase} />;
   }
@@ -303,6 +319,7 @@ export default function ClientsListPage() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                     <DropdownMenuLabel>View Options</DropdownMenuLabel>
+                    <DropdownMenuItem onSelect={() => setIsSettingsDialogOpen(true)}>Customize Settings</DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuSub>
                         <DropdownMenuSubTrigger>
@@ -370,10 +387,10 @@ export default function ClientsListPage() {
       <LeadsTable
         items={paginatedClients}
         viewType="client"
-        onEdit={(client) => { setSelectedClientForEdit(client); setIsFormOpen(true); }}
+        onEdit={(client) => { setSelectedClientForEdit(client as Client); setIsFormOpen(true); }}
         onDelete={handleDeleteClient}
         sortConfig={sortConfig}
-        requestSort={requestSort}
+        requestSort={requestSort as (key: keyof Client) => void}
         columnVisibility={columnVisibility}
         selectedIds={selectedClientIds}
         setSelectedIds={setSelectedClientIds}
@@ -399,8 +416,20 @@ export default function ClientsListPage() {
           onClose={() => setIsFormOpen(false)}
           onSubmit={handleFormSubmit}
           client={selectedClientForEdit}
+          users={users}
+          statuses={statuses}
         />
       )}
+      {isSettingsDialogOpen && (
+        <SettingsDialog
+          isOpen={isSettingsDialogOpen}
+          onClose={() => {
+            setIsSettingsDialogOpen(false);
+            refreshData(); // Refresh data when closing settings
+          }}
+          settingTypes={[{ title: 'Client Stages', type: 'CLIENT_STATUS' }]}
+        />
+       )}
        {isSearchOpen && (
         <AlertDialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
           <AlertDialogContent>
@@ -436,10 +465,10 @@ export default function ClientsListPage() {
               </DialogHeader>
               <div className="py-4">
                   <Label htmlFor="assign-user">Assign to</Label>
-                  <Select value={assignToUser} onValueChange={(v) => setAssignToUser(v as UserOptionType)}>
+                  <Select value={assignToUser} onValueChange={(v) => setAssignToUser(v)}>
                       <SelectTrigger><SelectValue placeholder="Select a user" /></SelectTrigger>
                       <SelectContent>
-                          {USER_OPTIONS.map(user => <SelectItem key={user} value={user}>{user}</SelectItem>)}
+                          {users.map(user => <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>)}
                       </SelectContent>
                   </Select>
               </div>
@@ -461,7 +490,7 @@ export default function ClientsListPage() {
                   <Select value={updateStageTo} onValueChange={(v) => setUpdateStageTo(v as ClientStatusType)}>
                       <SelectTrigger><SelectValue placeholder="Select a stage" /></SelectTrigger>
                       <SelectContent>
-                          {ACTIVE_CLIENT_STATUS_OPTIONS.map(stage => <SelectItem key={stage} value={stage}>{stage}</SelectItem>)}
+                          {statuses.filter(s => s.name !== 'Inactive').map(stage => <SelectItem key={stage.id} value={stage.name}>{stage.name}</SelectItem>)}
                       </SelectContent>
                   </Select>
               </div>

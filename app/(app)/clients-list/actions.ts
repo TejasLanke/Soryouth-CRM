@@ -5,7 +5,7 @@ import prisma from '@/lib/prisma';
 import type { Client, FollowUp, AddActivityData, CreateClientData, LeadStatusType, ClientType, ClientStatusType, UserOptionType } from '@/types';
 import { revalidatePath } from 'next/cache';
 import { format, parseISO } from 'date-fns';
-import { ACTIVE_CLIENT_STATUS_OPTIONS } from '@/lib/constants';
+import { verifySession } from '@/lib/auth';
 
 // Helper to map Prisma client to frontend Client type
 function mapPrismaClientToClientType(prismaClient: any): Client {
@@ -16,8 +16,8 @@ function mapPrismaClientToClientType(prismaClient: any): Client {
     phone: prismaClient.phone ?? undefined,
     status: prismaClient.status,
     priority: prismaClient.priority ?? undefined,
-    assignedTo: prismaClient.assignedTo ?? undefined,
-    createdBy: prismaClient.createdBy ?? undefined,
+    assignedTo: prismaClient.assignedTo?.name ?? undefined,
+    createdBy: prismaClient.createdBy?.name ?? undefined,
     createdAt: prismaClient.createdAt.toISOString(),
     updatedAt: prismaClient.updatedAt.toISOString(),
     kilowatt: prismaClient.kilowatt ?? undefined,
@@ -44,10 +44,10 @@ function mapPrismaFollowUpToFollowUpType(prismaFollowUp: any): FollowUp {
     status: prismaFollowUp.status,
     leadStageAtTimeOfFollowUp: prismaFollowUp.leadStageAtTimeOfFollowUp ?? undefined,
     comment: prismaFollowUp.comment ?? undefined,
-    createdBy: prismaFollowUp.createdBy ?? undefined,
+    createdBy: prismaFollowUp.createdBy?.name ?? undefined,
     createdAt: prismaFollowUp.createdAt.toISOString(),
     followupOrTask: prismaFollowUp.followupOrTask,
-    taskForUser: prismaFollowUp.taskForUser ?? undefined,
+    taskForUser: prismaFollowUp.taskForUser?.name ?? undefined,
     taskDate: prismaFollowUp.taskDate?.toISOString() ?? undefined,
     taskTime: prismaFollowUp.taskTime ?? undefined,
   } as FollowUp;
@@ -58,7 +58,7 @@ export async function getActiveClients(): Promise<Client[]> {
     const clientsFromDb = await prisma.client.findMany({
       where: {
         status: {
-          in: [...ACTIVE_CLIENT_STATUS_OPTIONS],
+          not: 'Inactive',
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -66,7 +66,9 @@ export async function getActiveClients(): Promise<Client[]> {
         followUps: {
           orderBy: { createdAt: 'desc' },
           take: 1
-        }
+        },
+        createdBy: true,
+        assignedTo: true,
       }
     });
     return clientsFromDb.map(mapPrismaClientToClientType);
@@ -87,7 +89,9 @@ export async function getInactiveClients(): Promise<Client[]> {
         followUps: {
           orderBy: { createdAt: 'desc' },
           take: 1
-        }
+        },
+        createdBy: true,
+        assignedTo: true,
       }
     });
     return clientsFromDb.map(mapPrismaClientToClientType);
@@ -102,9 +106,13 @@ export async function getClientById(id: string): Promise<Client | null> {
   try {
     const clientFromDb = await prisma.client.findUnique({
       where: { id },
-      include: { followUps: {
-        orderBy: { createdAt: 'desc' }
-      } }
+      include: { 
+        followUps: {
+          orderBy: { createdAt: 'desc' }
+        },
+        createdBy: true,
+        assignedTo: true,
+      }
     });
     if (!clientFromDb) return null;
     return mapPrismaClientToClientType(clientFromDb);
@@ -115,24 +123,37 @@ export async function getClientById(id: string): Promise<Client | null> {
 }
 
 export async function createClient(data: CreateClientData): Promise<Client | null> {
+    const session = await verifySession();
+    if (!session?.userId) {
+        console.error("Authentication error: No user session found.");
+        return null;
+    }
+
     try {
+        let assignedToId: string | null = null;
+        if (data.assignedTo) {
+            const user = await prisma.user.findFirst({ where: { name: data.assignedTo }});
+            if (user) assignedToId = user.id;
+        }
+
         const newClient = await prisma.client.create({
             data: {
                 name: data.name,
                 status: data.status,
                 email: data.email || null,
                 phone: data.phone || null,
-                assignedTo: data.assignedTo || null,
-                createdBy: data.createdBy || 'System',
                 kilowatt: data.kilowatt === undefined ? null : Number(data.kilowatt),
                 address: data.address || null,
                 priority: data.priority || null,
                 clientType: data.clientType || null,
                 electricityBillUrl: data.electricityBillUrl || null,
+                createdById: session.userId,
+                assignedToId: assignedToId,
             }
         });
         revalidatePath('/clients-list');
-        return mapPrismaClientToClientType(newClient);
+        const newClientWithRelations = await getClientById(newClient.id);
+        return newClientWithRelations;
     } catch (error) {
         console.error("Failed to create client:", error);
         return null;
@@ -142,7 +163,7 @@ export async function createClient(data: CreateClientData): Promise<Client | nul
 export async function updateClient(id: string, data: Partial<Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'followupCount'>>): Promise<Client | null> {
     try {
         const prismaData: any = {};
-        const fieldsToIgnore = ['id', 'createdAt', 'updatedAt', 'followupCount', 'lastCommentText', 'lastCommentDate', 'nextFollowUpDate', 'nextFollowUpTime'];
+        const fieldsToIgnore = ['id', 'createdAt', 'updatedAt', 'followupCount', 'lastCommentText', 'lastCommentDate', 'nextFollowUpDate', 'nextFollowUpTime', 'createdBy', 'assignedTo'];
         
         for (const key in data) {
             if (Object.prototype.hasOwnProperty.call(data, key)) {
@@ -159,9 +180,15 @@ export async function updateClient(id: string, data: Partial<Omit<Client, 'id' |
             }
         }
 
+        if (data.assignedTo) {
+            const user = await prisma.user.findFirst({ where: { name: data.assignedTo }});
+            prismaData.assignedToId = user ? user.id : null;
+        }
+
         const updatedClientFromDb = await prisma.client.update({
             where: { id },
-            data: prismaData
+            data: prismaData,
+            include: { createdBy: true, assignedTo: true }
         });
 
         revalidatePath('/clients-list');
@@ -194,6 +221,7 @@ export async function getActivitiesForClient(clientId: string): Promise<FollowUp
     const activities = await prisma.followUp.findMany({
       where: { clientId },
       orderBy: { createdAt: 'desc' },
+      include: { createdBy: true, taskForUser: true }
     });
     return activities.map(mapPrismaFollowUpToFollowUpType);
   } catch (error) {
@@ -207,7 +235,19 @@ export async function addClientActivity(data: AddActivityData): Promise<FollowUp
     console.error("addClientActivity requires a clientId");
     return null;
   }
+  const session = await verifySession();
+  if (!session?.userId) {
+    console.error("User must be logged in to add activity.");
+    return null;
+  }
+
   try {
+    let taskForUserId: string | null = null;
+    if (data.taskForUser) {
+        const user = await prisma.user.findFirst({ where: { name: data.taskForUser }});
+        if (user) taskForUserId = user.id;
+    }
+
     const result = await prisma.$transaction(async (tx) => {
       const newActivity = await tx.followUp.create({
         data: {
@@ -218,11 +258,11 @@ export async function addClientActivity(data: AddActivityData): Promise<FollowUp
           status: data.status,
           leadStageAtTimeOfFollowUp: data.leadStageAtTimeOfFollowUp || null,
           comment: data.comment || null,
-          createdBy: data.createdBy || 'System',
           followupOrTask: data.followupOrTask,
-          taskForUser: data.taskForUser || null,
           taskDate: data.taskDate ? parseISO(data.taskDate) : null,
           taskTime: data.taskTime || null,
+          createdById: session.userId,
+          taskForUserId: taskForUserId,
         },
       });
 
@@ -255,7 +295,11 @@ export async function addClientActivity(data: AddActivityData): Promise<FollowUp
     });
 
     revalidatePath(`/clients/${data.clientId}`);
-    return mapPrismaFollowUpToFollowUpType(result);
+    const newActivityWithRelations = await prisma.followUp.findUnique({
+        where: { id: result.id },
+        include: { createdBy: true, taskForUser: true }
+    });
+    return newActivityWithRelations ? mapPrismaFollowUpToFollowUpType(newActivityWithRelations) : null;
   } catch (error) {
     console.error('Failed to add client activity:', error);
     return null;
@@ -279,7 +323,7 @@ export async function convertClientToLead(clientId: string): Promise<{ success: 
     } else if (client.status === 'Fresher') {
         leadStatus = 'Fresher';
     } else if (client.status === 'Inactive') {
-        leadStatus = 'Follow-up'; // Reactivating an inactive client as a lead
+        leadStatus = 'Follow-up';
     }
 
     const newLead = await prisma.$transaction(async (tx) => {
@@ -291,8 +335,6 @@ export async function convertClientToLead(clientId: string): Promise<{ success: 
           status: leadStatus,
           priority: 'Average', 
           source: 'Other', 
-          assignedTo: client.assignedTo,
-          createdBy: client.createdBy,
           createdAt: client.createdAt,
           kilowatt: client.kilowatt,
           address: client.address,
@@ -302,6 +344,8 @@ export async function convertClientToLead(clientId: string): Promise<{ success: 
           nextFollowUpTime: client.nextFollowUpTime,
           lastCommentText: client.followUps[0]?.comment ?? `Reactivated from Client (Status: ${client.status})`,
           lastCommentDate: client.followUps[0]?.createdAt ?? new Date(),
+          createdById: client.createdById,
+          assignedToId: client.assignedToId,
         },
       });
 
@@ -341,12 +385,26 @@ export async function bulkUpdateClients(
   if (clientIds.length === 0) {
     return { success: false, count: 0, message: 'No clients selected.' };
   }
+  
+  const updateData: any = {};
+  if (data.status) updateData.status = data.status;
+  if (data.clientType) updateData.clientType = data.clientType;
+
+  if (data.assignedTo) {
+      const user = await prisma.user.findFirst({ where: { name: data.assignedTo }});
+      if (user) {
+          updateData.assignedToId = user.id;
+      } else {
+          return { success: false, count: 0, message: `User '${data.assignedTo}' not found.`};
+      }
+  }
+
   try {
     const result = await prisma.client.updateMany({
       where: {
         id: { in: clientIds },
       },
-      data,
+      data: updateData,
     });
     revalidatePath('/clients-list');
     revalidatePath('/inactive-clients');

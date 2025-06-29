@@ -12,14 +12,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { USER_OPTIONS, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, CLIENT_STATUS_OPTIONS, CLIENT_PRIORITY_OPTIONS } from '@/lib/constants';
-import type { Client, UserOptionType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateClientData, ClientStatusType, ClientPriorityType, Proposal } from '@/types';
+import { FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, CLIENT_PRIORITY_OPTIONS } from '@/lib/constants';
+import type { Client, User, UserOptionType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateClientData, ClientStatusType, ClientPriorityType, Proposal, CustomSetting } from '@/types';
 import { format, parseISO, isValid } from 'date-fns';
 import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, UserCircle2, FileText, ShoppingCart, Loader2, Save, Send, Video, Building, Repeat, UserX, IndianRupee } from 'lucide-react';
 import { DocumentCreationDialog } from '@/app/(app)/documents/document-creation-dialog';
 import { useToast } from "@/hooks/use-toast";
 import { getClientById, updateClient, addClientActivity, getActivitiesForClient, convertClientToLead } from '@/app/(app)/clients-list/actions';
 import { getProposalsForClient, createOrUpdateProposal } from '@/app/(app)/proposals/actions';
+import { getUsers } from '@/app/(app)/users/actions';
+import { getClientStatuses } from '@/app/(app)/settings/actions';
 import { ClientForm } from '@/app/(app)/clients/client-form';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -49,6 +51,8 @@ export default function ClientDetailsPage() {
   const clientId = typeof params.clientId === 'string' ? params.clientId : null;
   const { toast } = useToast();
   const [client, setClient] = useState<Client | null | undefined>(undefined);
+  const [users, setUsers] = useState<User[]>([]);
+  const [statuses, setStatuses] = useState<CustomSetting[]>([]);
   const [isFormPending, startFormTransition] = useTransition();
   const [isUpdating, startUpdateTransition] = useTransition();
   const [isConverting, startConversionTransition] = useTransition();
@@ -64,16 +68,15 @@ export default function ClientDetailsPage() {
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [activityComment, setActivityComment] = useState('');
 
   const [activityType, setActivityType] = useState<FollowUpType>(FOLLOW_UP_TYPES[0]);
   const [activityDate, setActivityDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [activityTime, setActivityTime] = useState<string>(format(new Date(), 'HH:mm'));
   const [activityStatus, setActivityStatus] = useState<FollowUpStatus>(FOLLOW_UP_STATUSES[0]);
   const [activityClientStage, setActivityClientStage] = useState<ClientStatusType | undefined>();
-  const [activityComment, setActivityComment] = useState('');
-
   
-  const [taskForUser, setTaskForUser] = useState<UserOptionType | undefined>(USER_OPTIONS[0]);
+  const [taskForUser, setTaskForUser] = useState<string | undefined>(undefined);
   const [taskDate, setTaskDate] = useState('');
   const [taskTime, setTaskTime] = useState('');
 
@@ -89,13 +92,28 @@ export default function ClientDetailsPage() {
 
   useEffect(() => {
     if (clientId) {
-      const fetchClientDetails = async () => {
+      const fetchDetails = async () => {
         setClient(undefined);
         try {
-          const fetchedClient = await getClientById(clientId);
+           const [fetchedClient, fetchedUsers, fetchedActivities, fetchedProposals, fetchedStatuses] = await Promise.all([
+            getClientById(clientId),
+            getUsers(),
+            getActivitiesForClient(clientId),
+            getProposalsForClient(clientId),
+            getClientStatuses()
+          ]);
+
           setClient(fetchedClient);
+          setUsers(fetchedUsers);
+          setActivities(fetchedActivities);
+          setProposals(fetchedProposals);
+          setStatuses(fetchedStatuses);
+
           if (fetchedClient) {
             setActivityClientStage(fetchedClient.status as ClientStatusType);
+          }
+          if (fetchedUsers.length > 0) {
+            setTaskForUser(fetchedUsers[0].name);
           }
         } catch (error) {
           console.error("Failed to fetch client details:", error);
@@ -105,19 +123,12 @@ export default function ClientDetailsPage() {
             description: "Could not load client details.",
             variant: "destructive",
           });
+        } finally {
+            setActivitiesLoading(false);
         }
       };
       
-      const fetchActivities = async () => {
-        setActivitiesLoading(true);
-        const fetchedActivities = await getActivitiesForClient(clientId);
-        setActivities(fetchedActivities);
-        setActivitiesLoading(false);
-      };
-
-      fetchClientDetails();
-      fetchActivities();
-      fetchProposals();
+      fetchDetails();
     } else {
       setClient(null);
     }
@@ -130,7 +141,7 @@ export default function ClientDetailsPage() {
     }
   }, [client]);
 
-  const handleProposalSubmit = async (data: Proposal) => {
+  const handleProposalSubmit = async (data: Partial<Proposal>) => {
     startFormTransition(async () => {
       const result = await createOrUpdateProposal(data);
       if (result) {
@@ -177,7 +188,6 @@ export default function ClientDetailsPage() {
         status: activityStatus,
         leadStageAtTimeOfFollowUp: activityClientStage,
         comment: activityComment,
-        createdBy: 'Mayur', 
         ...(isTask && {
           taskForUser,
           taskDate,
@@ -198,7 +208,9 @@ export default function ClientDetailsPage() {
           setClient(updatedClient);
         }
         setActivityComment('');
-        setTaskForUser(USER_OPTIONS[0]);
+        if (users.length > 0) {
+            setTaskForUser(users[0].name);
+        }
         setTaskDate('');
         setTaskTime('');
       } else {
@@ -365,7 +377,7 @@ export default function ClientDetailsPage() {
                       <SelectValue placeholder="Select stage" />
                     </SelectTrigger>
                     <SelectContent>
-                      {CLIENT_STATUS_OPTIONS.map(stage => <SelectItem key={stage} value={stage} className="text-xs">{stage}</SelectItem>)}
+                      {statuses.map(stage => <SelectItem key={stage.id} value={stage.name} className="text-xs">{stage.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -499,7 +511,7 @@ export default function ClientDetailsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="activityClientStage">Client Stage</Label>
-                    <Select value={activityClientStage} onValueChange={(val) => setActivityClientStage(val as ClientStatusType)}><SelectTrigger id="activityClientStage"><SelectValue placeholder="Select stage" /></SelectTrigger><SelectContent>{CLIENT_STATUS_OPTIONS.map(stage => <SelectItem key={stage} value={stage}>{stage}</SelectItem>)}</SelectContent></Select>
+                    <Select value={activityClientStage} onValueChange={(val) => setActivityClientStage(val as ClientStatusType)}><SelectTrigger id="activityClientStage"><SelectValue placeholder="Select stage" /></SelectTrigger><SelectContent>{statuses.map(stage => <SelectItem key={stage.id} value={stage.name}>{stage.name}</SelectItem>)}</SelectContent></Select>
                   </div>
                 </div>
                 <div>
@@ -512,7 +524,7 @@ export default function ClientDetailsPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
                         <div>
                             <Label htmlFor="taskForUser">Task for</Label>
-                            <Select value={taskForUser} onValueChange={(val) => setTaskForUser(val as UserOptionType)}><SelectTrigger id="taskForUser"><SelectValue placeholder="Select user" /></SelectTrigger><SelectContent>{USER_OPTIONS.map(user => <SelectItem key={user} value={user}>{user}</SelectItem>)}</SelectContent></Select>
+                            <Select value={taskForUser} onValueChange={(val) => setTaskForUser(val)}><SelectTrigger id="taskForUser"><SelectValue placeholder="Select user" /></SelectTrigger><SelectContent>{users.map(user => <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>)}</SelectContent></Select>
                         </div>
                         <div><Label htmlFor="taskDate">Task date</Label><Input type="date" id="taskDate" value={taskDate} onChange={e => setTaskDate(e.target.value)}/></div>
                         <div><Label htmlFor="taskTime">Task time</Label><Input type="time" id="taskTime" value={taskTime} onChange={e => setTaskTime(e.target.value)}/></div>
@@ -552,7 +564,7 @@ export default function ClientDetailsPage() {
                             )}
                              {activity.followupOrTask === 'Task' ? (
                                <Badge className="bg-green-600 text-white border-transparent hover:bg-green-700">
-                                Task Due: {activity.taskDate ? format(parseISO(activity.taskDate), 'dd-MM-yyyy') : ''} {activity.taskTime || ''}
+                                Task For: {activity.taskForUser} Due: {activity.taskDate ? format(parseISO(activity.taskDate), 'dd-MM-yyyy') : ''} {activity.taskTime || ''}
                               </Badge>
                             ) : (
                               <Badge variant="outline" className="bg-slate-800 text-white border-transparent hover:bg-slate-700">Followup</Badge>
@@ -576,13 +588,13 @@ export default function ClientDetailsPage() {
                    <Avatar className="h-8 w-8"><AvatarImage src={`https://placehold.co/40x40.png?text=${client.assignedTo?.charAt(0) || 'U'}`} data-ai-hint="user avatar" /><AvatarFallback>{client.assignedTo?.charAt(0) || 'U'}</AvatarFallback></Avatar>
                    <Select
                       value={client.assignedTo || ''}
-                      onValueChange={(value) => handleAttributeChange('assignedTo', value as UserOptionType)}
+                      onValueChange={(value) => handleAttributeChange('assignedTo', value)}
                       disabled={isUpdating}
                     >
                       <SelectTrigger className="h-9 text-sm flex-grow">
                         <SelectValue placeholder="Unassigned" />
                       </SelectTrigger>
-                      <SelectContent>{USER_OPTIONS.map(user => <SelectItem key={user} value={user} className="text-sm">{user}</SelectItem>)}</SelectContent>
+                      <SelectContent>{users.map(user => <SelectItem key={user.id} value={user.name} className="text-sm">{user.name}</SelectItem>)}</SelectContent>
                     </Select>
                 </div>
                 <p className="text-xs text-muted-foreground ml-10">Assigned to</p>
@@ -601,8 +613,7 @@ export default function ClientDetailsPage() {
               <CardHeader className="pb-2 pt-4"><CardTitle className="text-md">Notes</CardTitle></CardHeader>
               <CardContent><Textarea placeholder="Add notes here..." className="min-h-[100px] bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800" /></CardContent>
             </Card>
-            
-            <Card>
+             <Card>
               <CardHeader><CardTitle>Proposal History ({proposals.length})</CardTitle></CardHeader>
               <CardContent>
                 {proposals.length > 0 ? (
@@ -628,7 +639,6 @@ export default function ClientDetailsPage() {
                 )}
               </CardContent>
             </Card>
-
           </div>
         </div>
       </div>
@@ -648,7 +658,7 @@ export default function ClientDetailsPage() {
         onSelect={handleTemplateSelected}
       />
       {isDocumentDialogOpen && documentTypeToCreate === 'Purchase Order' && client && (<DocumentCreationDialog isOpen={isDocumentDialogOpen} onClose={() => setIsDocumentDialogOpen(false)} documentType="Purchase Order" />)}
-      {isEditFormOpen && client && (<ClientForm isOpen={isEditFormOpen} onClose={() => setIsEditFormOpen(false)} onSubmit={handleEditFormSubmit} client={client}/>)}
+      {isEditFormOpen && client && (<ClientForm isOpen={isEditFormOpen} onClose={() => setIsEditFormOpen(false)} onSubmit={handleEditFormSubmit} client={client} users={users} statuses={statuses} />)}
       {isPreviewOpen && selectedProposalForPreview && (
         <ProposalPreviewDialog
           isOpen={isPreviewOpen}

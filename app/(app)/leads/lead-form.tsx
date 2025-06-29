@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Lead, LeadStatusType, LeadPriorityType, LeadSourceOptionType, UserOptionType, ClientType, CreateLeadData } from '@/types';
+import type { Lead, LeadStatusType, LeadPriorityType, LeadSourceOptionType, User, ClientType, CreateLeadData, CustomSetting } from '@/types';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -32,18 +32,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import React, { useEffect, useMemo } from 'react';
-import { ACTIVE_LEAD_STATUS_OPTIONS, LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, LEAD_SOURCE_OPTIONS, USER_OPTIONS, CLIENT_TYPES } from '@/lib/constants';
+import { LEAD_PRIORITY_OPTIONS, CLIENT_TYPES } from '@/lib/constants';
 import { format, parseISO, isValid } from 'date-fns';
 
-// Define a schema for the form's value types using the widest possible enum for `status`.
-// This ensures the form's data type is stable.
-const leadFormValuesSchema = z.object({
+const getLeadSchema = (statuses: string[], sources: string[]) => z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   email: z.string().email({ message: 'Invalid email address.' }).optional().or(z.literal('')),
   phone: z.string().min(10, { message: 'Phone number must be at least 10 digits.' }).optional().or(z.literal('')),
-  status: z.enum(LEAD_STATUS_OPTIONS),
-  source: z.enum(LEAD_SOURCE_OPTIONS).optional(),
-  assignedTo: z.enum(USER_OPTIONS).optional(),
+  status: z.string().refine(val => statuses.includes(val), { message: "Please select a valid stage." }),
+  source: z.string().optional().refine(val => !val || sources.includes(val), { message: "Please select a valid source." }),
+  assignedTo: z.string().optional(),
   lastCommentText: z.string().optional(),
   nextFollowUpDate: z.string().optional().refine(val => !val || (isValid(parseISO(val))), { message: "Invalid date" }),
   nextFollowUpTime: z.string().optional().refine(val => !val || /^([01]\d|2[0-3]):([0-5]\d)$/.test(val), { message: "Invalid time (HH:MM)"}),
@@ -53,37 +51,30 @@ const leadFormValuesSchema = z.object({
   clientType: z.enum(CLIENT_TYPES).optional(),
 });
 
-type LeadFormValues = z.infer<typeof leadFormValuesSchema>;
+type LeadFormValues = z.infer<ReturnType<typeof getLeadSchema>>;
 
 interface LeadFormProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: CreateLeadData | Lead) => void;
   lead?: Lead | null;
-  formMode?: 'active' | 'detail';
+  users: User[];
+  statuses: CustomSetting[];
+  sources: CustomSetting[];
 }
 
-export function LeadForm({ isOpen, onClose, onSubmit, lead, formMode = 'detail' }: LeadFormProps) {
-  const statusOptions = useMemo(() => 
-    formMode === 'active' ? ACTIVE_LEAD_STATUS_OPTIONS : LEAD_STATUS_OPTIONS, 
-    [formMode]
-  );
-  
-  // Create a dynamic schema specifically for validation, which can change based on `formMode`.
-  const dynamicValidationSchema = useMemo(() => 
-    leadFormValuesSchema.extend({
-      status: z.enum(statusOptions),
-    }),
-    [statusOptions]
-  );
+export function LeadForm({ isOpen, onClose, onSubmit, lead, users, statuses, sources }: LeadFormProps) {
+  const statusNames = useMemo(() => statuses.map(s => s.name), [statuses]);
+  const sourceNames = useMemo(() => sources.map(s => s.name), [sources]);
+  const leadSchema = useMemo(() => getLeadSchema(statusNames, sourceNames), [statusNames, sourceNames]);
 
   const form = useForm<LeadFormValues>({
-    resolver: zodResolver(dynamicValidationSchema),
+    resolver: zodResolver(leadSchema),
     defaultValues: {
       name: '',
       email: '',
       phone: '',
-      status: 'Fresher',
+      status: statuses.find(s => s.name === 'Fresher')?.name || statuses[0]?.name,
       source: undefined,
       assignedTo: undefined,
       lastCommentText: '',
@@ -91,7 +82,7 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead, formMode = 'detail' 
       nextFollowUpTime: '',
       kilowatt: 0,
       address: '',
-      priority: undefined,
+      priority: 'Average',
       clientType: undefined,
     },
   });
@@ -99,8 +90,8 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead, formMode = 'detail' 
   useEffect(() => {
     if (isOpen) {
       if (lead) {
-        const currentStatusIsValid = (statusOptions as readonly string[]).includes(lead.status);
-        const statusToSet = currentStatusIsValid ? lead.status : statusOptions[0];
+        const currentStatusIsValid = statusNames.includes(lead.status);
+        const statusToSet = currentStatusIsValid ? lead.status : statusNames[0];
 
         form.reset({
           name: lead.name,
@@ -114,7 +105,7 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead, formMode = 'detail' 
           nextFollowUpTime: lead.nextFollowUpTime ?? '',
           kilowatt: lead.kilowatt ?? 0,
           address: lead.address ?? '',
-          priority: lead.priority ?? undefined,
+          priority: lead.priority ?? 'Average',
           clientType: lead.clientType ?? undefined,
         });
       } else {
@@ -122,7 +113,7 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead, formMode = 'detail' 
           name: '',
           email: '',
           phone: '',
-          status: 'Fresher',
+          status: statuses.find(s => s.name === 'Fresher')?.name || statuses[0]?.name,
           source: undefined,
           assignedTo: undefined,
           lastCommentText: '',
@@ -130,16 +121,15 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead, formMode = 'detail' 
           nextFollowUpTime: '',
           kilowatt: 0,
           address: '',
-          priority: undefined,
+          priority: 'Average',
           clientType: undefined,
         });
       }
     }
-  }, [lead, form, isOpen, statusOptions]);
+  }, [lead, form, isOpen, statusNames, statuses, sources]);
 
 
   const handleSubmit = (values: LeadFormValues) => {
-    // `values.status` is now correctly typed as LeadStatusType because of the static `LeadFormValues` definition.
     const submissionData = {
       ...values,
       kilowatt: values.kilowatt ?? undefined,
@@ -238,8 +228,8 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead, formMode = 'detail' 
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {statusOptions.map(statusValue => (
-                          <SelectItem key={statusValue} value={statusValue} className="capitalize">{statusValue}</SelectItem>
+                        {statuses.map(statusValue => (
+                          <SelectItem key={statusValue.id} value={statusValue.name} className="capitalize">{statusValue.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -323,8 +313,8 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead, formMode = 'detail' 
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {LEAD_SOURCE_OPTIONS.map(sourceValue => (
-                          <SelectItem key={sourceValue} value={sourceValue}>{sourceValue}</SelectItem>
+                        {sources.map(sourceValue => (
+                          <SelectItem key={sourceValue.id} value={sourceValue.name}>{sourceValue.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -345,8 +335,8 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead, formMode = 'detail' 
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {USER_OPTIONS.map(userValue => (
-                          <SelectItem key={userValue} value={userValue}>{userValue}</SelectItem>
+                        {users.map(user => (
+                          <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -413,4 +403,3 @@ export function LeadForm({ isOpen, onClose, onSubmit, lead, formMode = 'detail' 
     </Dialog>
   );
 }
-

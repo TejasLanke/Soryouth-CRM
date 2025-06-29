@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Client, ClientStatusType, ClientPriorityType, UserOptionType, ClientType, CreateClientData } from '@/types';
+import type { Client, ClientStatusType, ClientPriorityType, User, CreateClientData, CustomSetting } from '@/types';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -31,38 +31,44 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import React, { useEffect } from 'react';
-import { CLIENT_STATUS_OPTIONS, CLIENT_PRIORITY_OPTIONS, USER_OPTIONS, CLIENT_TYPES } from '@/lib/constants';
+import React, { useEffect, useMemo } from 'react';
+import { CLIENT_PRIORITY_OPTIONS, CLIENT_TYPES } from '@/lib/constants';
 
-const clientSchema = z.object({
+const getClientSchema = (statuses: string[]) => z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   email: z.string().email({ message: 'Invalid email address.' }).optional().or(z.literal('')),
   phone: z.string().min(10, { message: 'Phone number must be at least 10 digits.' }).optional().or(z.literal('')),
-  status: z.enum(CLIENT_STATUS_OPTIONS),
-  assignedTo: z.enum(USER_OPTIONS).optional(),
+  status: z.string().refine(val => statuses.includes(val), { message: "Please select a valid stage." }),
+  assignedTo: z.string().optional(),
   kilowatt: z.coerce.number().min(0).optional(),
   address: z.string().optional(),
   priority: z.enum(CLIENT_PRIORITY_OPTIONS).optional(),
   clientType: z.enum(CLIENT_TYPES).optional(),
 });
 
-type ClientFormValues = z.infer<typeof clientSchema>;
 
 interface ClientFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: ClientFormValues | Client) => void;
+  onSubmit: (data: CreateClientData | Client) => void;
   client?: Client | null;
+  users: User[];
+  statuses: CustomSetting[];
 }
 
-export function ClientForm({ isOpen, onClose, onSubmit, client }: ClientFormProps) {
+export function ClientForm({ isOpen, onClose, onSubmit, client, users, statuses }: ClientFormProps) {
+  const statusNames = useMemo(() => statuses.map(s => s.name), [statuses]);
+  const clientSchema = useMemo(() => getClientSchema(statusNames), [statusNames]);
+  
+  type ClientFormValues = z.infer<typeof clientSchema>;
+
   const form = useForm<ClientFormValues>({
     resolver: zodResolver(clientSchema),
     defaultValues: {
       name: '',
       email: '',
       phone: '',
-      status: 'Deal Done',
+      status: statuses.find(s => s.name === 'Deal Done')?.name || statuses[0]?.name,
       assignedTo: undefined,
       kilowatt: 0,
       address: '',
@@ -90,7 +96,7 @@ export function ClientForm({ isOpen, onClose, onSubmit, client }: ClientFormProp
             name: '',
             email: '',
             phone: '',
-            status: 'Deal Done',
+            status: statuses.find(s => s.name === 'Deal Done')?.name || statuses[0]?.name,
             assignedTo: undefined,
             kilowatt: 0,
             address: '',
@@ -99,7 +105,7 @@ export function ClientForm({ isOpen, onClose, onSubmit, client }: ClientFormProp
         });
       }
     }
-  }, [client, form, isOpen]);
+  }, [client, form, isOpen, statuses]);
 
   const handleSubmit = (values: ClientFormValues) => {
     const submissionData = { ...values };
@@ -113,6 +119,8 @@ export function ClientForm({ isOpen, onClose, onSubmit, client }: ClientFormProp
   const dialogTitle = client ? 'Edit Client' : 'Add New Client';
   const dialogDescription = client ? "Update the client's information." : 'Enter the details for the new client.';
   const submitButtonText = client ? 'Save Changes' : 'Add Client';
+  const userOptions = users.map(user => user.name);
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -199,8 +207,8 @@ export function ClientForm({ isOpen, onClose, onSubmit, client }: ClientFormProp
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {CLIENT_STATUS_OPTIONS.map(statusValue => (
-                          <SelectItem key={statusValue} value={statusValue} className="capitalize">{statusValue}</SelectItem>
+                        {statuses.map(statusValue => (
+                          <SelectItem key={statusValue.id} value={statusValue.name} className="capitalize">{statusValue.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -282,8 +290,8 @@ export function ClientForm({ isOpen, onClose, onSubmit, client }: ClientFormProp
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {USER_OPTIONS.map(userValue => (
-                          <SelectItem key={userValue} value={userValue}>{userValue}</SelectItem>
+                        {users.map(user => (
+                          <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

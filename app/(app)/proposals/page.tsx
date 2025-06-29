@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -7,7 +6,7 @@ import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Proposal, Client, Lead, ClientType } from '@/types';
-import { FileText, PlusCircle, User, Building, Home, Briefcase, Rows, IndianRupee, Loader2 } from 'lucide-react';
+import { FileText, PlusCircle, User, Building, Home, Briefcase, Rows, IndianRupee, Loader2, Search } from 'lucide-react';
 import { ProposalForm } from './proposal-form';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
@@ -19,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { ProposalPreviewDialog } from './proposal-preview-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CLIENT_TYPES } from '@/lib/constants';
+import { Input } from '@/components/ui/input';
 
 
 const ClientTypeIcon = ({ type }: { type: Proposal['clientType'] }) => {
@@ -42,6 +42,7 @@ export default function ProposalsListPage() {
   const [selectedProposalForEdit, setSelectedProposalForEdit] = useState<Proposal | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [selectedProposalForPreview, setSelectedProposalForPreview] = useState<Proposal | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
 
   const fetchAllData = async () => {
@@ -61,6 +62,18 @@ export default function ProposalsListPage() {
     fetchAllData();
   }, []);
 
+  const filteredProposals = useMemo(() => {
+    if (!searchTerm) {
+      return proposals;
+    }
+    const lowercasedTerm = searchTerm.toLowerCase();
+    return proposals.filter(p => 
+      p.name.toLowerCase().includes(lowercasedTerm) ||
+      p.proposalNumber.toLowerCase().includes(lowercasedTerm) ||
+      String(p.capacity).includes(lowercasedTerm)
+    );
+  }, [proposals, searchTerm]);
+
   const categorizedProposals = useMemo(() => {
     const grouped: Record<ClientType, Proposal[]> = {
       'Individual/Bungalow': [],
@@ -69,7 +82,7 @@ export default function ProposalsListPage() {
       'Industrial': [],
       'Other': []
     };
-    proposals.forEach(p => {
+    filteredProposals.forEach(p => {
         if (grouped[p.clientType]) {
             grouped[p.clientType].push(p);
         } else {
@@ -77,7 +90,7 @@ export default function ProposalsListPage() {
         }
     });
     return grouped;
-  }, [proposals]);
+  }, [filteredProposals]);
 
   const handleCreateNewProposal = () => {
     setSelectedProposalForEdit(null);
@@ -90,7 +103,7 @@ export default function ProposalsListPage() {
     setIsFormOpen(true);
   };
 
-  const handleFormSubmit = async (submittedProposal: Proposal) => {
+  const handleFormSubmit = async (submittedProposal: Partial<Proposal>) => {
     const result = await createOrUpdateProposal(submittedProposal);
     if (result) {
       toast({ title: "Proposal Saved", description: `Proposal ${result.proposalNumber} has been successfully saved.` });
@@ -114,11 +127,16 @@ export default function ProposalsListPage() {
     setIsFormOpen(true);
   };
   
-  const renderProposalList = (list: Proposal[]) => {
+  const renderProposalList = (list: Proposal[], category: ClientType) => {
     if (list.length === 0) {
       return (
         <div className="text-center text-muted-foreground py-10">
-          <p>No proposals for this category yet.</p>
+          <p>
+            {searchTerm 
+              ? `No proposals found for "${searchTerm}" in this category.` 
+              : `No proposals for this category yet.`
+            }
+          </p>
         </div>
       );
     }
@@ -158,7 +176,7 @@ export default function ProposalsListPage() {
               </CardContent>
                <div className="px-6 pb-4">
                  <Button variant="outline" size="sm" className="w-full" onClick={() => handleEditProposal(proposal)}>
-                    Edit & Regenerate Proposal
+                    Edit &amp; Regenerate Proposal
                 </Button>
                </div>
             </Card>
@@ -175,7 +193,17 @@ export default function ProposalsListPage() {
         description="View all proposals or create new ones for existing or new clients."
         icon={FileText}
         actions={
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            <div className="relative hidden md:block">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search proposals..."
+                className="pl-8 sm:w-[250px] lg:w-[300px]"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
             <Button onClick={handleCreateNewProposal}>
               <PlusCircle className="mr-2 h-4 w-4" /> Create New Proposal
             </Button>
@@ -210,7 +238,7 @@ export default function ProposalsListPage() {
             </TabsList>
             {CLIENT_TYPES.filter(type => type !== 'Other').map(type => (
                  <TabsContent key={type} value={type}>
-                    {renderProposalList(categorizedProposals[type])}
+                    {renderProposalList(categorizedProposals[type], type)}
                  </TabsContent>
             ))}
         </Tabs>

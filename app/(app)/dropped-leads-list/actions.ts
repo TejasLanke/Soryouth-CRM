@@ -16,8 +16,8 @@ function mapPrismaDroppedLeadToDroppedLeadType(prismaLead: any): DroppedLead {
     email: prismaLead.email ?? undefined,
     phone: prismaLead.phone ?? undefined,
     source: prismaLead.source ?? undefined,
-    assignedTo: prismaLead.assignedTo ?? undefined,
-    createdBy: prismaLead.createdBy ?? undefined,
+    assignedTo: prismaLead.assignedTo?.name ?? undefined,
+    createdBy: prismaLead.createdBy?.name ?? undefined,
     lastCommentText: prismaLead.lastCommentText ?? undefined,
     lastCommentDate: prismaLead.lastCommentDate ? format(prismaLead.lastCommentDate, 'dd-MM-yyyy') : undefined,
     nextFollowUpDate: prismaLead.nextFollowUpDate ? format(prismaLead.nextFollowUpDate, 'yyyy-MM-dd') : undefined,
@@ -45,10 +45,10 @@ function mapPrismaFollowUpToFollowUpType(prismaFollowUp: any): FollowUp {
     status: prismaFollowUp.status,
     leadStageAtTimeOfFollowUp: prismaFollowUp.leadStageAtTimeOfFollowUp ?? undefined,
     comment: prismaFollowUp.comment ?? undefined,
-    createdBy: prismaFollowUp.createdBy ?? undefined,
+    createdBy: prismaFollowUp.createdBy?.name ?? undefined,
     createdAt: prismaFollowUp.createdAt.toISOString(),
     followupOrTask: prismaFollowUp.followupOrTask,
-    taskForUser: prismaFollowUp.taskForUser ?? undefined,
+    taskForUser: prismaFollowUp.taskForUser?.name ?? undefined,
     taskDate: prismaFollowUp.taskDate?.toISOString() ?? undefined,
     taskTime: prismaFollowUp.taskTime ?? undefined,
   };
@@ -58,7 +58,11 @@ export async function getDroppedLeads(): Promise<DroppedLead[]> {
     try {
         const droppedLeads = await prisma.droppedLead.findMany({
             orderBy: { droppedAt: 'desc' },
-            include: { followUps: true }
+            include: { 
+              followUps: { select: { id: true }},
+              createdBy: true,
+              assignedTo: true,
+            }
         });
         return droppedLeads.map(mapPrismaDroppedLeadToDroppedLeadType);
     } catch (error) {
@@ -72,7 +76,11 @@ export async function getDroppedLeadById(id: string): Promise<DroppedLead | null
     try {
         const droppedLead = await prisma.droppedLead.findUnique({
             where: { id },
-            include: { followUps: true }
+            include: { 
+              followUps: true,
+              createdBy: true,
+              assignedTo: true,
+            }
         });
         return droppedLead ? mapPrismaDroppedLeadToDroppedLeadType(droppedLead) : null;
     } catch (error) {
@@ -87,6 +95,7 @@ export async function getActivitiesForDroppedLead(droppedLeadId: string): Promis
       const activities = await prisma.followUp.findMany({
         where: { droppedLeadId },
         orderBy: { createdAt: 'desc' },
+        include: { createdBy: true, taskForUser: true }
       });
       return activities.map(mapPrismaFollowUpToFollowUpType);
     } catch (error) {
@@ -114,8 +123,6 @@ export async function reactivateLead(droppedLeadId: string): Promise<{ success: 
                     phone: droppedLead.phone,
                     status: 'Follow-up' as LeadStatusType, // Default reactivated status
                     source: droppedLead.source,
-                    assignedTo: droppedLead.assignedTo,
-                    createdBy: droppedLead.createdBy,
                     createdAt: droppedLead.createdAt,
                     lastCommentText: `Reactivated: Lead was dropped with reason - ${droppedLead.dropReason}. ${droppedLead.dropComment || ''}`.trim(),
                     lastCommentDate: new Date(),
@@ -127,6 +134,8 @@ export async function reactivateLead(droppedLeadId: string): Promise<{ success: 
                     clientType: droppedLead.clientType,
                     electricityBillUrl: droppedLead.electricityBillUrl,
                     dropReason: droppedLead.dropReason,
+                    createdById: droppedLead.createdById,
+                    assignedToId: droppedLead.assignedToId,
                 }
             });
 
@@ -167,14 +176,12 @@ export async function bulkReactivateLeads(leadIds: string[]): Promise<{ success:
     let reactivatedCount = 0;
     try {
       for (const leadId of leadIds) {
-        // Reusing the single reactivateLead logic in a loop
         const result = await reactivateLead(leadId);
         if (result.success) {
           reactivatedCount++;
         }
       }
       
-      // Revalidation is already handled inside reactivateLead, but an extra one here doesn't hurt.
       revalidatePath('/leads-list');
       revalidatePath('/dropped-leads-list');
       
