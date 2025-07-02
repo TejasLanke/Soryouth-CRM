@@ -1,85 +1,93 @@
 
 'use server';
 
-import type { DocumentType } from '@/types';
+import fs from 'fs/promises';
+import path from 'path';
+import { revalidatePath } from 'next/cache';
 
-interface CreateDocumentResponse {
-  success: boolean;
-  message?: string;
-  error?: string;
-  documentId?: string; // Potentially the Google Drive File ID
+const generatedDocsDir = path.join(process.cwd(), 'public', 'generated_documents');
+
+export interface GeneratedDocument {
+  clientName: string;
+  documentType: string;
+  timestamp: string;
+  pdfUrl: string;
+  docxUrl: string;
 }
 
-/**
- * Server Action to initiate document generation in Google Drive via Apps Script.
- *
- * This is a placeholder. In a real application, this function would:
- * 1. Authenticate with Google (e.g., using a Service Account).
- * 2. Call the Google Apps Script API to execute a specific Apps Script function.
- *    - The Apps Script function would be responsible for:
- *      a. Taking `documentType` and `formData` as input.
- *      b. Creating a new Google Doc (possibly from a template).
- *      c. Populating the Doc with data from `formData`.
- *      d. Saving the Doc as .docx in a designated Google Drive folder.
- *      e. Returning the new file's ID or URL.
- * 3. Handle the response from the Apps Script API.
- * 4. Potentially store metadata about the generated document (e.g., its Drive ID, title, type)
- *    in your application's database if needed for faster lookups or additional features.
- */
-export async function createDocumentInDrive(
-  documentType: DocumentType,
-  formData: any // Consider defining specific types for formData based on documentType
-): Promise<CreateDocumentResponse> {
-  console.log(`Attempting to create document: ${documentType}`);
-  console.log('Form Data:', formData);
+// Function to ensure the directory exists
+async function ensureDirectoryExists() {
+    try {
+        await fs.access(generatedDocsDir);
+    } catch {
+        await fs.mkdir(generatedDocsDir, { recursive: true });
+    }
+}
 
-  // Simulate API call latency
-  await new Promise(resolve => setTimeout(resolve, 1500));
+export async function getGeneratedDocuments(documentType: string): Promise<GeneratedDocument[]> {
+  await ensureDirectoryExists();
+  try {
+    const files = await fs.readdir(generatedDocsDir);
+    const documentTypeSlug = documentType.replace(/\s/g, '_');
+    
+    const documents: GeneratedDocument[] = files
+      .filter(file => file.endsWith('.pdf') && file.includes(`_${documentTypeSlug}_`))
+      .map(pdfFile => {
+        const docxFile = pdfFile.replace(/\.pdf$/, '.docx');
+        const fileNameNoExt = pdfFile.replace(/\.pdf$/, '');
+        
+        // This is more robust: it splits on the last underscore, which separates the timestamp.
+        const lastUnderscoreIndex = fileNameNoExt.lastIndexOf('_');
+        const timestamp = fileNameNoExt.substring(lastUnderscoreIndex + 1);
+        const nameAndType = fileNameNoExt.substring(0, lastUnderscoreIndex);
+        
+        // The type slug is at the end of the nameAndType string
+        const clientName = nameAndType.replace(`_${documentTypeSlug}`, '').replace(/_/g, ' ');
 
-  // In a real scenario, you would make an authenticated call to Google Apps Script API here.
-  // For example:
-  // const scriptId = 'YOUR_APPS_SCRIPT_ID';
-  // const functionName = 'generateDocument'; // Your Apps Script function name
-  //
-  // try {
-  //   // Initialize Google API client (e.g., googleapis)
-  //   // const auth = new google.auth.GoogleAuth({ ... }); // Service Account auth
-  //   // const script = google.script({ version: 'v1', auth });
-  //   //
-  //   // const request = {
-  //   //   scriptId: scriptId,
-  //   //   resource: {
-  //   //     function: functionName,
-  //   //     parameters: [documentType, formData],
-  //   //     devMode: false, // Set to true if testing an unpublished script
-  //   //   },
-  //   // };
-  //   // const response = await script.scripts.run(request);
-  //   //
-  //   // if (response.data.error) {
-  //   //   console.error('Apps Script execution error:', response.data.error);
-  //   //   return { success: false, error: `Apps Script Error: ${response.data.error.message || 'Unknown error'}` };
-  //   // }
-  //   //
-  //   // const result = response.data.response?.result;
-  //   // if (result && result.fileId) {
-  //   //   return { success: true, message: `${documentType} created successfully.`, documentId: result.fileId };
-  //   // } else {
-  //   //   return { success: false, error: 'Apps Script did not return a file ID.' };
-  //   // }
-  // } catch (e: any) {
-  //   console.error('Error calling Apps Script API:', e);
-  //   return { success: false, error: `API Error: ${e.message}` };
-  // }
+        return {
+          clientName: clientName,
+          documentType,
+          timestamp: new Date(parseInt(timestamp)).toISOString(),
+          pdfUrl: `/generated_documents/${pdfFile}`,
+          docxUrl: `/generated_documents/${docxFile}`,
+        };
+      })
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-  // Mock success response for now
-  if (formData.customerName === 'FailTest' || formData.clientName === 'FailTest' || formData.title === 'FailTest') {
-     return { success: false, error: 'Simulated failure based on input.' };
+    return documents;
+  } catch (error: any) {
+    console.error(`Failed to get documents for type ${documentType}:`, error);
+    if (error.code === 'ENOENT') {
+        return []; // Directory doesn't exist yet, return empty array.
+    }
+    throw error;
   }
+}
 
-  return {
-    success: true,
-    message: `Placeholder: ${documentType} generation process started successfully.`,
-    documentId: `mock_drive_id_${Date.now()}`, // Simulate a returned Drive ID
-  };
+export async function deleteGeneratedDocument(pdfUrl: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!pdfUrl.startsWith('/generated_documents/')) {
+        return { success: false, error: 'Invalid file path.' };
+    }
+    
+    const pdfFileName = path.basename(pdfUrl);
+    const docxFileName = pdfFileName.replace('.pdf', '.docx');
+
+    const pdfFilePath = path.join(generatedDocsDir, pdfFileName);
+    const docxFilePath = path.join(generatedDocsDir, docxFileName);
+
+    // Delete both files, ignoring errors if one doesn't exist
+    await fs.unlink(pdfFilePath).catch(e => console.warn(`Could not delete PDF, it might not exist: ${pdfFilePath}`, e));
+    await fs.unlink(docxFilePath).catch(e => console.warn(`Could not delete DOCX, it might not exist: ${docxFilePath}`, e));
+    
+    // Extract document type from filename to revalidate the correct path
+    const documentTypeSlugWithUnderscores = pdfFileName.split('_').slice(1, -1).join('_');
+    const documentType = documentTypeSlugWithUnderscores.replace(/_/g, ' ');
+    
+    revalidatePath(`/documents/${encodeURIComponent(documentType)}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to delete document:', error);
+    return { success: false, error: 'An unexpected error occurred.' };
+  }
 }

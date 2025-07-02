@@ -12,14 +12,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { LEAD_SOURCE_OPTIONS, LEAD_STATUS_OPTIONS, LEAD_PRIORITY_OPTIONS, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, CLIENT_TYPES, DROP_REASON_OPTIONS } from '@/lib/constants';
-import type { Lead, User, UserOptionType, LeadSourceOptionType, LeadStatusType, LeadPriorityType, ClientType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateLeadData, AnyStatusType, DropReasonType, Proposal } from '@/types';
+import { LEAD_PRIORITY_OPTIONS, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, CLIENT_TYPES, DROP_REASON_OPTIONS } from '@/lib/constants';
+import type { Lead, User, UserOptionType, LeadSourceOptionType, LeadStatusType, LeadPriorityType, ClientType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateLeadData, AnyStatusType, DropReasonType, Proposal, CustomSetting } from '@/types';
 import { format, parseISO, isValid } from 'date-fns';
 import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, UserCircle2, FileText, ShoppingCart, Loader2, Save, Send, Video, Building, Repeat, Trash2, IndianRupee } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { getLeadById, updateLead, addActivity, convertToClient, dropLead, getActivitiesForLead } from '@/app/(app)/leads-list/actions';
 import { getProposalsForLead, createOrUpdateProposal } from '@/app/(app)/proposals/actions';
 import { getUsers } from '@/app/(app)/users/actions';
+import { getLeadStatuses, getLeadSources } from '@/app/(app)/settings/actions';
 import { LeadForm } from '@/app/(app)/leads/lead-form';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -60,6 +61,8 @@ export default function LeadDetailsPage() {
   const { toast } = useToast();
   const [lead, setLead] = useState<Lead | null | undefined>(undefined);
   const [users, setUsers] = useState<User[]>([]);
+  const [leadStatuses, setLeadStatuses] = useState<CustomSetting[]>([]);
+  const [leadSources, setLeadSources] = useState<CustomSetting[]>([]);
   const [isFormPending, startFormTransition] = useTransition();
   const [isUpdating, startUpdateTransition] = useTransition();
   const [isDropping, startDropTransition] = useTransition();
@@ -105,12 +108,17 @@ export default function LeadDetailsPage() {
       const fetchLeadDetails = async () => {
         setLead(undefined);
         try {
-          const [fetchedLead, fetchedUsers] = await Promise.all([
+          const [fetchedLead, fetchedUsers, fetchedStatuses, fetchedSources] = await Promise.all([
             getLeadById(leadId),
-            getUsers()
+            getUsers(),
+            getLeadStatuses(),
+            getLeadSources(),
           ]);
           setLead(fetchedLead);
           setUsers(fetchedUsers);
+          setLeadStatuses(fetchedStatuses);
+          setLeadSources(fetchedSources);
+
           if (fetchedLead) {
             setActivityLeadStage(fetchedLead.status as LeadStatusType);
             setActivityPriority(fetchedLead.priority as LeadPriorityType || undefined);
@@ -438,7 +446,7 @@ export default function LeadDetailsPage() {
                       <SelectValue placeholder="Select stage" />
                     </SelectTrigger>
                     <SelectContent>
-                      {LEAD_STATUS_OPTIONS.map(stage => <SelectItem key={stage} value={stage} className="text-xs">{stage}</SelectItem>)}
+                      {leadStatuses.map(stage => <SelectItem key={stage.id} value={stage.name} className="text-xs">{stage.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -481,14 +489,7 @@ export default function LeadDetailsPage() {
               <CardContent className="space-y-3">
                 <div>
                   <Label htmlFor="leadSource" className="text-xs">Source</Label>
-                  <Select value={lead.source || undefined} disabled>
-                    <SelectTrigger id="leadSource" className="h-8 text-xs">
-                      <SelectValue placeholder="Select source" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {LEAD_SOURCE_OPTIONS.map(src => <SelectItem key={src} value={src} className="text-xs">{src}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <Input id="leadSource" value={lead.source || 'N/A'} disabled className="h-8 text-xs" />
                 </div>
                 <div>
                   <Label className="text-xs">Address</Label>
@@ -583,7 +584,7 @@ export default function LeadDetailsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="activityLeadStage">Lead Stage</Label>
-                    <Select value={activityLeadStage} onValueChange={(val) => setActivityLeadStage(val as LeadStatusType)}><SelectTrigger id="activityLeadStage"><SelectValue placeholder="Select stage" /></SelectTrigger><SelectContent>{LEAD_STATUS_OPTIONS.map(stage => <SelectItem key={stage} value={stage}>{stage}</SelectItem>)}</SelectContent></Select>
+                    <Select value={activityLeadStage} onValueChange={(val) => setActivityLeadStage(val as LeadStatusType)}><SelectTrigger id="activityLeadStage"><SelectValue placeholder="Select stage" /></SelectTrigger><SelectContent>{leadStatuses.map(stage => <SelectItem key={stage.id} value={stage.name}>{stage.name}</SelectItem>)}</SelectContent></Select>
                   </div>
                    <div>
                     <Label htmlFor="activityPriority">Lead Priority</Label>
@@ -718,7 +719,7 @@ export default function LeadDetailsPage() {
           </div>
         </div>
       </div>
-      {isEditFormOpen && lead && (<LeadForm isOpen={isEditFormOpen} onClose={() => setIsEditFormOpen(false)} onSubmit={handleEditFormSubmit} lead={lead} formMode="detail" users={users} />)}
+      {isEditFormOpen && lead && (<LeadForm isOpen={isEditFormOpen} onClose={() => setIsEditFormOpen(false)} onSubmit={handleEditFormSubmit} lead={lead} users={users} statuses={leadStatuses} sources={leadSources} />)}
       {isProposalFormOpen && lead && (
           <ProposalForm 
             isOpen={isProposalFormOpen} 

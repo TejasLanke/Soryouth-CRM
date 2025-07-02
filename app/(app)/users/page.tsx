@@ -14,8 +14,8 @@ import { getUsers, deleteUser, updateUserRole } from './actions';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { AlertDialogTrigger, AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { USER_ROLES } from '@/lib/constants';
 import { Label } from '@/components/ui/label';
@@ -174,13 +174,13 @@ export default function ManageUsersPage() {
       </Card>
 
       <Dialog open={isEditRoleDialogOpen} onOpenChange={setIsEditRoleDialogOpen}>
-        <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle>Edit Role for {selectedUser?.name}</AlertDialogTitle>
-                <AlertDialogDescription>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Edit Role for {selectedUser?.name}</DialogTitle>
+                <DialogDescription>
                     Select a new role for this user.
-                </AlertDialogDescription>
-            </AlertDialogHeader>
+                </DialogDescription>
+            </DialogHeader>
             <div className="py-4">
                 <Label htmlFor="role-select">Role</Label>
                 <Select value={selectedRole} onValueChange={(value) => setSelectedRole(value as UserRole)}>
@@ -194,14 +194,16 @@ export default function ManageUsersPage() {
                     </SelectContent>
                 </Select>
             </div>
-            <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleUpdateRole} disabled={isUpdating}>
+            <DialogFooter>
+                <DialogClose asChild>
+                  <Button variant="outline">Cancel</Button>
+                </DialogClose>
+                <Button onClick={handleUpdateRole} disabled={isUpdating}>
                     {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Update Role
-                </AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
+                </Button>
+            </DialogFooter>
+        </DialogContent>
       </Dialog>
     </>
   );

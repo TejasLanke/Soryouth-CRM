@@ -25,7 +25,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import type { DocumentType } from '@/types';
-import { createDocumentInDrive } from './actions';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, IndianRupee } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
@@ -35,6 +34,8 @@ interface DocumentCreationDialogProps {
   isOpen: boolean;
   onClose: () => void;
   documentType: DocumentType;
+  templateId: string;
+  onSuccess: (urls: { pdfUrl: string, docxUrl: string }) => void;
 }
 
 // Define schemas for different document types
@@ -80,6 +81,9 @@ const annexureISchema = z.object({
   clientName: z.string().min(1, "Client name is required"),
   clientAddress: z.string().min(1, "Client address is required"),
   capacity: z.coerce.number().positive("Capacity (kW) must be a positive number"),
+  sanctionedCapacity: z.string().min(1, "Sanctioned capacity is required"),
+  capacityType: z.enum(['Single Phase', 'Three Phase'], { required_error: "Capacity type is required" }),
+  dateOfInstallation: z.string().min(1, "Date of installation is required"),
   phoneNumber: z.string().min(1, "Phone number is required"),
   consumerNumber: z.string().min(1, "Consumer number is required"),
   email: z.string().email("Invalid email address"),
@@ -96,13 +100,6 @@ const genericSchema = z.object({
   details: z.string().min(5, "Details must be at least 5 characters"),
 });
 
-type PurchaseOrderFormValues = z.infer<typeof purchaseOrderSchema>;
-type WarrantyCertificateFormValues = z.infer<typeof warrantyCertificateSchema>;
-type WorkCompletionReportFormValues = z.infer<typeof workCompletionReportSchema>;
-type NetMeteringAgreementFormValues = z.infer<typeof netMeteringAgreementSchema>;
-type AnnexureIFormValues = z.infer<typeof annexureISchema>;
-type GenericFormValues = z.infer<typeof genericSchema>;
-
 const maharashtraDistricts = [
   "Mumbai", "Pune", "Nagpur", "Nashik", "Thane", "Aurangabad", "Solapur",
   "Kolhapur", "Satara", "Sangli", "Ahmednagar", "Amravati", "Beed", "Bhandara",
@@ -117,7 +114,7 @@ const inverterMakeOptions = ["Growatt", "Sungrow"];
 const inverterRatingOptions = [3, 5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100].map(r => ({ label: `${r} kW`, value: `${r}kW` }));
 const projectModelOptions = ["CAPEX", "OPEX"];
 
-export function DocumentCreationDialog({ isOpen, onClose, documentType }: DocumentCreationDialogProps) {
+export function DocumentCreationDialog({ isOpen, onClose, documentType, templateId, onSuccess }: DocumentCreationDialogProps) {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
 
@@ -169,6 +166,9 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
       };
       case 'Annexure I': return {
         ...commonFields,
+        sanctionedCapacity: '',
+        dateOfInstallation: '',
+        capacityType: undefined,
         phoneNumber: '',
         consumerNumber: '',
         email: '',
@@ -184,8 +184,8 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
     }
   }, [documentType]);
 
-  const form = useForm({
-    resolver: zodResolver(currentSchema),
+  const form = useForm<z.infer<typeof currentSchema>>({
+    resolver: zodResolver(currentSchema as any),
     defaultValues: defaultValues as any, 
   });
 
@@ -227,26 +227,31 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
         if (documentType === 'Purchase Order') {
             dataToSubmit = { ...values, totalAmount: calculatedTotal, gstAmount: calculatedGST, grandTotalAmount: calculatedGrandTotal };
         }
-        const result = await createDocumentInDrive(documentType, dataToSubmit);
+        
+        const response = await fetch('/api/documents/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ templateId, formData: dataToSubmit, documentType }),
+        });
+        
+        const result = await response.json();
 
-        if (result.success) {
-          toast({
-            title: 'Document Generation Started',
-            description: `${documentType} for ${values.clientName || values.title} is being generated.`,
-          });
-          onClose();
-        } else {
-          toast({
-            title: 'Error',
-            description: result.error || 'Failed to start document generation.',
-            variant: 'destructive',
-          });
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to generate document.');
         }
+
+        toast({
+            title: 'Document Generation Successful',
+            description: `${documentType} for ${values.clientName || values.title} has been generated.`,
+        });
+        onSuccess({ pdfUrl: result.pdfUrl, docxUrl: result.docxUrl });
+        onClose();
+        
       } catch (error) {
         console.error('Failed to submit document creation:', error);
         toast({
           title: 'Error',
-          description: 'An unexpected error occurred.',
+          description: (error as Error).message || 'An unexpected error occurred.',
           variant: 'destructive',
         });
       }
@@ -671,25 +676,52 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
                 </FormItem>
               )}
             />
+             <div className="grid grid-cols-3 gap-4">
+                <FormField control={form.control} name="capacity" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Capacity (kW)</FormLabel>
+                        <FormControl><Input type="number" placeholder="e.g., 10" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}/></FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )} />
+                <FormField control={form.control} name="sanctionedCapacity" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Sanctioned Capacity</FormLabel>
+                        <FormControl><Input placeholder="e.g., 10kW" {...field} /></FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )} />
+                <FormField control={form.control} name="capacityType" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Capacity Type</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                                <SelectTrigger><SelectValue placeholder="Select Type" /></SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                                <SelectItem value="Single Phase">Single Phase</SelectItem>
+                                <SelectItem value="Three Phase">Three Phase</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <FormMessage />
+                    </FormItem>
+                )} />
+            </div>
             <div className="grid grid-cols-2 gap-4">
-              <FormField control={form.control} name="capacity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Capacity (kW)</FormLabel>
-                    <FormControl><Input type="number" placeholder="e.g., 10" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}/></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField control={form.control} name="phoneNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone Number</FormLabel>
-                    <FormControl><Input type="tel" placeholder="e.g., 9876543210" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <FormField control={form.control} name="phoneNumber" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Phone Number</FormLabel>
+                        <FormControl><Input type="tel" placeholder="e.g., 9876543210" {...field} /></FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )} />
+                <FormField control={form.control} name="dateOfInstallation" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Date of Installation</FormLabel>
+                        <FormControl><Input type="date" {...field} /></FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )} />
             </div>
             <FormField control={form.control} name="consumerNumber"
               render={({ field }) => (
@@ -799,6 +831,7 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
           </>
         );
       case 'DCR Declaration':
+      case 'Other':
       default:
         return (
            <>
@@ -845,7 +878,7 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-2 pb-4 max-h-[70vh] overflow-y-auto pr-2">
             {renderFormFields()}
-            <DialogFooter className="pt-4">
+            <DialogFooter className="pt-4 sticky bottom-0 bg-background">
               <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
                 Cancel
               </Button>
@@ -866,4 +899,3 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType }: Docume
     </Dialog>
   );
 }
-

@@ -14,13 +14,13 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { saveTemplate } from './actions';
-import type { Template } from '@/types';
-import { PLACEHOLDER_DEFINITIONS } from '@/lib/constants';
+import type { Template, DocumentType, ProposalOrDocumentType } from '@/types';
+import { PLACEHOLDER_DEFINITIONS_PROPOSAL, PLACEHOLDER_DEFINITIONS_DOCUMENTS, DOCUMENT_TYPES_CONFIG } from '@/lib/constants';
 import { Copy, Loader2, UploadCloud, File, Download } from 'lucide-react';
 
 const templateSchema = z.object({
   name: z.string().min(3, 'Template name must be at least 3 characters long.'),
-  type: z.enum(['Proposal', 'Document'], { required_error: 'Please select a template type.' }),
+  type: z.string().min(1, 'Please select a template type.'),
   originalDocxPath: z.string().min(1, 'A document must be uploaded.'),
 });
 
@@ -35,16 +35,18 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadedFileName, setUploadedFileName] = useState<string | undefined>(template?.originalDocxPath || undefined);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(template?.originalDocxPath || null);
 
   const form = useForm<TemplateFormValues>({
     resolver: zodResolver(templateSchema),
     defaultValues: {
       name: template?.name || '',
-      type: template?.type || 'Proposal',
+      type: template?.type || undefined,
       originalDocxPath: template?.originalDocxPath || '',
     },
   });
+  
+  const watchedTemplateType = form.watch('type');
 
   useEffect(() => {
     if (template) {
@@ -116,7 +118,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
         ...values,
       };
 
-      const result = await saveTemplate(dataToSave);
+      const result = await saveTemplate(dataToSave as any); // Cast to any to satisfy Prisma's create type which expects all fields
       if (result) {
         toast({
           title: 'Template Saved',
@@ -133,6 +135,42 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
       }
     });
   };
+
+  const renderPlaceholders = () => {
+    let placeholders: any = {};
+    if (watchedTemplateType === 'Proposal') {
+      placeholders = PLACEHOLDER_DEFINITIONS_PROPOSAL;
+    } else if (watchedTemplateType && PLACEHOLDER_DEFINITIONS_DOCUMENTS[watchedTemplateType as DocumentType]) {
+      placeholders = PLACEHOLDER_DEFINITIONS_DOCUMENTS[watchedTemplateType as DocumentType];
+    } else {
+      return <p className="text-sm text-muted-foreground">Select a template type to see available placeholders.</p>;
+    }
+
+    return (
+      <Accordion type="multiple" className="w-full">
+        {Object.entries(placeholders).map(([groupName, groupPlaceholders]) => (
+          <AccordionItem value={groupName} key={groupName}>
+            <AccordionTrigger>{groupName}</AccordionTrigger>
+            <AccordionContent>
+              <div className="space-y-2">
+                {(groupPlaceholders as any[]).map(p => (
+                  <div key={p.placeholder} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
+                    <div>
+                      <p className="font-mono text-xs font-semibold">{p.placeholder}</p>
+                      <p className="text-xs text-muted-foreground">{p.description}</p>
+                    </div>
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleCopyPlaceholder(p.placeholder)}>
+                      <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
+    );
+  }
 
   return (
     <div className="grid md:grid-cols-3 gap-8">
@@ -175,7 +213,9 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="Proposal">Proposal</SelectItem>
-                            <SelectItem value="Document">Document</SelectItem>
+                            {DOCUMENT_TYPES_CONFIG.map(docType => (
+                                <SelectItem key={docType.type} value={docType.type}>{docType.type}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -227,31 +267,10 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
         <Card>
           <CardHeader>
             <CardTitle>Available Placeholders</CardTitle>
-            <CardDescription>Click to copy and then paste them (including the double curly brackets) into your Word document template.</CardDescription>
+            <CardDescription>Click to copy and then paste them (including the `{` `}` brackets) into your Word document template.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Accordion type="multiple" className="w-full" defaultValue={['Client Details', 'Proposal Details']}>
-              {Object.entries(PLACEHOLDER_DEFINITIONS).map(([groupName, placeholders]) => (
-                <AccordionItem value={groupName} key={groupName}>
-                  <AccordionTrigger>{groupName}</AccordionTrigger>
-                  <AccordionContent>
-                    <div className="space-y-2">
-                      {placeholders.map(p => (
-                        <div key={p.placeholder} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
-                          <div>
-                            <p className="font-mono text-xs font-semibold">{p.placeholder}</p>
-                            <p className="text-xs text-muted-foreground">{p.description}</p>
-                          </div>
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleCopyPlaceholder(p.placeholder)}>
-                            <Copy className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
+            {renderPlaceholders()}
           </CardContent>
         </Card>
       </div>

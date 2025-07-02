@@ -1,58 +1,102 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useTransition } from 'react';
+import Link from 'next/link';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ClipboardPaste, PlusCircle, Edit } from 'lucide-react';
+import { ClipboardPaste, PlusCircle, Edit, Trash2, FileText } from 'lucide-react';
 import type { Template } from '@/types';
-import { getTemplates } from './actions';
-import Link from 'next/link';
+import { getTemplates, deleteTemplate } from './actions';
 import { format } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ManageTemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDeleting, startDeleteTransition] = useTransition();
+  const { toast } = useToast();
+
+  const fetchTemplates = async () => {
+    setIsLoading(true);
+    const fetchedTemplates = await getTemplates();
+    setTemplates(fetchedTemplates);
+    setIsLoading(false);
+  };
 
   useEffect(() => {
-    async function fetchTemplates() {
-      setIsLoading(true);
-      const fetchedTemplates = await getTemplates();
-      setTemplates(fetchedTemplates);
-      setIsLoading(false);
-    }
     fetchTemplates();
   }, []);
 
+  const handleDelete = (templateId: string) => {
+    startDeleteTransition(async () => {
+      const result = await deleteTemplate(templateId);
+      if (result.success) {
+        toast({ title: 'Template Deleted', description: 'The template has been successfully deleted.' });
+        fetchTemplates(); // Re-fetch templates to update the list
+      } else {
+        toast({ title: 'Error', description: 'Failed to delete the template.', variant: 'destructive' });
+      }
+    });
+  };
+
   const proposalTemplates = templates.filter(t => t.type === 'Proposal');
-  const documentTemplates = templates.filter(t => t.type === 'Document');
+  const documentTemplates = templates.filter(t => t.type !== 'Proposal');
 
   const renderTemplateList = (templateList: Template[]) => {
     if (isLoading) {
       return <p>Loading templates...</p>;
     }
     if (templateList.length === 0) {
-      return <p className="text-sm text-muted-foreground">No templates found for this category.</p>;
+      return <p className="text-sm text-muted-foreground py-4">No templates found for this category.</p>;
     }
     return (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {templateList.map(template => (
-          <Card key={template.id}>
-            <CardHeader>
-              <CardTitle>{template.name}</CardTitle>
-              <CardDescription>
-                Last updated: {format(new Date(template.updatedAt), 'dd MMM, yyyy')}
-              </CardDescription>
+          <Card key={template.id} className="flex flex-col">
+             <CardHeader className="flex-row items-start justify-between gap-4">
+              <div>
+                <CardTitle>{template.name}</CardTitle>
+                <CardDescription>
+                  Last updated: {format(new Date(template.updatedAt), 'dd MMM, yyyy')}
+                </CardDescription>
+              </div>
+              <Badge variant="outline">{template.type}</Badge>
             </CardHeader>
-            <CardFooter>
+            <CardContent className="flex-grow" />
+            <CardFooter className="flex justify-end gap-2">
               <Button asChild variant="secondary" size="sm">
                 <Link href={`/manage-templates/${template.id}`}>
                   <Edit className="mr-2 h-4 w-4" />
-                  Edit Template
+                  Edit
                 </Link>
               </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently delete the template "{template.name}". This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => handleDelete(template.id)} disabled={isDeleting}>
+                      {isDeleting ? 'Deleting...' : 'Yes, Delete'}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </CardFooter>
           </Card>
         ))}

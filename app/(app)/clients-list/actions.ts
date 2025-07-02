@@ -359,6 +359,14 @@ export async function convertClientToLead(clientId: string): Promise<{ success: 
         });
       }
 
+      await tx.proposal.updateMany({
+        where: { clientId: client.id },
+        data: {
+          leadId: createdLead.id,
+          clientId: null,
+        },
+      });
+
       await tx.client.delete({
         where: { id: client.id },
       });

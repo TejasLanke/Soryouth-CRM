@@ -1,4 +1,6 @@
-import type { NavItem, Lead, Client, Proposal, Document, Communication, DocumentType, ClientType, LeadPriorityType, ClientPriorityType, UserOptionType, DropReasonType, Expense, Survey, UserRole, Template } from '@/types';
+
+import type { NavItem, Lead, Client, Proposal, Document, Communication, DocumentType, ClientType, LeadPriorityType, ClientPriorityType, UserOptionType, DropReasonType, Expense, Survey, UserRole, Template, ProposalOrDocumentType } from '@/types';
+import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard,
   UsersRound,
@@ -108,7 +110,7 @@ export const MOCK_CLIENTS: Client[] = [
   },
 ];
 
-export const DOCUMENT_TYPES_CONFIG: Array<{ type: DocumentType; icon: React.ComponentType<{ className?: string }>; description: string }> = [
+export const DOCUMENT_TYPES_CONFIG: Array<{ type: DocumentType; icon: LucideIcon; description: string }> = [
   { type: 'Work Completion Report', icon: CheckSquare, description: 'Reports confirming project completion.' }, { type: 'Purchase Order', icon: FileText, description: 'Purchase orders for goods or services.' }, { type: 'Annexure I', icon: FileSignature, description: 'Annexure I documents for compliance.' }, { type: 'DCR Declaration', icon: Edit, description: 'Declarations related to domestic content requirement.' }, { type: 'Net Metering Agreement', icon: Eye, description: 'Agreements for net metering services.' }, { type: 'Warranty Certificate', icon: Award, description: 'Certificates for product/service warranties.' },
 ];
 
@@ -125,7 +127,10 @@ export const CONSUMER_LOAD_TYPES = ['LT', 'HT'] as const;
 export const ROOF_TYPES = ['Metal', 'RCC', 'Asbestos', 'Other'] as const;
 export const DISCOM_OPTIONS = ['MSEDCL', 'Adani Electricity', 'Tata Power', 'Torrent Power', 'Other'] as const;
 
-export const PLACEHOLDER_DEFINITIONS = {
+type PlaceholderDef = { placeholder: string; description: string; };
+type PlaceholderGroup = { [groupName: string]: PlaceholderDef[] };
+
+export const PLACEHOLDER_DEFINITIONS_PROPOSAL: PlaceholderGroup = {
   'Client Details': [
     { placeholder: '{{name}}', description: 'The full name of the client or company.' },
     { placeholder: '{{contact_person}}', description: 'The name of the main contact person.' },
@@ -164,4 +169,92 @@ export const PLACEHOLDER_DEFINITIONS = {
   'Date & Time': [
      { placeholder: '{{date_today}}', description: 'The current date when the document is generated.' },
   ],
+};
+
+const commonPlaceholders: PlaceholderGroup = {
+  'Client Info': [
+    { placeholder: '{{client_name}}', description: 'Full name of the client/company.' },
+    { placeholder: '{{client_address}}', description: 'Address of the client/site.' },
+  ],
+   'Date': [
+     { placeholder: '{{date_today}}', description: 'The current date (e.g., 28 Jun, 2024).' },
+  ],
+};
+
+export const PLACEHOLDER_DEFINITIONS_DOCUMENTS: Record<DocumentType, PlaceholderGroup> = {
+  'Purchase Order': {
+    ...commonPlaceholders,
+    'PO Details': [
+      { placeholder: '{{po_date}}', description: 'Date of the Purchase Order.' },
+      { placeholder: '{{capacity}}', description: 'System capacity in kW.' },
+      { placeholder: '{{rate_per_watt}}', description: 'Agreed rate per watt.' },
+    ],
+    'PO Financials': [
+      { placeholder: '{{total_amount}}', description: 'Total amount before tax.' },
+      { placeholder: '{{gst_amount}}', description: 'Calculated GST amount.' },
+      { placeholder: '{{grand_total_amount}}', description: 'The final total amount including tax.' },
+    ],
+  },
+  'Warranty Certificate': {
+    ...commonPlaceholders,
+    'System Details': [
+        { placeholder: '{{capacity}}', description: 'System capacity in kW.' },
+        { placeholder: '{{module_make}}', description: 'Make/brand of the solar modules.' },
+        { placeholder: '{{module_wattage}}', description: 'Wattage of individual modules.' },
+        { placeholder: '{{inverter_make}}', description: 'Make/brand of the inverter.' },
+        { placeholder: '{{inverter_rating}}', description: 'Rating of the inverter.' },
+        { placeholder: '{{date_of_commissioning}}', description: 'Date the system was commissioned.' },
+    ]
+  },
+  'Work Completion Report': {
+      ...commonPlaceholders,
+      'Report Details': [
+        { placeholder: '{{consumer_number}}', description: 'The electricity consumer number.' },
+        { placeholder: '{{sanction_number}}', description: 'Official sanction number for the project.' },
+        { placeholder: '{{sanction_date}}', description: 'Date of project sanction.' },
+        { placeholder: '{{work_completion_date}}', description: 'Date work was completed.' },
+      ]
+  },
+  'Net Metering Agreement': {
+      ...commonPlaceholders,
+      'Agreement Details': [
+        { placeholder: '{{consumer_number}}', description: 'The electricity consumer number.' },
+        { placeholder: '{{agreement_date}}', description: 'Date of the net metering agreement.' },
+        { placeholder: '{{capacity}}', description: 'System capacity in kW.' },
+        { placeholder: '{{discom_section}}', description: 'The DISCOM section office.' },
+        { placeholder: '{{discom_subdivision}}', description: 'The DISCOM sub-division office.' },
+      ]
+  },
+  'Annexure I': {
+    ...commonPlaceholders,
+    'System & Client Details': [
+      { placeholder: '{{capacity}}', description: 'System capacity in kW.' },
+      { placeholder: '{{sanctioned_capacity}}', description: 'Sanctioned capacity for the project.' },
+      { placeholder: '{{capacity_type}}', description: 'The type of capacity (Single/Three Phase).' },
+      { placeholder: '{{date_of_installation}}', description: 'Date the system was installed.' },
+      { placeholder: '{{phone_number}}', description: 'Client\'s phone number.' },
+      { placeholder: '{{consumer_number}}', description: 'The electricity consumer number.' },
+      { placeholder: '{{email}}', description: 'Client\'s email address.' },
+      { placeholder: '{{inverter_details}}', description: 'Make and model of the inverter.' },
+      { placeholder: '{{inverter_rating}}', description: 'Rating of the inverter.' },
+      { placeholder: '{{module_wattage}}', description: 'Wattage of individual modules.' },
+      { placeholder: '{{number_of_modules}}', description: 'Total number of modules installed.' },
+      { placeholder: '{{project_model}}', description: 'Project model (CAPEX/OPEX).' },
+      { placeholder: '{{district}}', description: 'District of installation.' },
+    ]
+  },
+  'DCR Declaration': {
+      ...commonPlaceholders,
+      'Declaration Content': [
+          { placeholder: '{{title}}', description: 'Title of the declaration document.' },
+          { placeholder: '{{details}}', description: 'The main body/content of the declaration.' },
+      ]
+  },
+  'Other': {
+    ...commonPlaceholders,
+     'Generic Fields': [
+          { placeholder: '{{title}}', description: 'The title of your document.' },
+          { placeholder: '{{details}}', description: 'The main content/body for your document.' },
+      ]
+  }
 };

@@ -1,7 +1,9 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,12 +34,14 @@ const ClientTypeIcon = ({ type }: { type: Proposal['clientType'] }) => {
 };
 
 export default function ProposalsListPage() {
+  const router = useRouter();
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
+  const [isBatchTemplateDialogOpen, setIsBatchTemplateDialogOpen] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [selectedProposalForEdit, setSelectedProposalForEdit] = useState<Proposal | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -101,6 +105,11 @@ export default function ProposalsListPage() {
     setSelectedTemplateId(templateId);
     setIsTemplateDialogOpen(false);
     setIsFormOpen(true);
+  };
+
+  const handleBatchTemplateSelected = (templateId: string) => {
+    setIsBatchTemplateDialogOpen(false);
+    router.push(`/proposals/batch?templateId=${templateId}`);
   };
 
   const handleFormSubmit = async (submittedProposal: Partial<Proposal>) => {
@@ -207,10 +216,8 @@ export default function ProposalsListPage() {
             <Button onClick={handleCreateNewProposal}>
               <PlusCircle className="mr-2 h-4 w-4" /> Create New Proposal
             </Button>
-            <Button asChild variant="outline">
-              <Link href="/proposals/batch">
-                <Rows className="mr-2 h-4 w-4" /> Batch Generation
-              </Link>
+            <Button variant="outline" onClick={() => setIsBatchTemplateDialogOpen(true)}>
+              <Rows className="mr-2 h-4 w-4" /> Batch Generation
             </Button>
           </div>
         }
@@ -248,6 +255,12 @@ export default function ProposalsListPage() {
         isOpen={isTemplateDialogOpen}
         onClose={() => setIsTemplateDialogOpen(false)}
         onSelect={handleTemplateSelected}
+      />
+
+      <TemplateSelectionDialog
+        isOpen={isBatchTemplateDialogOpen}
+        onClose={() => setIsBatchTemplateDialogOpen(false)}
+        onSelect={handleBatchTemplateSelected}
       />
 
       <ProposalForm

@@ -1,3 +1,4 @@
+
 import type { LEAD_PRIORITY_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES, EXPENSE_CATEGORIES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS, SURVEY_STATUS_OPTIONS, SURVEY_TYPE_OPTIONS, METER_PHASES, CONSUMER_LOAD_TYPES, ROOF_TYPES, DISCOM_OPTIONS, CLIENT_PRIORITY_OPTIONS, USER_ROLES } from '@/lib/constants';
 
 // Deriving types from the const arrays ensures type safety and single source of truth
@@ -89,10 +90,12 @@ export interface Proposal {
   clientId?: string;
   leadId?: string;
   templateId?: string;
-  name: string; 
+  name: string;
   clientType: ClientType;
   contactPerson: string;
   location: string;
+  phone?: string | null;
+  email?: string | null;
   capacity: number;
   moduleType: ModuleType;
   moduleWattage: ModuleWattage;
@@ -137,7 +140,7 @@ export interface Document {
   title: string;
   type: DocumentType;
   relatedLeadId?: string;
-  relatedClientId?: string; 
+  relatedClientId?: string;
   relatedProposalId?: string;
   createdAt: string;
   filePath?: string;
@@ -145,8 +148,8 @@ export interface Document {
 
 export interface Communication {
   id: string;
-  leadId?: string; 
-  clientId?: string; 
+  leadId?: string;
+  clientId?: string;
   type: 'Email' | 'Call' | 'SMS' | 'Meeting' | 'System Alert';
   subject?: string;
   content: string;
@@ -197,17 +200,17 @@ export interface FollowUp {
   clientId?: string;
   droppedLeadId?: string;
   type: FollowUpType;
-  date: string; 
+  date: string;
   time?: string;
   status: FollowUpStatus;
   leadStageAtTimeOfFollowUp?: AnyStatusType;
   comment?: string;
   createdBy?: string;
-  createdAt: string; 
+  createdAt: string;
   followupOrTask: 'Followup' | 'Task';
   taskForUser?: string;
-  taskDate?: string; 
-  taskTime?: string; 
+  taskDate?: string;
+  taskTime?: string;
 }
 
 export type AddActivityData = Omit<FollowUp, 'id' | 'createdAt' | 'droppedLeadId' | 'createdBy'> & {
@@ -217,7 +220,7 @@ export type AddActivityData = Omit<FollowUp, 'id' | 'createdAt' | 'droppedLeadId
 
 export interface Task {
   id: string;
-  entityId: string; 
+  entityId: string;
   entityType: 'lead' | 'client';
   assignedTo: UserOptionType;
   dueDate: string;
@@ -253,13 +256,13 @@ export interface Survey {
   surveyNumber: string;
   clientName: string;
   location: string;
-  surveyDate: string; 
+  surveyDate: string;
   surveyorName: UserOptionType;
   status: SurveyStatusType;
   type: SurveyTypeOption;
   notes?: string;
-  createdAt: string; 
-  updatedAt: string; 
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface SurveySortConfig {
@@ -281,7 +284,7 @@ export type DiscomType = typeof DISCOM_OPTIONS[number];
 
 export interface SiteSurveyData {
   consumerName: string;
-  date: string; 
+  date: string;
   consumerCategory: ConsumerCategoryType;
   location: string;
   numberOfMeters: number;
@@ -303,10 +306,12 @@ export type SiteSurveyFormValues = Omit<SiteSurveyData, 'electricityBillFile'> &
   electricityBillFile?: FileList | null;
 };
 
+export type ProposalOrDocumentType = 'Proposal' | DocumentType;
+
 export interface Template {
   id: string;
   name: string;
-  type: 'Proposal' | 'Document';
+  type: ProposalOrDocumentType;
   originalDocxPath: string;
   createdAt: string;
   updatedAt: string;

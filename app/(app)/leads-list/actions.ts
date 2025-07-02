@@ -346,7 +346,16 @@ export async function convertToClient(leadId: string): Promise<{ success: boolea
         });
       }
 
-      // 3. Delete the original lead
+      // 3. Re-associate all proposals with the new client
+      await tx.proposal.updateMany({
+        where: { leadId: lead.id },
+        data: {
+          clientId: createdClient.id,
+          leadId: null,
+        },
+      });
+
+      // 4. Delete the original lead
       await tx.lead.delete({
         where: { id: lead.id },
       });

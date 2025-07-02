@@ -1,23 +1,27 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MOCK_LEADS, MOCK_PROPOSALS, MOCK_COMMUNICATIONS, USER_OPTIONS } from '@/lib/constants';
-import type { Lead, Proposal, Communication } from '@/types';
 import { format, parseISO, isWithinInterval, startOfDay, endOfDay, subDays } from 'date-fns';
 import type { DateRange } from 'react-day-picker';
-import { CalendarIcon, Users, UserX, FileText, Award, Phone, BellRing, TrendingDown, TrendingUp, LineChart as LineChartIcon, Filter, UserCircle2 } from 'lucide-react';
+import { CalendarIcon, Users, UserX, FileText, Award, Phone, BellRing, LineChart as LineChartIcon, Filter, Loader2 } from 'lucide-react';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from '@/components/ui/chart';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend as RechartsLegend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { Lead, Proposal, Client, DroppedLead, User } from '@/types';
+import { getLeads } from '@/app/(app)/leads-list/actions';
+import { getDroppedLeads } from '@/app/(app)/dropped-leads-list/actions';
+import { getAllProposals } from '@/app/(app)/proposals/actions';
+import { getActiveClients } from '@/app/(app)/clients-list/actions';
+import { getUsers } from '@/app/(app)/users/actions';
 
 
 const initialDateRange: DateRange = {
@@ -28,15 +32,15 @@ const initialDateRange: DateRange = {
 interface UserReportRow {
   userId: string;
   userName: string;
-  avatarUrl?: string; // Placeholder for avatar
+  avatarUrl?: string;
   leadsCreated: number;
   leadsDropped: number;
-  dealsCreated: number; // proposals created
+  dealsCreated: number;
   dealsWon: number;
   dealsLost: number;
   followUps: number;
   calls: number;
-  callDuration: string; // e.g., "0h 0m"
+  callDuration: string;
   reminders: number;
 }
 
@@ -50,112 +54,106 @@ interface DayReportStats {
   calls: number;
   reminders: number;
   chartData: { date: string; created: number; dropped: number }[];
-  droppedLeadsDetails: Lead[];
-  wonDealsDetails: Lead[];
+  droppedLeadsDetails: DroppedLead[];
+  wonDealsDetails: Client[];
   userWiseSummary: UserReportRow[];
 }
 
 export default function DayReportPage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(initialDateRange);
-  const [selectedUserFilter, setSelectedUserFilter] = useState<string>('all'); // For top-level filter
+  const [selectedUserFilter, setSelectedUserFilter] = useState<string>('all');
   const [reportStats, setReportStats] = useState<DayReportStats | null>(null);
 
-  const handleApplyFilters = () => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [allLeads, setAllLeads] = useState<Lead[]>([]);
+  const [allDroppedLeads, setAllDroppedLeads] = useState<DroppedLead[]>([]);
+  const [allClients, setAllClients] = useState<Client[]>([]);
+  const [allProposals, setAllProposals] = useState<Proposal[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+
+  const handleApplyFilters = useCallback(() => {
     const fromDate = dateRange?.from ? startOfDay(dateRange.from) : undefined;
     const toDate = dateRange?.to ? endOfDay(dateRange.to) : undefined;
+    const dateInterval = fromDate && toDate ? { start: fromDate, end: toDate } : null;
 
-    // Filter leads based on main page filters (date and selectedUserFilter)
-    const pageFilteredLeads = MOCK_LEADS.filter(lead => {
-      const leadDate = parseISO(lead.createdAt);
-      const userMatch = selectedUserFilter === 'all' || lead.assignedTo === selectedUserFilter;
-      const dateMatch = fromDate && toDate ? isWithinInterval(leadDate, { start: fromDate, end: toDate }) : true;
-      return userMatch && dateMatch;
-    });
-    
-    const pageFilteredProposals = MOCK_PROPOSALS.filter(proposal => {
-      const proposalDate = parseISO(proposal.createdAt);
-      const dateMatch = fromDate && toDate ? isWithinInterval(proposalDate, { start: fromDate, end: toDate }) : true;
-      // Further filter proposals if a specific user is selected for the main report
-      if (selectedUserFilter !== 'all') {
-        const clientLead = MOCK_LEADS.find(l => l.id === proposal.clientId);
-        return dateMatch && clientLead?.assignedTo === selectedUserFilter;
-      }
-      return dateMatch;
+    const userMatches = (item: { assignedTo?: string | null }) => selectedUserFilter === 'all' || item.assignedTo === selectedUserFilter;
+    const dateMatches = (dateStr: string) => dateInterval ? isWithinInterval(parseISO(dateStr), dateInterval) : true;
+
+    const pageFilteredLeads = allLeads.filter(lead => userMatches(lead) && dateMatches(lead.createdAt));
+    const pageFilteredDroppedLeads = allDroppedLeads.filter(lead => userMatches(lead) && dateMatches(lead.droppedAt));
+    const pageFilteredWonDeals = allClients.filter(client => userMatches(client) && dateMatches(client.updatedAt));
+    const pageFilteredProposals = allProposals.filter(proposal => {
+        const customer = allLeads.find(l => l.id === proposal.leadId) || allClients.find(c => c.id === proposal.clientId);
+        return userMatches(customer || {}) && dateMatches(proposal.createdAt);
     });
 
     const leadsCreated = pageFilteredLeads.length;
-    const leadsDroppedList = pageFilteredLeads.filter(lead => lead.status === 'Lost' && fromDate && toDate && isWithinInterval(parseISO(lead.updatedAt), {start: fromDate, end: toDate}));
-    const leadsDropped = leadsDroppedList.length;
-    const dealsWonList = pageFilteredLeads.filter(lead => lead.status === 'Deal Done' && fromDate && toDate && isWithinInterval(parseISO(lead.updatedAt), {start: fromDate, end: toDate}));
-    const dealsWon = dealsWonList.length;
+    const leadsDropped = pageFilteredDroppedLeads.length;
+    const dealsWon = pageFilteredWonDeals.length;
     
-    const followUps = pageFilteredLeads.filter(lead => {
-        if (!lead.nextFollowUpDate) return false;
-        const followupDate = parseISO(lead.nextFollowUpDate);
-        return fromDate && toDate ? isWithinInterval(followupDate, { start: fromDate, end: toDate }) : true;
+    const followUps = allLeads.filter(lead => {
+        if (!lead.nextFollowUpDate || !dateInterval) return false;
+        return userMatches(lead) && isWithinInterval(parseISO(lead.nextFollowUpDate), dateInterval);
     }).length;
 
     const dailyChartData: { [date: string]: { created: number; dropped: number } } = {};
-    if(fromDate && toDate) {
-        for (let d = new Date(fromDate); d <= toDate; d.setDate(d.getDate() + 1)) {
+    if(dateInterval) {
+        for (let d = new Date(dateInterval.start); d <= dateInterval.end; d.setDate(d.getDate() + 1)) {
             const dateStr = format(d, 'MMM dd');
             dailyChartData[dateStr] = { created: 0, dropped: 0 };
         }
     }
 
-    pageFilteredLeads.forEach(lead => {
+    allLeads.forEach(lead => {
+        if (!dateMatches(lead.createdAt)) return;
         const createdDateStr = format(parseISO(lead.createdAt), 'MMM dd');
         if (dailyChartData[createdDateStr]) {
             dailyChartData[createdDateStr].created++;
         }
-        if (lead.status === 'Lost' && fromDate && toDate && isWithinInterval(parseISO(lead.updatedAt), {start: fromDate, end: toDate})) {
-            const droppedDateStr = format(parseISO(lead.updatedAt), 'MMM dd');
-            if (dailyChartData[droppedDateStr]) {
-                dailyChartData[droppedDateStr].dropped++;
-            }
+    });
+
+    allDroppedLeads.forEach(lead => {
+        if (!dateMatches(lead.droppedAt)) return;
+        const droppedDateStr = format(parseISO(lead.droppedAt), 'MMM dd');
+        if (dailyChartData[droppedDateStr]) {
+            dailyChartData[droppedDateStr].dropped++;
         }
     });
     
-    const chartDataFinal = Object.entries(dailyChartData).map(([date, counts]) => ({ date, ...counts })).sort((a, b) => parseISO(a.date + ' ' + new Date().getFullYear()).getTime() - parseISO(b.date + ' ' + new Date().getFullYear()).getTime());
+    const chartDataFinal = Object.entries(dailyChartData).map(([date, counts]) => ({ date, ...counts })).sort((a, b) => new Date(a.date + ' ' + new Date().getFullYear()).getTime() - new Date(b.date + ' ' + new Date().getFullYear()).getTime());
 
-    // User-wise summary calculation
-    const userWiseSummaryData: UserReportRow[] = USER_OPTIONS.map(user => {
-        const userLeads = MOCK_LEADS.filter(lead => lead.assignedTo === user);
+    const userWiseSummaryData: UserReportRow[] = allUsers.map(user => {
+        const userLeads = allLeads.filter(lead => lead.assignedTo === user.name);
+        const userDroppedLeads = allDroppedLeads.filter(lead => lead.assignedTo === user.name);
+        const userClients = allClients.filter(client => client.assignedTo === user.name);
         
-        const userLeadsCreatedInRange = userLeads.filter(lead => 
-            fromDate && toDate && isWithinInterval(parseISO(lead.createdAt), { start: fromDate, end: toDate })
-        ).length;
-
-        const userLeadsDroppedInRange = userLeads.filter(lead => 
-            lead.status === 'Lost' && fromDate && toDate && isWithinInterval(parseISO(lead.updatedAt), { start: fromDate, end: toDate })
-        ).length;
-
-        const userDealsWonInRange = userLeads.filter(lead =>
-            lead.status === 'Deal Done' && fromDate && toDate && isWithinInterval(parseISO(lead.updatedAt), { start: fromDate, end: toDate })
-        ).length;
+        const userLeadsCreatedInRange = userLeads.filter(lead => dateMatches(lead.createdAt)).length;
+        const userLeadsDroppedInRange = userDroppedLeads.filter(lead => dateMatches(lead.droppedAt)).length;
+        const userDealsWonInRange = userClients.filter(client => dateMatches(client.updatedAt)).length;
         
-        const userProposalsCreatedInRange = MOCK_PROPOSALS.filter(proposal => {
-            const clientLead = MOCK_LEADS.find(l => l.id === proposal.clientId);
-            return clientLead?.assignedTo === user && fromDate && toDate && isWithinInterval(parseISO(proposal.createdAt), { start: fromDate, end: toDate });
+        const userProposalsCreatedInRange = allProposals.filter(proposal => {
+            const customerIsLead = userLeads.some(l => l.id === proposal.leadId);
+            const customerIsClient = userClients.some(c => c.id === proposal.clientId);
+            return (customerIsLead || customerIsClient) && dateMatches(proposal.createdAt);
         }).length;
 
         const userFollowUpsInRange = userLeads.filter(lead => 
-            lead.nextFollowUpDate && fromDate && toDate && isWithinInterval(parseISO(lead.nextFollowUpDate), { start: fromDate, end: toDate })
+            lead.nextFollowUpDate && dateMatches(lead.nextFollowUpDate)
         ).length;
 
         return {
-            userId: user,
-            userName: user,
-            avatarUrl: `https://placehold.co/32x32.png?text=${user.charAt(0)}`, // Simple placeholder
+            userId: user.id,
+            userName: user.name,
+            avatarUrl: `https://placehold.co/32x32.png?text=${user.name.charAt(0)}`,
             leadsCreated: userLeadsCreatedInRange,
             leadsDropped: userLeadsDroppedInRange,
-            dealsCreated: userProposalsCreatedInRange, // Proposals created
+            dealsCreated: userProposalsCreatedInRange,
             dealsWon: userDealsWonInRange,
-            dealsLost: userLeadsDroppedInRange, // Same as leads dropped
+            dealsLost: userLeadsDroppedInRange,
             followUps: userFollowUpsInRange,
-            calls: 0, // Placeholder
-            callDuration: "0h 0m", // Placeholder
-            reminders: 0, // Placeholder
+            calls: 0,
+            callDuration: "0h 0m",
+            reminders: 0,
         };
     });
     
@@ -169,16 +167,37 @@ export default function DayReportPage() {
       calls: 0, 
       reminders: 0, 
       chartData: chartDataFinal,
-      droppedLeadsDetails: leadsDroppedList.slice(0, 5),
-      wonDealsDetails: dealsWonList.slice(0, 5),
+      droppedLeadsDetails: pageFilteredDroppedLeads.slice(0, 5),
+      wonDealsDetails: pageFilteredWonDeals.slice(0, 5),
       userWiseSummary: userWiseSummaryData,
     });
-  };
+  }, [dateRange, selectedUserFilter, allLeads, allDroppedLeads, allClients, allProposals, allUsers]);
 
   useEffect(() => {
-    handleApplyFilters();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    const fetchData = async () => {
+      setIsLoading(true);
+      const [leads, droppedLeads, clients, proposals, users] = await Promise.all([
+        getLeads(),
+        getDroppedLeads(),
+        getActiveClients(),
+        getAllProposals(),
+        getUsers(),
+      ]);
+      setAllLeads(leads);
+      setAllDroppedLeads(droppedLeads);
+      setAllClients(clients);
+      setAllProposals(proposals);
+      setAllUsers(users);
+      setIsLoading(false);
+    };
+    fetchData();
   }, []);
+
+  useEffect(() => {
+    if (!isLoading) {
+      handleApplyFilters();
+    }
+  }, [isLoading, handleApplyFilters]);
 
   const statCards = reportStats ? [
     { title: 'Leads Created', value: reportStats.leadsCreated, icon: Users, trend: 'neutral' },
@@ -190,10 +209,9 @@ export default function DayReportPage() {
   ] : [];
 
   const lineChartConfig: ChartConfig = {
-    created: { label: 'Leads Created', color: 'hsl(var(--secondary))' }, // Changed to secondary color (green)
-    dropped: { label: 'Leads Dropped', color: 'hsl(var(--chart-5))' }, // Kept as red-ish
+    created: { label: 'Leads Created', color: 'hsl(var(--chart-1))' },
+    dropped: { label: 'Leads Dropped', color: 'hsl(var(--chart-5))' },
   };
-
 
   return (
     <div className="space-y-6">
@@ -250,8 +268,8 @@ export default function DayReportPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Users</SelectItem>
-                {USER_OPTIONS.map(user => (
-                  <SelectItem key={user} value={user}>{user}</SelectItem>
+                {allUsers.map(user => (
+                  <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -261,8 +279,12 @@ export default function DayReportPage() {
           </Button>
         </CardContent>
       </Card>
-
-      {reportStats ? (
+      
+      {isLoading ? (
+        <div className="flex justify-center items-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      ) : reportStats ? (
         <>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             {statCards.map(stat => (
@@ -315,7 +337,7 @@ export default function DayReportPage() {
                     {reportStats.droppedLeadsDetails.map(lead => (
                       <li key={lead.id} className="text-sm p-2 border rounded-md bg-muted/30">
                         <p className="font-medium">{lead.name} <span className="text-xs text-muted-foreground">({lead.phone || 'N/A'})</span></p>
-                        <p>Dropped on: {format(parseISO(lead.updatedAt), 'dd MMM, yyyy')}</p>
+                        <p>Dropped on: {format(parseISO(lead.droppedAt), 'dd MMM, yyyy')}</p>
                         <p>Reason: {lead.dropReason || 'Not specified'}</p>
                         <p className="text-xs text-muted-foreground">Assigned to: {lead.assignedTo || 'N/A'}</p>
                       </li>
@@ -329,17 +351,17 @@ export default function DayReportPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Recently Won Deals</CardTitle>
-                <CardDescription>Details of the latest leads marked as 'Deal Done'.</CardDescription>
+                <CardDescription>Details of the latest clients converted from leads.</CardDescription>
               </CardHeader>
               <CardContent>
                  {reportStats.wonDealsDetails.length > 0 ? (
                   <ul className="space-y-3">
-                    {reportStats.wonDealsDetails.map(lead => (
-                      <li key={lead.id} className="text-sm p-2 border rounded-md bg-muted/30">
-                        <p className="font-medium">{lead.name} <span className="text-xs text-muted-foreground">({lead.phone || 'N/A'})</span></p>
-                        <p>Won on: {format(parseISO(lead.updatedAt), 'dd MMM, yyyy')}</p>
-                        <p>Kilowatt: {lead.kilowatt || 'N/A'} kW</p>
-                         <p className="text-xs text-muted-foreground">Assigned to: {lead.assignedTo || 'N/A'}</p>
+                    {reportStats.wonDealsDetails.map(client => (
+                      <li key={client.id} className="text-sm p-2 border rounded-md bg-muted/30">
+                        <p className="font-medium">{client.name} <span className="text-xs text-muted-foreground">({client.phone || 'N/A'})</span></p>
+                        <p>Won on: {format(parseISO(client.updatedAt), 'dd MMM, yyyy')}</p>
+                        <p>Kilowatt: {client.kilowatt || 'N/A'} kW</p>
+                         <p className="text-xs text-muted-foreground">Assigned to: {client.assignedTo || 'N/A'}</p>
                       </li>
                     ))}
                   </ul>
@@ -422,7 +444,6 @@ export default function DayReportPage() {
               </Table>
             </CardContent>
           </Card>
-
         </>
       ) : (
         <Card>
@@ -434,4 +455,3 @@ export default function DayReportPage() {
     </div>
   );
 }
-
