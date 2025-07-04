@@ -3,9 +3,8 @@
 
 import type { Template, CreateTemplateData } from '@/types';
 import { revalidatePath } from 'next/cache';
-import fs from 'fs/promises';
-import path from 'path';
 import prisma from '@/lib/prisma';
+import { deleteFileFromS3 } from '@/lib/s3';
 
 // Helper to map Prisma template to frontend Template type
 function mapPrismaTemplateToTemplateType(prismaTemplate: any): Template {
@@ -50,6 +49,11 @@ export async function saveTemplate(data: { id?: string; name: string; type: 'Pro
   try {
     let savedTemplate;
     if (data.id) {
+      // Fetch the old template to get the old file path
+      const oldTemplate = await prisma.template.findUnique({
+        where: { id: data.id },
+      });
+
       // Update existing template
       savedTemplate = await prisma.template.update({
         where: { id: data.id },
@@ -59,6 +63,18 @@ export async function saveTemplate(data: { id?: string; name: string; type: 'Pro
           originalDocxPath: data.originalDocxPath,
         },
       });
+
+      // If the path has changed and an old path existed, delete the old file from S3
+      if (oldTemplate && oldTemplate.originalDocxPath && oldTemplate.originalDocxPath !== data.originalDocxPath) {
+        try {
+            const s3Url = new URL(oldTemplate.originalDocxPath);
+            const key = s3Url.pathname.substring(1); // Remove leading '/'
+            await deleteFileFromS3(key);
+        } catch (error) {
+            console.error(`Failed to delete old template file from S3: ${oldTemplate.originalDocxPath}`, error);
+            // Log the error but don't block the update. The new template is saved.
+        }
+      }
       revalidatePath(`/manage-templates/${data.id}`);
     } else {
       // Create new template
@@ -88,19 +104,21 @@ export async function deleteTemplate(id: string): Promise<{ success: boolean }> 
       return { success: false };
     }
 
-    // Delete from DB first
-    await prisma.template.delete({ where: { id } });
-
-    // Then delete the associated file
+    // Delete the associated file from S3 first
     if (templateToDelete.originalDocxPath) {
         try {
-            const filePath = path.join(process.cwd(), 'public', templateToDelete.originalDocxPath);
-            await fs.unlink(filePath);
+            // Extract the key from the full S3 URL
+            const s3Url = new URL(templateToDelete.originalDocxPath);
+            const key = s3Url.pathname.substring(1); // Remove leading '/'
+            await deleteFileFromS3(key);
         } catch (error) {
-            console.error(`Failed to delete template file: ${templateToDelete.originalDocxPath}`, error);
-            // Don't throw, as the DB entry is already deleted. Log the error.
+            console.error(`Failed to delete template file from S3: ${templateToDelete.originalDocxPath}`, error);
+            // Log the error but proceed with deleting the DB record to avoid orphans in the UI.
         }
     }
+
+    // Then delete from DB
+    await prisma.template.delete({ where: { id } });
     
     revalidatePath('/manage-templates');
     return { success: true };

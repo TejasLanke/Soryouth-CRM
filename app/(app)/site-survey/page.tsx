@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useMemo, useTransition, ChangeEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -12,13 +12,23 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { USER_OPTIONS, CONSUMER_CATEGORIES_OPTIONS, METER_PHASES, CONSUMER_LOAD_TYPES, ROOF_TYPES, DISCOM_OPTIONS } from '@/lib/constants';
-import type { SiteSurveyFormValues, ConsumerCategoryType, MeterPhaseType, ConsumerLoadType, RoofType, DiscomType, UserOptionType } from '@/types';
+import { CONSUMER_CATEGORIES_OPTIONS, METER_PHASES, CONSUMER_LOAD_TYPES, ROOF_TYPES, DISCOM_OPTIONS } from '@/lib/constants';
+import type { ConsumerCategoryType, MeterPhaseType, ConsumerLoadType, RoofType, DiscomType, UserOptionType, Lead, Client, User, CustomSetting, CreateLeadData, CreateSiteSurveyData } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { format, isValid, parseISO } from 'date-fns';
-import { ClipboardEdit, IndianRupee, UploadCloud } from 'lucide-react';
+import { ClipboardEdit, IndianRupee, UploadCloud, ChevronsUpDown, Check, X, Loader2, PlusCircle } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { cn } from '@/lib/utils';
+import { getLeads, createLead } from '@/app/(app)/leads-list/actions';
+import { getActiveClients } from '@/app/(app)/clients-list/actions';
+import { getLeadStatuses, getLeadSources } from '@/app/(app)/settings/actions';
+import { getUsers } from '@/app/(app)/users/actions';
+import { createSiteSurvey } from './actions';
+import { LeadForm } from '@/app/(app)/leads/lead-form';
 
-const siteSurveySchema = z.object({
+
+const getSiteSurveySchema = (userNames: string[]) => z.object({
   consumerName: z.string().min(2, { message: 'Consumer name must be at least 2 characters.' }),
   date: z.string().refine((val) => isValid(parseISO(val)), { message: "A valid date is required." }),
   consumerCategory: z.enum(CONSUMER_CATEGORIES_OPTIONS, { required_error: "Consumer category is required." }),
@@ -34,15 +44,79 @@ const siteSurveySchema = z.object({
   discom: z.enum(DISCOM_OPTIONS, { required_error: "Discom is required." }),
   sanctionedLoad: z.string().optional(),
   remark: z.string().optional(),
-  surveyorName: z.enum(USER_OPTIONS, { required_error: "Surveyor name is required." }),
+  surveyorName: userNames.length > 0
+    ? z.enum(userNames as [string, ...string[]], { required_error: "A surveyor must be selected." })
+    : z.string({ required_error: "Surveyor name is required." }).refine(() => false, "Cannot submit: No surveyors are available in the system."),
   electricityBillFile: z.instanceof(FileList).optional().nullable()
     .refine(files => !files || files.length === 0 || files[0].size <= 5 * 1024 * 1024, `Max file size is 5MB.`)
     .refine(files => !files || files.length === 0 || ['image/jpeg', 'image/png', 'application/pdf'].includes(files[0].type), '.jpg, .png, or .pdf files are accepted.'),
+  leadId: z.string().optional(),
+  clientId: z.string().optional(),
 });
+
+
+const CustomerCombobox = ({ onSelect, customers }: { onSelect: (customer: Client | Lead) => void; customers: (Client | Lead)[] }) => {
+    const [open, setOpen] = useState(false);
+    const [selectedCustomer, setSelectedCustomer] = useState<(Client | Lead) | null>(null);
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" className="w-full justify-between">
+                    {selectedCustomer ? selectedCustomer.name : "Select an existing Lead/Client..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                <Command>
+                    <CommandInput placeholder="Search customer..." />
+                    <CommandEmpty>No customer found.</CommandEmpty>
+                    <CommandGroup>
+                        {customers.map((customer) => (
+                            <CommandItem
+                                key={customer.id}
+                                value={`${customer.name} ${customer.id}`}
+                                onSelect={() => {
+                                    onSelect(customer);
+                                    setSelectedCustomer(customer);
+                                    setOpen(false);
+                                }}
+                            >
+                                <Check className={cn("mr-2 h-4 w-4", selectedCustomer?.id === customer.id ? "opacity-100" : "opacity-0")} />
+                                <div>
+                                    <p>{customer.name}</p>
+                                    <p className="text-xs text-muted-foreground">{'source' in customer ? `Lead: ${customer.status}` : `Client: ${customer.status}`}</p>
+                                </div>
+                            </CommandItem>
+                        ))}
+                    </CommandGroup>
+                </Command>
+            </PopoverContent>
+        </Popover>
+    );
+};
+
 
 export default function SiteSurveyPage() {
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitting, startSubmitTransition] = useTransition();
+  const [isDataLoading, setIsDataLoading] = useState(true);
+  const [isLeadFormOpen, setIsLeadFormOpen] = useState(false);
+
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [leadStatuses, setLeadStatuses] = useState<CustomSetting[]>([]);
+  const [leadSources, setLeadSources] = useState<CustomSetting[]>([]);
+
+  const allCustomers = useMemo(() => [...clients, ...leads], [clients, leads]);
+
+  const siteSurveySchema = useMemo(() => {
+    const userNames = users.map(u => u.name);
+    return getSiteSurveySchema(userNames);
+  }, [users]);
+  
+  type SiteSurveyFormValues = z.infer<typeof siteSurveySchema>;
 
   const form = useForm<SiteSurveyFormValues>({
     resolver: zodResolver(siteSurveySchema),
@@ -64,20 +138,107 @@ export default function SiteSurveyPage() {
       remark: '',
       surveyorName: undefined,
       electricityBillFile: null,
+      leadId: undefined,
+      clientId: undefined,
     },
   });
 
-  const onSubmit = (values: SiteSurveyFormValues) => {
-    setIsSubmitting(true);
-    console.log('Site Survey Form Submitted:', values);
-    // In a real app, handle file upload here
-    const submittedData = { ...values, electricityBillFile: values.electricityBillFile?.[0]?.name };
-    toast({
-      title: 'Survey Data Submitted',
-      description: `Survey for ${values.consumerName} recorded. Bill: ${submittedData.electricityBillFile || 'Not uploaded'}.`,
+  useEffect(() => {
+    async function fetchData() {
+        setIsDataLoading(true);
+        const [fetchedLeads, fetchedClients, fetchedUsers, fetchedLeadStatuses, fetchedLeadSources] = await Promise.all([
+            getLeads(),
+            getActiveClients(),
+            getUsers(),
+            getLeadStatuses(),
+            getLeadSources()
+        ]);
+        setLeads(fetchedLeads);
+        setClients(fetchedClients);
+        setUsers(fetchedUsers);
+        setLeadStatuses(fetchedLeadStatuses);
+        setLeadSources(fetchedLeadSources);
+        setIsDataLoading(false);
+    }
+    fetchData();
+  }, []);
+
+  const handleCustomerSelect = (customer: Client | Lead) => {
+    form.setValue('consumerName', customer.name);
+    form.setValue('location', customer.address || '');
+    form.setValue('consumerCategory', customer.clientType || 'Other');
+    if ('source' in customer) { // It's a Lead
+        form.setValue('leadId', customer.id);
+        form.setValue('clientId', undefined);
+    } else { // It's a Client
+        form.setValue('clientId', customer.id);
+        form.setValue('leadId', undefined);
+    }
+  };
+  
+  const handleLeadFormSubmit = async (data: CreateLeadData | Lead) => {
+    startSubmitTransition(async () => {
+        const result = await createLead(data as CreateLeadData);
+        if (result && !('error' in result)) {
+            const newLeads = await getLeads();
+            setLeads(newLeads);
+            handleCustomerSelect(result);
+            toast({ title: "Lead Created", description: `Lead "${result.name}" has been created and selected.`});
+            setIsLeadFormOpen(false);
+        } else {
+            toast({ title: "Error", description: "Failed to create lead.", variant: "destructive"});
+        }
     });
-    form.reset();
-    setIsSubmitting(false);
+  };
+
+  const onSubmit = (values: SiteSurveyFormValues) => {
+    startSubmitTransition(async () => {
+      try {
+        const surveyor = users.find(u => u.name === values.surveyorName);
+        if (!surveyor) {
+            throw new Error('Selected surveyor not found.');
+        }
+
+        let billFileUrl: string | undefined = undefined;
+        const billFile = values.electricityBillFile?.[0];
+
+        if (billFile) {
+            const fileFormData = new FormData();
+            fileFormData.append('file', billFile);
+            
+            const response = await fetch('/api/templates/upload', {
+                method: 'POST',
+                body: fileFormData,
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to upload electricity bill.');
+            }
+            const result = await response.json();
+            billFileUrl = result.filePath;
+        }
+
+        const dataToSave = {
+          ...values,
+          surveyorId: surveyor.id,
+          electricityBillFile: billFileUrl,
+        } as CreateSiteSurveyData;
+
+        const result = await createSiteSurvey(dataToSave);
+
+        if (result && 'error' in result) {
+            throw new Error(result.error);
+        } else if (result) {
+            toast({ title: 'Survey Submitted Successfully', description: `Survey for ${values.consumerName} has been recorded.` });
+            form.reset();
+        } else {
+            throw new Error('An unexpected error occurred. The server did not respond.');
+        }
+      } catch (error) {
+        toast({ title: 'Error Submitting Survey', description: (error as Error).message, variant: 'destructive' });
+      }
+    });
   };
 
   return (
@@ -90,18 +251,30 @@ export default function SiteSurveyPage() {
       <Card className="lg:col-span-2">
         <CardHeader>
           <CardTitle>Survey Details</CardTitle>
-          <CardDescription>Please provide accurate information.</CardDescription>
+          <CardDescription>Select an existing customer or fill in the details for a new one.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <div className="space-y-2">
+                    <FormLabel>Select Existing Customer</FormLabel>
+                    <div className="flex gap-2 items-center">
+                        <div className="flex-grow">
+                            {isDataLoading ? <Loader2 className="animate-spin" /> : <CustomerCombobox customers={allCustomers} onSelect={handleCustomerSelect} />}
+                        </div>
+                        <Button type="button" variant="outline" onClick={() => setIsLeadFormOpen(true)}>
+                            <PlusCircle className="mr-2 h-4 w-4" /> New Lead
+                        </Button>
+                    </div>
+                </div>
+
               <div className="grid md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}
                   name="consumerName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Consumer Name</FormLabel>
+                      <FormLabel>Consumer Name *</FormLabel>
                       <FormControl><Input placeholder="Enter consumer name" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
@@ -112,7 +285,7 @@ export default function SiteSurveyPage() {
                   name="date"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Date of Survey</FormLabel>
+                      <FormLabel>Date of Survey *</FormLabel>
                       <FormControl><Input type="date" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
@@ -125,7 +298,7 @@ export default function SiteSurveyPage() {
                 name="consumerCategory"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Consumer Category</FormLabel>
+                    <FormLabel>Consumer Category *</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl><SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger></FormControl>
                       <SelectContent>
@@ -142,7 +315,7 @@ export default function SiteSurveyPage() {
                 name="location"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Location</FormLabel>
+                    <FormLabel>Location *</FormLabel>
                     <FormControl><Textarea placeholder="Enter full site address" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
@@ -155,7 +328,7 @@ export default function SiteSurveyPage() {
                   name="numberOfMeters"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Number of Meters</FormLabel>
+                      <FormLabel>Number of Meters *</FormLabel>
                       <FormControl><Input type="number" placeholder="e.g., 1" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
@@ -212,7 +385,7 @@ export default function SiteSurveyPage() {
                   name="consumerLoadType"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Consumer Load Type (LT/HT)</FormLabel>
+                      <FormLabel>Consumer Load Type (LT/HT) *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Select load type" /></SelectTrigger></FormControl>
                         <SelectContent>
@@ -231,7 +404,7 @@ export default function SiteSurveyPage() {
                   name="roofType"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Type of Roof</FormLabel>
+                      <FormLabel>Type of Roof *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Select roof type" /></SelectTrigger></FormControl>
                         <SelectContent>
@@ -247,7 +420,7 @@ export default function SiteSurveyPage() {
                   name="buildingHeight"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Height of Building (e.g., G+2)</FormLabel>
+                      <FormLabel>Height of Building *</FormLabel>
                       <FormControl><Input placeholder="e.g., G+2 or 30ft" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
@@ -258,7 +431,7 @@ export default function SiteSurveyPage() {
                   name="shadowFreeArea"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Shadow Free Area (sq.ft.)</FormLabel>
+                      <FormLabel>Shadow Free Area (sq.ft.) *</FormLabel>
                       <FormControl><Input placeholder="e.g., 500 sq.ft." {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
@@ -272,7 +445,7 @@ export default function SiteSurveyPage() {
                   name="discom"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>DISCOM</FormLabel>
+                      <FormLabel>DISCOM *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Select DISCOM" /></SelectTrigger></FormControl>
                         <SelectContent>
@@ -313,11 +486,11 @@ export default function SiteSurveyPage() {
                 name="surveyorName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Surveyor Name</FormLabel>
+                    <FormLabel>Surveyor Name *</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl><SelectTrigger><SelectValue placeholder="Select surveyor" /></SelectTrigger></FormControl>
                       <SelectContent>
-                        {USER_OPTIONS.map(user => <SelectItem key={user} value={user}>{user}</SelectItem>)}
+                        {users.map(user => <SelectItem key={user.id} value={user.name}>{user.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -328,43 +501,56 @@ export default function SiteSurveyPage() {
               <FormField
                 control={form.control}
                 name="electricityBillFile"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Upload Electricity Bill (Optional)</FormLabel>
-                    <FormControl>
-                        <div className="flex items-center justify-center w-full">
-                            <label htmlFor="dropzone-file-bill" className="flex flex-col items-center justify-center w-full h-32 border-2 border-border border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted">
-                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                    <UploadCloud className="w-8 h-8 mb-2 text-muted-foreground" />
-                                    <p className="mb-1 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                                    <p className="text-xs text-muted-foreground">PDF, PNG, JPG (MAX. 5MB)</p>
-                                </div>
-                                <Input 
-                                  id="dropzone-file-bill" 
-                                  type="file" 
-                                  className="hidden" 
-                                  accept=".pdf,.png,.jpg,.jpeg"
-                                  onChange={(e) => field.onChange(e.target.files)} 
-                                />
-                            </label>
-                        </div> 
-                    </FormControl>
-                    {field.value && field.value[0] && <p className="text-xs text-muted-foreground mt-1">File: {field.value[0].name}</p>}
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field: { value, onChange, ...fieldProps } }) => {
+                    return (
+                        <FormItem>
+                            <FormLabel>Upload Electricity Bill (Optional)</FormLabel>
+                            <FormControl>
+                                <div className="flex items-center justify-center w-full">
+                                    <label htmlFor="dropzone-file-bill" className="flex flex-col items-center justify-center w-full h-32 border-2 border-border border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted">
+                                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                            <UploadCloud className="w-8 h-8 mb-2 text-muted-foreground" />
+                                            <p className="mb-1 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+                                            <p className="text-xs text-muted-foreground">PDF, PNG, JPG (MAX. 5MB)</p>
+                                        </div>
+                                        <Input 
+                                        id="dropzone-file-bill" 
+                                        type="file" 
+                                        className="hidden" 
+                                        accept=".pdf,.png,.jpg,.jpeg"
+                                        onChange={(e) => onChange(e.target.files)} 
+                                        {...fieldProps}
+                                        />
+                                    </label>
+                                </div> 
+                            </FormControl>
+                             {value?.length && <p className="text-xs text-muted-foreground mt-1">File: {value[0].name}</p>}
+                            <FormMessage />
+                        </FormItem>
+                    )
+                }}
               />
 
               <Button type="submit" className="w-full md:w-auto" disabled={isSubmitting}>
-                {isSubmitting ? 'Submitting...' : 'Submit Survey'}
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : 'Submit Survey'}
               </Button>
             </form>
           </Form>
         </CardContent>
       </Card>
-      <div className="mt-8">
-        <img src="https://placehold.co/1200x300.png" data-ai-hint="site survey solar" alt="Site Survey for Solar Installation" className="w-full rounded-lg object-cover"/>
-      </div>
+      
+      {isLeadFormOpen && (
+        <LeadForm 
+            isOpen={isLeadFormOpen}
+            onClose={() => setIsLeadFormOpen(false)}
+            onSubmit={handleLeadFormSubmit}
+            users={users}
+            statuses={leadStatuses}
+            sources={leadSources}
+        />
+      )}
     </>
   );
 }
+
+    

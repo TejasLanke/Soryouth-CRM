@@ -1,9 +1,9 @@
 
 'use client';
 
-import { useEffect, useState, useTransition, useMemo } from 'react';
+import { useEffect, useState, useTransition, useMemo, ChangeEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -13,13 +13,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, CLIENT_PRIORITY_OPTIONS } from '@/lib/constants';
-import type { Client, User, UserOptionType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateClientData, ClientStatusType, ClientPriorityType, Proposal, CustomSetting } from '@/types';
+import type { Client, User, UserOptionType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateClientData, ClientStatusType, ClientPriorityType, Proposal, CustomSetting, SiteSurvey, DocumentType } from '@/types';
 import { format, parseISO, isValid } from 'date-fns';
-import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, UserCircle2, FileText, ShoppingCart, Loader2, Save, Send, Video, Building, Repeat, UserX, IndianRupee } from 'lucide-react';
-import { DocumentCreationDialog } from '@/app/(app)/documents/document-creation-dialog';
+import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, UserCircle2, FileText, ShoppingCart, Loader2, Save, Send, Video, Building, Repeat, UserX, IndianRupee, ClipboardEdit, Eye, UploadCloud } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { getClientById, updateClient, addClientActivity, getActivitiesForClient, convertClientToLead } from '@/app/(app)/clients-list/actions';
 import { getProposalsForClient, createOrUpdateProposal } from '@/app/(app)/proposals/actions';
+import { getSurveysForClient } from '@/app/(app)/site-survey/actions';
 import { getUsers } from '@/app/(app)/users/actions';
 import { getClientStatuses } from '@/app/(app)/settings/actions';
 import { ClientForm } from '@/app/(app)/clients/client-form';
@@ -29,6 +29,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { ProposalPreviewDialog } from '@/app/(app)/proposals/proposal-preview-dialog';
 import { ProposalForm } from '@/app/(app)/proposals/proposal-form';
 import { TemplateSelectionDialog } from '@/app/(app)/proposals/template-selection-dialog';
+import { DocumentCreationDialog } from '@/app/(app)/documents/document-creation-dialog';
+import { DocumentTemplateSelectionDialog } from '@/app/(app)/documents/document-template-selection-dialog';
 
 
 const ActivityIcon = ({ type, className }: { type: string, className?: string }) => {
@@ -45,6 +47,43 @@ const ActivityIcon = ({ type, className }: { type: string, className?: string })
   }
 };
 
+const SurveyDetailsCard = ({ survey }: { survey: SiteSurvey }) => {
+    if (!survey) return null;
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                    <ClipboardEdit className="h-5 w-5 text-primary" />
+                    Site Survey Details
+                </CardTitle>
+                <CardDescription>Survey No: {survey.surveyNumber.slice(-8)}</CardDescription>
+            </CardHeader>
+            <CardContent className="text-xs space-y-3">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                    <div><strong>Survey Date:</strong> {format(parseISO(survey.date), 'dd MMM, yyyy')}</div>
+                    <div><strong>Surveyor:</strong> {survey.surveyorName}</div>
+                    <div><strong>Category:</strong> {survey.consumerCategory}</div>
+                    <div><strong>Roof Type:</strong> {survey.roofType}</div>
+                    <div><strong>Building Height:</strong> {survey.buildingHeight}</div>
+                    <div><strong>Shadow-Free Area:</strong> {survey.shadowFreeArea}</div>
+                    <div><strong>DISCOM:</strong> {survey.discom}</div>
+                    <div><strong>Sanctioned Load:</strong> {survey.sanctionedLoad || 'N/A'}</div>
+                    <div><strong>Meter Phase:</strong> {survey.meterPhase || 'N/A'}</div>
+                    <div><strong>No. of Meters:</strong> {survey.numberOfMeters}</div>
+                    <div><strong>Meter Rating:</strong> {survey.meterRating || 'N/A'}</div>
+                    <div><strong>Avg. Bill (₹):</strong> {survey.electricityAmount?.toLocaleString('en-IN') || 'N/A'}</div>
+                </div>
+                {survey.remark && (
+                    <div className="pt-1">
+                        <strong className="font-semibold">Remark:</strong>
+                        <p className="p-2 bg-muted rounded-md mt-1 text-xs">{survey.remark}</p>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+};
+
 export default function ClientDetailsPage() {
   const router = useRouter();
   const params = useParams();
@@ -57,18 +96,25 @@ export default function ClientDetailsPage() {
   const [isUpdating, startUpdateTransition] = useTransition();
   const [isConverting, startConversionTransition] = useTransition();
   const [isStatusChanging, startStatusChangeTransition] = useTransition();
+  const [isUploadingBill, startBillUploadTransition] = useTransition();
   
   const [activities, setActivities] = useState<FollowUp[]>([]);
   const [isActivitiesLoading, setActivitiesLoading] = useState(true);
+  const [surveys, setSurveys] = useState<SiteSurvey[]>([]);
 
   const [isProposalFormOpen, setIsProposalFormOpen] = useState(false);
-  const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
-  const [documentTypeToCreate, setDocumentTypeToCreate] = useState<'Purchase Order' | null>(null);
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
-  const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [isProposalTemplateDialogOpen, setIsProposalTemplateDialogOpen] = useState(false);
+  const [selectedProposalTemplateId, setSelectedProposalTemplateId] = useState<string | null>(null);
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [activityComment, setActivityComment] = useState('');
+
+  const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
+  const [isDocumentTemplateDialogOpen, setIsDocumentTemplateDialogOpen] = useState(false);
+  const [documentTypeToCreate, setDocumentTypeToCreate] = useState<DocumentType | null>(null);
+  const [selectedDocumentTemplateId, setSelectedDocumentTemplateId] = useState<string | null>(null);
+  const [documentPreviewUrls, setDocumentPreviewUrls] = useState<{ pdfUrl: string, docxUrl: string } | null>(null);
+
 
   const [activityType, setActivityType] = useState<FollowUpType>(FOLLOW_UP_TYPES[0]);
   const [activityDate, setActivityDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -82,6 +128,7 @@ export default function ClientDetailsPage() {
 
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [selectedProposalForPreview, setSelectedProposalForPreview] = useState<Proposal | null>(null);
+  const [isBillPreviewOpen, setIsBillPreviewOpen] = useState(false);
 
   const fetchProposals = async () => {
     if (clientId) {
@@ -95,12 +142,13 @@ export default function ClientDetailsPage() {
       const fetchDetails = async () => {
         setClient(undefined);
         try {
-           const [fetchedClient, fetchedUsers, fetchedActivities, fetchedProposals, fetchedStatuses] = await Promise.all([
+           const [fetchedClient, fetchedUsers, fetchedActivities, fetchedProposals, fetchedStatuses, fetchedSurveys] = await Promise.all([
             getClientById(clientId),
             getUsers(),
             getActivitiesForClient(clientId),
             getProposalsForClient(clientId),
-            getClientStatuses()
+            getClientStatuses(),
+            getSurveysForClient(clientId),
           ]);
 
           setClient(fetchedClient);
@@ -108,6 +156,7 @@ export default function ClientDetailsPage() {
           setActivities(fetchedActivities);
           setProposals(fetchedProposals);
           setStatuses(fetchedStatuses);
+          setSurveys(fetchedSurveys);
 
           if (fetchedClient) {
             setActivityClientStage(fetchedClient.status as ClientStatusType);
@@ -141,6 +190,45 @@ export default function ClientDetailsPage() {
     }
   }, [client]);
 
+  const handleBillUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !client) return;
+
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      toast({ title: "File Too Large", description: "Please upload a file smaller than 5MB.", variant: "destructive" });
+      return;
+    }
+
+    startBillUploadTransition(async () => {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch('/api/templates/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to upload bill.');
+        }
+
+        const result = await response.json();
+        const updatedClient = await updateClient(client.id, { electricityBillUrl: result.filePath });
+        
+        if (updatedClient) {
+          setClient(updatedClient);
+          toast({ title: "E-Bill Uploaded", description: "The electricity bill has been successfully attached." });
+        } else {
+          throw new Error("Failed to save the bill URL to the client.");
+        }
+      } catch (error) {
+        toast({ title: "Upload Failed", description: (error as Error).message, variant: "destructive" });
+      }
+    });
+  };
+
   const handleProposalSubmit = async (data: Partial<Proposal>) => {
     startFormTransition(async () => {
       const result = await createOrUpdateProposal(data);
@@ -159,18 +247,42 @@ export default function ClientDetailsPage() {
       }
     });
     setIsProposalFormOpen(false);
-    setSelectedTemplateId(null);
+    setSelectedProposalTemplateId(null);
   };
 
   const handleCreateNewProposal = () => {
-      setIsTemplateDialogOpen(true);
+      setIsProposalTemplateDialogOpen(true);
   };
 
-  const handleTemplateSelected = (templateId: string) => {
-      setSelectedTemplateId(templateId);
-      setIsTemplateDialogOpen(false);
+  const handleProposalTemplateSelected = (templateId: string) => {
+      setSelectedProposalTemplateId(templateId);
+      setIsProposalTemplateDialogOpen(false);
       setIsProposalFormOpen(true);
   };
+
+  const handleCreateNewDocument = (type: DocumentType) => {
+    setDocumentTypeToCreate(type);
+    setIsDocumentTemplateDialogOpen(true);
+  };
+
+  const handleDocumentTemplateSelected = (templateId: string) => {
+      setSelectedDocumentTemplateId(templateId);
+      setIsDocumentTemplateDialogOpen(false);
+      setIsDocumentDialogOpen(true);
+  };
+
+  const handleDocumentGenerationSuccess = (urls: { pdfUrl: string, docxUrl: string }) => {
+      setIsDocumentDialogOpen(false);
+      setDocumentPreviewUrls(urls);
+  };
+  
+  const closeDocumentDialogs = () => {
+      setIsDocumentTemplateDialogOpen(false);
+      setIsDocumentDialogOpen(false);
+      setDocumentTypeToCreate(null);
+      setSelectedDocumentTemplateId(null);
+  };
+
 
   const handleSaveActivity = () => {
     if (!client) return;
@@ -486,7 +598,7 @@ export default function ClientDetailsPage() {
                   </AlertDialogContent>
                 </AlertDialog>
                 <Button onClick={handleCreateNewProposal} className="w-full" size="sm"><FileText className="mr-2 h-4 w-4" /> Create Proposal</Button>
-                <Button onClick={() => { setDocumentTypeToCreate('Purchase Order'); setIsDocumentDialogOpen(true); }} className="w-full" variant="outline" size="sm"><ShoppingCart className="mr-2 h-4 w-4" /> Create Purchase Order</Button>
+                <Button onClick={() => handleCreateNewDocument('Purchase Order')} className="w-full" variant="outline" size="sm"><ShoppingCart className="mr-2 h-4 w-4" /> Create Purchase Order</Button>
               </CardContent>
             </Card>
           </div>
@@ -579,6 +691,7 @@ export default function ClientDetailsPage() {
                 )}
               </CardContent>
             </Card>
+            {surveys.length > 0 && <SurveyDetailsCard survey={surveys[0]} />}
           </div>
 
           <div className="lg:col-span-3 space-y-6">
@@ -608,6 +721,25 @@ export default function ClientDetailsPage() {
                 </div>
                 <p className="text-xs text-muted-foreground ml-10">Created by</p>
               </CardContent>
+            </Card>
+             <Card>
+                <CardHeader className="pb-2 pt-4"><CardTitle className="text-md">E-Bill</CardTitle></CardHeader>
+                <CardContent className="space-y-2">
+                    {client.electricityBillUrl ? (
+                        <Button variant="outline" size="sm" className="w-full" onClick={() => setIsBillPreviewOpen(true)}>
+                            <Eye className="mr-2 h-4 w-4" /> View Uploaded Bill
+                        </Button>
+                    ) : (
+                        <div className="text-center text-xs text-muted-foreground p-2">No bill uploaded.</div>
+                    )}
+                    <div>
+                        <Label htmlFor="bill-upload" className={cn(buttonVariants({variant: "secondary", size: "sm"}), "w-full cursor-pointer")}>
+                            {isUploadingBill ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <UploadCloud className="mr-2 h-4 w-4"/>}
+                            {client.electricityBillUrl ? 'Replace Bill' : 'Upload Bill'}
+                        </Label>
+                        <Input id="bill-upload" type="file" className="hidden" accept=".pdf,.png,.jpg,.jpeg" onChange={handleBillUpload} disabled={isUploadingBill}/>
+                    </div>
+                </CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2 pt-4"><CardTitle className="text-md">Notes</CardTitle></CardHeader>
@@ -645,20 +777,40 @@ export default function ClientDetailsPage() {
       {isProposalFormOpen && client && (
         <ProposalForm
             isOpen={isProposalFormOpen}
-            onClose={() => { setIsProposalFormOpen(false); setSelectedTemplateId(null); }}
+            onClose={() => { setIsProposalFormOpen(false); setSelectedProposalTemplateId(null); }}
             onSubmit={handleProposalSubmit}
             clients={[client]}
             leads={[]}
-            templateId={selectedTemplateId}
+            templateId={selectedProposalTemplateId}
         />
       )}
       <TemplateSelectionDialog
-        isOpen={isTemplateDialogOpen}
-        onClose={() => setIsTemplateDialogOpen(false)}
-        onSelect={handleTemplateSelected}
+        isOpen={isProposalTemplateDialogOpen}
+        onClose={() => setIsProposalTemplateDialogOpen(false)}
+        onSelect={handleProposalTemplateSelected}
       />
-      {isDocumentDialogOpen && documentTypeToCreate === 'Purchase Order' && client && (<DocumentCreationDialog isOpen={isDocumentDialogOpen} onClose={() => setIsDocumentDialogOpen(false)} documentType="Purchase Order" />)}
+      
+      {documentTypeToCreate && (
+        <DocumentTemplateSelectionDialog
+          isOpen={isDocumentTemplateDialogOpen}
+          onClose={closeDocumentDialogs}
+          onSelect={handleDocumentTemplateSelected}
+          documentType={documentTypeToCreate}
+        />
+      )}
+      
+      {isDocumentDialogOpen && documentTypeToCreate && selectedDocumentTemplateId && (
+        <DocumentCreationDialog
+          isOpen={isDocumentDialogOpen}
+          onClose={closeDocumentDialogs}
+          documentType={documentTypeToCreate}
+          templateId={selectedDocumentTemplateId}
+          onSuccess={handleDocumentGenerationSuccess}
+        />
+      )}
+
       {isEditFormOpen && client && (<ClientForm isOpen={isEditFormOpen} onClose={() => setIsEditFormOpen(false)} onSubmit={handleEditFormSubmit} client={client} users={users} statuses={statuses} />)}
+      
       {isPreviewOpen && selectedProposalForPreview && (
         <ProposalPreviewDialog
           isOpen={isPreviewOpen}
@@ -667,6 +819,26 @@ export default function ClientDetailsPage() {
           docxUrl={selectedProposalForPreview.docxUrl || null}
         />
       )}
+      
+      {isBillPreviewOpen && client.electricityBillUrl && (
+        <ProposalPreviewDialog
+            isOpen={isBillPreviewOpen}
+            onClose={() => setIsBillPreviewOpen(false)}
+            pdfUrl={client.electricityBillUrl}
+            docxUrl={null}
+        />
+      )}
+
+      {documentPreviewUrls && (
+        <ProposalPreviewDialog
+            isOpen={!!documentPreviewUrls}
+            onClose={() => setDocumentPreviewUrls(null)}
+            pdfUrl={documentPreviewUrls.pdfUrl}
+            docxUrl={documentPreviewUrls.docxUrl}
+        />
+      )}
     </div>
   );
 }
+
+    

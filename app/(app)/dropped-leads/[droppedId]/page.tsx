@@ -1,23 +1,23 @@
 
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useState, useTransition, ChangeEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from "@/components/ui/label";
-import { LEAD_SOURCE_OPTIONS, CLIENT_TYPES } from '@/lib/constants';
-import type { DroppedLead, FollowUp } from '@/types';
+import { Input } from '@/components/ui/input';
+import type { DroppedLead, FollowUp, SiteSurvey, Proposal } from '@/types';
 import { format, parseISO, isValid } from 'date-fns';
-import { ChevronLeft, Phone, MessageSquare, Mail, MessageCircle, UserCircle2, Loader2, Send, Video, Building, Repeat, Trash2, CalendarX2 } from 'lucide-react';
+import { ChevronLeft, UserCircle2, Loader2, Send, Video, Building, Repeat, CalendarX2, Phone, MessageSquare, Mail, ClipboardEdit, Eye, UploadCloud, FileText, IndianRupee } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { getDroppedLeadById, getActivitiesForDroppedLead, reactivateLead } from '@/app/(app)/dropped-leads-list/actions';
-import { Separator } from '@/components/ui/separator';
+import { getDroppedLeadById, getActivitiesForDroppedLead, reactivateLead, getSurveysForDroppedLead, getProposalsForDroppedLead, updateDroppedLead } from '@/app/(app)/dropped-leads-list/actions';
 import { cn } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { ProposalPreviewDialog } from '@/app/(app)/proposals/proposal-preview-dialog';
+
 
 const ActivityIcon = ({ type, className }: { type: string, className?: string }) => {
   const defaultClassName = "h-4 w-4";
@@ -33,6 +33,44 @@ const ActivityIcon = ({ type, className }: { type: string, className?: string })
   }
 };
 
+const SurveyDetailsCard = ({ survey }: { survey: SiteSurvey }) => {
+    if (!survey) return null;
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                    <ClipboardEdit className="h-5 w-5 text-primary" />
+                    Site Survey Details
+                </CardTitle>
+                <CardDescription>Survey No: {survey.surveyNumber.slice(-8)}</CardDescription>
+            </CardHeader>
+            <CardContent className="text-xs space-y-3">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                    <div><strong>Survey Date:</strong> {format(parseISO(survey.date), 'dd MMM, yyyy')}</div>
+                    <div><strong>Surveyor:</strong> {survey.surveyorName}</div>
+                    <div><strong>Category:</strong> {survey.consumerCategory}</div>
+                    <div><strong>Roof Type:</strong> {survey.roofType}</div>
+                    <div><strong>Building Height:</strong> {survey.buildingHeight}</div>
+                    <div><strong>Shadow-Free Area:</strong> {survey.shadowFreeArea}</div>
+                    <div><strong>DISCOM:</strong> {survey.discom}</div>
+                    <div><strong>Sanctioned Load:</strong> {survey.sanctionedLoad || 'N/A'}</div>
+                    <div><strong>Meter Phase:</strong> {survey.meterPhase || 'N/A'}</div>
+                    <div><strong>No. of Meters:</strong> {survey.numberOfMeters}</div>
+                    <div><strong>Meter Rating:</strong> {survey.meterRating || 'N/A'}</div>
+                    <div><strong>Avg. Bill (₹):</strong> {survey.electricityAmount?.toLocaleString('en-IN') || 'N/A'}</div>
+                </div>
+                {survey.remark && (
+                    <div className="pt-1">
+                        <strong className="font-semibold">Remark:</strong>
+                        <p className="p-2 bg-muted rounded-md mt-1 text-xs">{survey.remark}</p>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+};
+
+
 export default function DroppedLeadDetailsPage() {
   const router = useRouter();
   const params = useParams();
@@ -42,6 +80,12 @@ export default function DroppedLeadDetailsPage() {
   const [isReactivating, startReactivationTransition] = useTransition();
   const [activities, setActivities] = useState<FollowUp[]>([]);
   const [isActivitiesLoading, setActivitiesLoading] = useState(true);
+  const [surveys, setSurveys] = useState<SiteSurvey[]>([]);
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [isUploadingBill, startBillUploadTransition] = useTransition();
+  const [isBillPreviewOpen, setIsBillPreviewOpen] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [selectedProposalForPreview, setSelectedProposalForPreview] = useState<Proposal | null>(null);
 
   useEffect(() => {
     if (droppedId) {
@@ -49,12 +93,16 @@ export default function DroppedLeadDetailsPage() {
         setDroppedLead(undefined);
         setActivitiesLoading(true);
         try {
-          const [fetchedLead, fetchedActivities] = await Promise.all([
+          const [fetchedLead, fetchedActivities, fetchedSurveys, fetchedProposals] = await Promise.all([
             getDroppedLeadById(droppedId),
-            getActivitiesForDroppedLead(droppedId)
+            getActivitiesForDroppedLead(droppedId),
+            getSurveysForDroppedLead(droppedId),
+            getProposalsForDroppedLead(droppedId)
           ]);
           setDroppedLead(fetchedLead);
           setActivities(fetchedActivities);
+          setSurveys(fetchedSurveys);
+          setProposals(fetchedProposals);
         } catch (error) {
           console.error("Failed to fetch dropped lead details:", error);
           setDroppedLead(null);
@@ -73,6 +121,45 @@ export default function DroppedLeadDetailsPage() {
     }
   }, [droppedId, toast]);
   
+  const handleBillUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !droppedLead) return;
+
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      toast({ title: "File Too Large", description: "Please upload a file smaller than 5MB.", variant: "destructive" });
+      return;
+    }
+
+    startBillUploadTransition(async () => {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch('/api/templates/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to upload bill.');
+        }
+
+        const result = await response.json();
+        const updatedLead = await updateDroppedLead(droppedLead.id, { electricityBillUrl: result.filePath });
+        
+        if (updatedLead) {
+          setDroppedLead(updatedLead);
+          toast({ title: "E-Bill Uploaded", description: "The electricity bill has been successfully attached." });
+        } else {
+          throw new Error("Failed to save the bill URL to the dropped lead.");
+        }
+      } catch (error) {
+        toast({ title: "Upload Failed", description: (error as Error).message, variant: "destructive" });
+      }
+    });
+  };
+
   const handleReactivateLead = () => {
     if (!droppedLead) return;
     startReactivationTransition(async () => {
@@ -121,6 +208,7 @@ export default function DroppedLeadDetailsPage() {
   const droppedDateTime = droppedLead.droppedAt && isValid(parseISO(droppedLead.droppedAt)) ? format(parseISO(droppedLead.droppedAt), 'dd-MM-yyyy HH:mm') : 'N/A';
 
   return (
+    <>
     <div className="flex flex-col h-full">
       <div className="flex justify-between items-center p-4 border-b bg-card sticky top-0 z-10">
         <h1 className="text-xl font-semibold font-headline">{droppedLead.name}</h1>
@@ -169,29 +257,6 @@ export default function DroppedLeadDetailsPage() {
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-md">Details at Drop</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <Label className="text-xs">Source</Label>
-                   <p className="text-sm p-2 bg-muted rounded-md">{droppedLead.source || 'N/A'}</p>
-                </div>
-                 <div>
-                  <Label className="text-xs">Customer Type</Label>
-                   <p className="text-sm p-2 bg-muted rounded-md">{droppedLead.clientType || 'N/A'}</p>
-                </div>
-                <div>
-                  <Label className="text-xs">Kilowatt</Label>
-                   <p className="text-sm p-2 bg-muted rounded-md">{droppedLead.kilowatt ? `${droppedLead.kilowatt} kW` : 'N/A'}</p>
-                </div>
-                 <div>
-                  <Label className="text-xs">Address</Label>
-                  <p className="text-sm bg-muted p-2 rounded-md min-h-[40px]">{droppedLead.address || 'Not specified'}</p>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
                 <CardTitle className="text-md">Quick Actions</CardTitle>
               </CardHeader>
               <CardContent>
@@ -218,6 +283,7 @@ export default function DroppedLeadDetailsPage() {
                 </AlertDialog>
               </CardContent>
             </Card>
+
           </div>
 
           <div className="lg:col-span-6 space-y-6">
@@ -264,6 +330,7 @@ export default function DroppedLeadDetailsPage() {
                 )}
               </CardContent>
             </Card>
+            {surveys.length > 0 && <SurveyDetailsCard survey={surveys[0]} />}
           </div>
 
           <div className="lg:col-span-3 space-y-6">
@@ -285,9 +352,71 @@ export default function DroppedLeadDetailsPage() {
                 <p className="text-xs text-muted-foreground ml-10">Created by</p>
               </CardContent>
             </Card>
+            <Card>
+                <CardHeader className="pb-2 pt-4"><CardTitle className="text-md">E-Bill</CardTitle></CardHeader>
+                <CardContent className="space-y-2">
+                    {droppedLead.electricityBillUrl ? (
+                        <Button variant="outline" size="sm" className="w-full" onClick={() => setIsBillPreviewOpen(true)}>
+                            <Eye className="mr-2 h-4 w-4" /> View Uploaded Bill
+                        </Button>
+                    ) : (
+                        <div className="text-center text-xs text-muted-foreground p-2">No bill uploaded.</div>
+                    )}
+                    <div>
+                        <Label htmlFor="bill-upload" className={cn(buttonVariants({variant: "secondary", size: "sm"}), "w-full cursor-pointer")}>
+                            {isUploadingBill ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <UploadCloud className="mr-2 h-4 w-4"/>}
+                            {droppedLead.electricityBillUrl ? 'Replace Bill' : 'Upload Bill'}
+                        </Label>
+                        <Input id="bill-upload" type="file" className="hidden" accept=".pdf,.png,.jpg,.jpeg" onChange={handleBillUpload} disabled={isUploadingBill}/>
+                    </div>
+                </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle>Proposal History ({proposals.length})</CardTitle></CardHeader>
+              <CardContent>
+                {proposals.length > 0 ? (
+                  <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                    {proposals.map(proposal => (
+                      <div key={proposal.id} onClick={() => { setSelectedProposalForPreview(proposal); setIsPreviewOpen(true); }} className="flex items-center justify-between p-3 border rounded-md cursor-pointer hover:bg-muted/50">
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="font-semibold text-sm">{proposal.proposalNumber}</p>
+                            <p className="text-xs text-muted-foreground">Capacity: {proposal.capacity} kW</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                           <p className="font-semibold text-sm flex items-center"><IndianRupee className="h-4 w-4 mr-0.5" />{proposal.finalAmount.toLocaleString('en-IN')}</p>
+                           <p className="text-xs text-muted-foreground">{format(parseISO(proposal.proposalDate), 'dd MMM yyyy')}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                   <p className="text-sm text-center text-muted-foreground py-6">No proposals created for this lead.</p>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
     </div>
+    {isBillPreviewOpen && droppedLead.electricityBillUrl && (
+      <ProposalPreviewDialog
+          isOpen={isBillPreviewOpen}
+          onClose={() => setIsBillPreviewOpen(false)}
+          pdfUrl={droppedLead.electricityBillUrl}
+          docxUrl={null}
+      />
+    )}
+    {isPreviewOpen && selectedProposalForPreview && (
+      <ProposalPreviewDialog
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        pdfUrl={selectedProposalForPreview.pdfUrl || null}
+        docxUrl={selectedProposalForPreview.docxUrl || null}
+      />
+    )}
+    </>
   );
 }

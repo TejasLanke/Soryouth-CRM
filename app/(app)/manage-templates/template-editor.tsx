@@ -118,7 +118,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
         ...values,
       };
 
-      const result = await saveTemplate(dataToSave as any); // Cast to any to satisfy Prisma's create type which expects all fields
+      const result = await saveTemplate(dataToSave as any);
       if (result) {
         toast({
           title: 'Template Saved',
@@ -243,7 +243,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                         <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground p-2 border rounded-md">
                           <File className="h-4 w-4" />
                           <span className="flex-grow">{uploadedFileName.split('/').pop()}</span>
-                          <a href={uploadedFileName} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                           <a href={uploadedFileName} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                             <Download className="h-4 w-4"/>
                           </a>
                         </div>

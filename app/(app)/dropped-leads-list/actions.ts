@@ -2,7 +2,7 @@
 'use server';
 
 import prisma from '@/lib/prisma';
-import type { DroppedLead, FollowUp, LeadStatusType } from '@/types';
+import type { DroppedLead, FollowUp, LeadStatusType, SiteSurvey, Proposal } from '@/types';
 import { revalidatePath } from 'next/cache';
 import { format, parseISO } from 'date-fns';
 
@@ -51,6 +51,64 @@ function mapPrismaFollowUpToFollowUpType(prismaFollowUp: any): FollowUp {
     taskForUser: prismaFollowUp.taskForUser?.name ?? undefined,
     taskDate: prismaFollowUp.taskDate?.toISOString() ?? undefined,
     taskTime: prismaFollowUp.taskTime ?? undefined,
+  };
+}
+
+// Duplicated from site-survey/actions.ts to avoid circular dependencies
+function mapPrismaSurveyToSiteSurvey(survey: any): SiteSurvey {
+  return {
+    id: survey.id,
+    surveyNumber: survey.surveyNumber,
+    consumerName: survey.consumerName,
+    date: format(survey.date, 'yyyy-MM-dd'),
+    consumerCategory: survey.consumerCategory,
+    location: survey.location,
+    numberOfMeters: survey.numberOfMeters,
+    meterRating: survey.meterRating ?? undefined,
+    meterPhase: survey.meterPhase ?? undefined,
+    electricityAmount: survey.electricityAmount ?? undefined,
+    consumerLoadType: survey.consumerLoadType,
+    roofType: survey.roofType,
+    buildingHeight: survey.buildingHeight,
+    shadowFreeArea: survey.shadowFreeArea,
+    discom: survey.discom,
+    sanctionedLoad: survey.sanctionedLoad ?? undefined,
+    remark: survey.remark ?? undefined,
+    electricityBillFile: survey.electricityBillFile ?? undefined,
+    status: survey.status,
+    createdAt: survey.createdAt.toISOString(),
+    updatedAt: survey.updatedAt.toISOString(),
+    leadId: survey.leadId ?? undefined,
+    clientId: survey.clientId ?? undefined,
+    droppedLeadId: survey.droppedLeadId ?? undefined,
+    surveyorName: survey.surveyor.name,
+    surveyorId: survey.surveyorId,
+  };
+}
+
+// Helper to map Prisma proposal to frontend Proposal type
+function mapPrismaProposalToProposalType(prismaProposal: any): Proposal {
+  // Ensure all numeric fields are correctly typed as numbers, especially Decimals from Prisma
+  return {
+    ...prismaProposal,
+    proposalDate: prismaProposal.proposalDate.toISOString(),
+    createdAt: prismaProposal.createdAt.toISOString(),
+    updatedAt: prismaProposal.updatedAt.toISOString(),
+    capacity: Number(prismaProposal.capacity),
+    ratePerWatt: Number(prismaProposal.ratePerWatt),
+    inverterRating: Number(prismaProposal.inverterRating),
+    baseAmount: Number(prismaProposal.baseAmount),
+    cgstAmount: Number(prismaProposal.cgstAmount),
+    sgstAmount: Number(prismaProposal.sgstAmount),
+    subtotalAmount: Number(prismaProposal.subtotalAmount),
+    finalAmount: Number(prismaProposal.finalAmount),
+    subsidyAmount: Number(prismaProposal.subsidyAmount),
+    unitRate: prismaProposal.unitRate ? Number(prismaProposal.unitRate) : undefined,
+    requiredSpace: prismaProposal.requiredSpace ? Number(prismaProposal.requiredSpace) : undefined,
+    generationPerDay: prismaProposal.generationPerDay ? Number(prismaProposal.generationPerDay) : undefined,
+    generationPerYear: prismaProposal.generationPerYear ? Number(prismaProposal.generationPerYear) : undefined,
+    savingsPerYear: prismaProposal.savingsPerYear ? Number(prismaProposal.savingsPerYear) : undefined,
+    droppedLeadId: prismaProposal.droppedLeadId ?? undefined,
   };
 }
 
@@ -104,6 +162,35 @@ export async function getActivitiesForDroppedLead(droppedLeadId: string): Promis
     }
 }
 
+export async function getSurveysForDroppedLead(droppedLeadId: string): Promise<SiteSurvey[]> {
+  try {
+    const surveys = await prisma.siteSurvey.findMany({
+      where: { droppedLeadId },
+      orderBy: { date: 'desc' },
+      include: { surveyor: true },
+    });
+    return surveys.map(mapPrismaSurveyToSiteSurvey);
+  } catch (error) {
+    console.error(`Failed to fetch surveys for dropped lead ${droppedLeadId}:`, error);
+    return [];
+  }
+}
+
+export async function getProposalsForDroppedLead(droppedLeadId: string): Promise<Proposal[]> {
+    if (!droppedLeadId) return [];
+    try {
+        const proposals = await prisma.proposal.findMany({
+            where: { droppedLeadId },
+            orderBy: { createdAt: 'desc' },
+        });
+        return proposals.map(mapPrismaProposalToProposalType);
+    } catch (error) {
+        console.error(`Failed to fetch proposals for dropped lead ${droppedLeadId}:`, error);
+        return [];
+    }
+}
+
+
 export async function reactivateLead(droppedLeadId: string): Promise<{ success: boolean; newLeadId?: string; message?: string }> {
     try {
         const droppedLead = await prisma.droppedLead.findUnique({
@@ -139,16 +226,33 @@ export async function reactivateLead(droppedLeadId: string): Promise<{ success: 
                 }
             });
 
-            if (droppedLead.followUps.length > 0) {
-                await tx.followUp.updateMany({
-                    where: { droppedLeadId: droppedLead.id },
-                    data: {
-                        leadId: createdLead.id,
-                        droppedLeadId: null
-                    }
-                });
-            }
+            // Re-associate follow-ups
+            await tx.followUp.updateMany({
+                where: { droppedLeadId: droppedLead.id },
+                data: {
+                    leadId: createdLead.id,
+                    droppedLeadId: null
+                }
+            });
             
+            // Re-associate proposals
+            await tx.proposal.updateMany({
+                where: { droppedLeadId: droppedLead.id },
+                data: {
+                    leadId: createdLead.id,
+                    droppedLeadId: null
+                }
+            });
+
+            // Re-associate surveys
+            await tx.siteSurvey.updateMany({
+                where: { droppedLeadId: droppedLead.id },
+                data: {
+                    leadId: createdLead.id,
+                    droppedLeadId: null
+                }
+            });
+
             await tx.droppedLead.delete({
                 where: { id: droppedLeadId }
             });
@@ -167,6 +271,20 @@ export async function reactivateLead(droppedLeadId: string): Promise<{ success: 
     }
 }
 
+export async function updateDroppedLead(id: string, data: Partial<Pick<DroppedLead, 'electricityBillUrl'>>): Promise<DroppedLead | null> {
+    try {
+        const updatedLead = await prisma.droppedLead.update({
+            where: { id },
+            data: data,
+            include: { createdBy: true, assignedTo: true, followUps: true }
+        });
+        revalidatePath(`/dropped-leads/${id}`);
+        return mapPrismaDroppedLeadToDroppedLeadType(updatedLead);
+    } catch (error) {
+        console.error(`Failed to update dropped lead ${id}:`, error);
+        return null;
+    }
+}
 
 export async function bulkReactivateLeads(leadIds: string[]): Promise<{ success: boolean, count: number, message?: string }> {
     if (leadIds.length === 0) {

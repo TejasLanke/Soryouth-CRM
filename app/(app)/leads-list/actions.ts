@@ -410,15 +410,32 @@ export async function dropLead(leadId: string, dropReason: DropReasonType, dropC
                 }
             });
             
-            if (leadToDrop.followUps.length > 0) {
-                await tx.followUp.updateMany({
-                    where: { leadId: leadToDrop.id },
-                    data: {
-                        droppedLeadId: createdDroppedLead.id,
-                        leadId: null,
-                    }
-                });
-            }
+            // Re-associate follow-ups
+            await tx.followUp.updateMany({
+                where: { leadId: leadToDrop.id },
+                data: {
+                    droppedLeadId: createdDroppedLead.id,
+                    leadId: null,
+                }
+            });
+
+            // Re-associate proposals
+            await tx.proposal.updateMany({
+              where: { leadId: leadToDrop.id },
+              data: {
+                droppedLeadId: createdDroppedLead.id,
+                leadId: null,
+              }
+            });
+
+            // Re-associate site surveys
+            await tx.siteSurvey.updateMany({
+                where: { leadId: leadToDrop.id },
+                data: {
+                    droppedLeadId: createdDroppedLead.id,
+                    leadId: null,
+                }
+            });
 
             await tx.lead.delete({
                 where: { id: leadId }

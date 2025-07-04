@@ -1,10 +1,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
+import os from 'os';
 import fs from 'fs/promises';
 import { format, parseISO } from 'date-fns';
 import { getTemplateById } from '@/app/(app)/manage-templates/actions';
 import type { DocumentType } from '@/types';
+import { uploadFileToS3, getFileFromS3 } from '@/lib/s3';
+import prisma from '@/lib/prisma';
 
 function getDocumentTemplateData(formData: any, documentType: DocumentType) {
     const formattedData: Record<string, any> = {
@@ -75,7 +78,6 @@ function getDocumentTemplateData(formData: any, documentType: DocumentType) {
             });
             break;
         default:
-            // For 'Other' or any new types, just use the raw form data
             Object.assign(formattedData, formData);
             break;
     }
@@ -85,6 +87,7 @@ function getDocumentTemplateData(formData: any, documentType: DocumentType) {
 
 
 export async function POST(request: NextRequest) {
+  let tempFilePath: string | null = null;
   try {
     const { templateId, formData, documentType } = await request.json();
 
@@ -98,6 +101,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Template not found or has no associated file.' }, { status: 404 });
     }
     
+    // Use SDK to get the file from S3 instead of a public fetch
+    const s3Url = new URL(template.originalDocxPath);
+    const templateKey = s3Url.pathname.substring(1); // Remove leading '/'
+    const templateBuffer = await getFileFromS3(templateKey);
+    
+    const tempDir = os.tmpdir();
+    tempFilePath = path.join(tempDir, `template-${Date.now()}.docx`);
+    await fs.writeFile(tempFilePath, templateBuffer);
+
     const templateData = getDocumentTemplateData(formData, documentType);
     
     const pythonServiceUrl = 'http://127.0.0.1:5001/generate';
@@ -105,7 +117,8 @@ export async function POST(request: NextRequest) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            template_path: template.originalDocxPath,
+            // Pass the path to the temporary local file
+            template_path: tempFilePath,
             data: templateData
         })
     });
@@ -124,26 +137,29 @@ export async function POST(request: NextRequest) {
     const pdfBuffer = Buffer.from(result.pdf_b64, 'base64');
     const docxBuffer = Buffer.from(result.docx_b64, 'base64');
 
-    const generatedDir = path.join(process.cwd(), 'public', 'generated_documents');
-    await fs.mkdir(generatedDir, { recursive: true });
-    
-    const baseFileName = `${formData.clientName?.replace(/\s/g, '_') || 'document'}_${documentType.replace(/\s/g, '_')}_${Date.now()}`;
-    const pdfFileName = `${baseFileName}.pdf`;
-    const docxFileName = `${baseFileName}.docx`;
+    const baseKey = `documents/${formData.clientName?.replace(/\s/g, '_') || 'document'}_${documentType.replace(/\s/g, '_')}_${Date.now()}`;
+    const pdfKey = `${baseKey}.pdf`;
+    const docxKey = `${baseKey}.docx`;
 
-    const pdfFilePath = path.join(generatedDir, pdfFileName);
-    const docxFilePath = path.join(generatedDir, docxFileName);
+    const [pdfUrl, docxUrl] = await Promise.all([
+        uploadFileToS3(pdfBuffer, pdfKey, 'application/pdf'),
+        uploadFileToS3(docxBuffer, docxKey, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    ]);
 
-    await fs.writeFile(pdfFilePath, pdfBuffer);
-    await fs.writeFile(docxFilePath, docxBuffer);
-
-    const publicPdfUrl = `/generated_documents/${pdfFileName}`;
-    const publicDocxUrl = `/generated_documents/${docxFileName}`;
+    // Save metadata to the new GeneratedDocument table
+    await prisma.generatedDocument.create({
+      data: {
+        clientName: formData.clientName,
+        documentType: documentType,
+        pdfUrl: pdfUrl,
+        docxUrl: docxUrl,
+      },
+    });
 
     return NextResponse.json({
       success: true,
-      pdfUrl: publicPdfUrl,
-      docxUrl: publicDocxUrl,
+      pdfUrl: pdfUrl,
+      docxUrl: docxUrl,
     });
 
   } catch (error) {
@@ -153,5 +169,10 @@ export async function POST(request: NextRequest) {
         errorMessage = error.message;
     }
     return NextResponse.json({ error: errorMessage }, { status: 500 });
+  } finally {
+      // Clean up the temporary file
+      if (tempFilePath) {
+          await fs.unlink(tempFilePath).catch(err => console.error(`Failed to delete temp file: ${tempFilePath}`, err));
+      }
   }
 }

@@ -1,90 +1,63 @@
 
 'use server';
 
-import fs from 'fs/promises';
-import path from 'path';
+import prisma from '@/lib/prisma';
+import { deleteFileFromS3 } from '@/lib/s3';
 import { revalidatePath } from 'next/cache';
+import type { GeneratedDocument } from '@/types';
 
-const generatedDocsDir = path.join(process.cwd(), 'public', 'generated_documents');
-
-export interface GeneratedDocument {
-  clientName: string;
-  documentType: string;
-  timestamp: string;
-  pdfUrl: string;
-  docxUrl: string;
-}
-
-// Function to ensure the directory exists
-async function ensureDirectoryExists() {
-    try {
-        await fs.access(generatedDocsDir);
-    } catch {
-        await fs.mkdir(generatedDocsDir, { recursive: true });
-    }
+// Helper to map Prisma document to frontend GeneratedDocument type
+function mapPrismaGeneratedDocument(doc: any): GeneratedDocument {
+  return {
+    ...doc,
+    createdAt: doc.createdAt.toISOString(),
+  };
 }
 
 export async function getGeneratedDocuments(documentType: string): Promise<GeneratedDocument[]> {
-  await ensureDirectoryExists();
   try {
-    const files = await fs.readdir(generatedDocsDir);
-    const documentTypeSlug = documentType.replace(/\s/g, '_');
-    
-    const documents: GeneratedDocument[] = files
-      .filter(file => file.endsWith('.pdf') && file.includes(`_${documentTypeSlug}_`))
-      .map(pdfFile => {
-        const docxFile = pdfFile.replace(/\.pdf$/, '.docx');
-        const fileNameNoExt = pdfFile.replace(/\.pdf$/, '');
-        
-        // This is more robust: it splits on the last underscore, which separates the timestamp.
-        const lastUnderscoreIndex = fileNameNoExt.lastIndexOf('_');
-        const timestamp = fileNameNoExt.substring(lastUnderscoreIndex + 1);
-        const nameAndType = fileNameNoExt.substring(0, lastUnderscoreIndex);
-        
-        // The type slug is at the end of the nameAndType string
-        const clientName = nameAndType.replace(`_${documentTypeSlug}`, '').replace(/_/g, ' ');
-
-        return {
-          clientName: clientName,
-          documentType,
-          timestamp: new Date(parseInt(timestamp)).toISOString(),
-          pdfUrl: `/generated_documents/${pdfFile}`,
-          docxUrl: `/generated_documents/${docxFile}`,
-        };
-      })
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
-    return documents;
+    const documents = await prisma.generatedDocument.findMany({
+      where: { documentType },
+      orderBy: { createdAt: 'desc' },
+    });
+    return documents.map(mapPrismaGeneratedDocument);
   } catch (error: any) {
     console.error(`Failed to get documents for type ${documentType}:`, error);
-    if (error.code === 'ENOENT') {
-        return []; // Directory doesn't exist yet, return empty array.
-    }
-    throw error;
+    return [];
   }
 }
 
 export async function deleteGeneratedDocument(pdfUrl: string): Promise<{ success: boolean; error?: string }> {
   try {
-    if (!pdfUrl.startsWith('/generated_documents/')) {
-        return { success: false, error: 'Invalid file path.' };
+    if (!pdfUrl) {
+      return { success: false, error: 'Invalid file URL provided.' };
     }
-    
-    const pdfFileName = path.basename(pdfUrl);
-    const docxFileName = pdfFileName.replace('.pdf', '.docx');
 
-    const pdfFilePath = path.join(generatedDocsDir, pdfFileName);
-    const docxFilePath = path.join(generatedDocsDir, docxFileName);
+    // Find the document record in the database using the PDF URL
+    const docToDelete = await prisma.generatedDocument.findFirst({
+      where: { pdfUrl },
+    });
 
-    // Delete both files, ignoring errors if one doesn't exist
-    await fs.unlink(pdfFilePath).catch(e => console.warn(`Could not delete PDF, it might not exist: ${pdfFilePath}`, e));
-    await fs.unlink(docxFilePath).catch(e => console.warn(`Could not delete DOCX, it might not exist: ${docxFilePath}`, e));
+    if (!docToDelete) {
+      return { success: false, error: 'Document record not found in database.' };
+    }
+
+    // Extract keys from URLs for S3 deletion
+    const pdfKey = new URL(docToDelete.pdfUrl).pathname.substring(1);
+    const docxKey = new URL(docToDelete.docxUrl).pathname.substring(1);
+
+    // Delete files from S3
+    await Promise.all([
+      deleteFileFromS3(pdfKey),
+      deleteFileFromS3(docxKey)
+    ]);
     
-    // Extract document type from filename to revalidate the correct path
-    const documentTypeSlugWithUnderscores = pdfFileName.split('_').slice(1, -1).join('_');
-    const documentType = documentTypeSlugWithUnderscores.replace(/_/g, ' ');
-    
-    revalidatePath(`/documents/${encodeURIComponent(documentType)}`);
+    // Delete the record from the database
+    await prisma.generatedDocument.delete({
+      where: { id: docToDelete.id },
+    });
+
+    revalidatePath(`/documents/${encodeURIComponent(docToDelete.documentType)}`);
     return { success: true };
   } catch (error) {
     console.error('Failed to delete document:', error);

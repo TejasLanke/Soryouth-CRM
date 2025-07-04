@@ -185,7 +185,7 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType, template
   }, [documentType]);
 
   const form = useForm<z.infer<typeof currentSchema>>({
-    resolver: zodResolver(currentSchema as any),
+    resolver: zodResolver(currentSchema as any), // Use `as any` to bypass strict union type check at compile time
     defaultValues: defaultValues as any, 
   });
 
@@ -868,7 +868,7 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType, template
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Create New {documentType}</DialogTitle>
           <DialogDescription>

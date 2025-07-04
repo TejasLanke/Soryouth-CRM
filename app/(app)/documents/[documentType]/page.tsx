@@ -8,7 +8,8 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { DOCUMENT_TYPES_CONFIG } from '@/lib/constants';
 import { Loader2, ArrowLeft, FileText, Trash2, Eye } from 'lucide-react';
-import { getGeneratedDocuments, deleteGeneratedDocument, type GeneratedDocument } from '../actions';
+import { getGeneratedDocuments, deleteGeneratedDocument } from '../actions';
+import type { GeneratedDocument } from '@/types';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -116,20 +117,14 @@ export default function GeneratedDocumentsPage() {
                             <CardHeader>
                                 <CardTitle className="font-headline">{doc.clientName}</CardTitle>
                                 <CardDescription>
-                                    Generated: {format(new Date(doc.timestamp), 'dd MMM, yyyy p')}
+                                    Generated: {format(new Date(doc.createdAt), 'dd MMM, yyyy p')}
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="flex-grow" />
                             <CardFooter className="flex justify-end gap-2">
                                 <Button variant="outline" size="sm" onClick={() => setPreviewUrls({ pdfUrl: doc.pdfUrl, docxUrl: doc.docxUrl })}>
-                                    <Eye className="mr-2 h-4 w-4" /> View
+                                    <Eye className="mr-2 h-4 w-4" /> View & Download
                                 </Button>
-                                <a href={doc.docxUrl} download className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-                                    .DOCX
-                                </a>
-                                <a href={doc.pdfUrl} download className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-                                    PDF
-                                </a>
                                 <AlertDialog>
                                     <AlertDialogTrigger asChild>
                                         <Button variant="destructive" size="icon" title="Delete Document">

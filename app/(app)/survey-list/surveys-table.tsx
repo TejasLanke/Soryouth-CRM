@@ -1,9 +1,8 @@
 
 'use client';
 
-import type { Survey, SurveySortConfig, SurveyStatusType, SurveyTypeOption, UserOptionType } from '@/types';
-import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
+import type { SiteSurvey, SurveySortConfig, SurveyStatusType, SurveyTypeOption, UserOptionType } from '@/types';
+import React from 'react';
 import {
   Table,
   TableBody,
@@ -38,11 +37,11 @@ import { format, parseISO, isValid } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 interface SurveysTableProps {
-  surveys: Survey[];
-  onEditSurvey?: (survey: Survey) => void;
+  surveys: SiteSurvey[];
+  onEditSurvey?: (survey: SiteSurvey) => void;
   onDeleteSurvey?: (surveyId: string) => void;
   sortConfig?: SurveySortConfig | null;
-  requestSort?: (key: keyof Survey) => void;
+  requestSort?: (key: keyof SiteSurvey) => void;
 }
 
 const formatDateInternal = (dateString?: string) => {
@@ -81,7 +80,7 @@ export function SurveysTable({ surveys, onEditSurvey, onDeleteSurvey, sortConfig
     }
   };
 
-  const getSortIndicator = (key: keyof Survey) => {
+  const getSortIndicator = (key: keyof SiteSurvey) => {
     if (!requestSort || !sortConfig || sortConfig.key !== key) {
       return <ArrowUpDown className="ml-1 h-3 w-3 opacity-50" />;
     }
@@ -90,7 +89,7 @@ export function SurveysTable({ surveys, onEditSurvey, onDeleteSurvey, sortConfig
       <ArrowUpDown className="ml-1 h-3 w-3 transform rotate-180 text-primary" />;
   };
   
-  const renderHeaderCell = (label: string, sortKey: keyof Survey) => (
+  const renderHeaderCell = (label: string, sortKey: keyof SiteSurvey) => (
     <TableHead className="text-muted-foreground whitespace-nowrap">
       {requestSort ? (
         <Button variant="ghost" size="sm" className="px-1 py-0 h-auto text-xs" onClick={() => requestSort(sortKey)}>
@@ -113,11 +112,11 @@ export function SurveysTable({ surveys, onEditSurvey, onDeleteSurvey, sortConfig
                   <Checkbox id="selectAllSurveys" aria-label="Select all surveys" />
                 </TableHead>
                 {renderHeaderCell('Survey No.', 'surveyNumber')}
-                {renderHeaderCell('Client Name', 'clientName')}
+                {renderHeaderCell('Client Name', 'consumerName')}
                 {renderHeaderCell('Location', 'location')}
-                {renderHeaderCell('Survey Date', 'surveyDate')}
+                {renderHeaderCell('Survey Date', 'date')}
                 {renderHeaderCell('Surveyor', 'surveyorName')}
-                {renderHeaderCell('Type', 'type')}
+                {renderHeaderCell('Type', 'consumerCategory')}
                 {renderHeaderCell('Status', 'status')}
                 {onEditSurvey && onDeleteSurvey && <TableHead className="text-right text-muted-foreground">Actions</TableHead>}
               </TableRow>
@@ -129,13 +128,11 @@ export function SurveysTable({ surveys, onEditSurvey, onDeleteSurvey, sortConfig
                     <Checkbox id={`select-survey-${survey.id}`} aria-label={`Select survey ${survey.surveyNumber}`} />
                   </TableCell>
                   <TableCell className="font-medium py-3 text-xs">
-                    {/* <Link href={`/surveys/${survey.id}`} className="hover:underline text-primary"> */}
-                      {survey.surveyNumber}
-                    {/* </Link> */}
+                      {survey.surveyNumber.slice(-8)}
                   </TableCell>
-                  <TableCell className="py-3 text-sm">{survey.clientName || '-'}</TableCell>
+                  <TableCell className="py-3 text-sm">{survey.consumerName || '-'}</TableCell>
                   <TableCell className="py-3 text-xs">{survey.location || '-'}</TableCell>
-                  <TableCell className="py-3 text-xs">{formatDateInternal(survey.surveyDate)}</TableCell>
+                  <TableCell className="py-3 text-xs">{formatDateInternal(survey.date)}</TableCell>
                   <TableCell className="py-3">
                      <div className="flex items-center gap-2">
                         <Avatar className="h-6 w-6">
@@ -147,12 +144,12 @@ export function SurveysTable({ surveys, onEditSurvey, onDeleteSurvey, sortConfig
                   </TableCell>
                   <TableCell className="py-3 text-xs">
                     <div className="flex items-center">
-                        <SurveyTypeDisplayIcon type={survey.type} />
-                        {survey.type}
+                        <SurveyTypeDisplayIcon type={survey.consumerCategory as SurveyTypeOption} />
+                        {survey.consumerCategory}
                     </div>
                   </TableCell>
                   <TableCell className="py-3">
-                    <Badge variant={getStatusBadgeVariant(survey.status)} className="capitalize text-xs">{survey.status}</Badge>
+                    <Badge variant={getStatusBadgeVariant(survey.status as SurveyStatusType)} className="capitalize text-xs">{survey.status}</Badge>
                   </TableCell>
                   {onEditSurvey && onDeleteSurvey && (
                     <TableCell className="text-right py-3">
@@ -208,4 +205,3 @@ export function SurveysTable({ surveys, onEditSurvey, onDeleteSurvey, sortConfig
     </div>
   );
 }
-

@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Proposal, Client, Lead, ClientType, ModuleType, DCRStatus, ModuleWattage, LeadStatusType, Template } from '@/types';
+import type { Proposal, Client, Lead, ClientType, ModuleType, DCRStatus, ModuleWattage, User, CustomSetting, CreateLeadData } from '@/types';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, Controller } from 'react-hook-form';
 import * as z from 'zod';
@@ -31,9 +31,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import React, { useEffect, useMemo, useState, useTransition } from 'react';
-import { CLIENT_TYPES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS, LEAD_STATUS_OPTIONS } from '@/lib/constants';
+import { CLIENT_TYPES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS } from '@/lib/constants';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, IndianRupee, ChevronsUpDown, Check, X, Loader2 } from 'lucide-react';
+import { CalendarIcon, IndianRupee, ChevronsUpDown, Check, X, Loader2, PlusCircle } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
@@ -41,6 +41,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
 import { useToast } from '@/hooks/use-toast';
+import { LeadForm } from '@/app/(app)/leads/lead-form';
+import { getLeads, createLead } from '@/app/(app)/leads-list/actions';
+import { getUsers } from '@/app/(app)/users/actions';
+import { getLeadStatuses, getLeadSources } from '@/app/(app)/settings/actions';
 
 export const proposalSchema = z.object({
   clientId: z.string().optional(),
@@ -124,6 +128,40 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, templateId, 
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
 
+  const [isLeadFormOpen, setIsLeadFormOpen] = useState(false);
+  const [localLeads, setLocalLeads] = useState<Lead[]>(leads);
+  const [isCustomerDataLoading, setIsCustomerDataLoading] = useState(true);
+
+  // State for LeadForm dependencies
+  const [users, setUsers] = useState<User[]>([]);
+  const [leadStatuses, setLeadStatuses] = useState<CustomSetting[]>([]);
+  const [leadSources, setLeadSources] = useState<CustomSetting[]>([]);
+
+  // Update local leads when prop changes
+  useEffect(() => {
+    setLocalLeads(leads);
+  }, [leads]);
+
+  // Load data for LeadForm when it's opened
+  useEffect(() => {
+    if (isLeadFormOpen) {
+      const fetchDataForLeadForm = async () => {
+        setIsCustomerDataLoading(true);
+        const [fetchedUsers, fetchedStatuses, fetchedSources] = await Promise.all([
+          getUsers(),
+          getLeadStatuses(),
+          getLeadSources(),
+        ]);
+        setUsers(fetchedUsers);
+        setLeadStatuses(fetchedStatuses);
+        setLeadSources(fetchedSources);
+        setIsCustomerDataLoading(false);
+      };
+      fetchDataForLeadForm();
+    }
+  }, [isLeadFormOpen]);
+
+
   const handleClientSelect = (client: Client) => {
     setSelectedClientId(client.id);
     setSelectedLeadId(null);
@@ -145,14 +183,53 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, templateId, 
     form.setValue("contactPerson", lead.name);
     form.setValue("location", lead.address || "");
   };
+  
+  const handleLeadFormSubmit = async (data: CreateLeadData | Lead) => {
+    startGenerationTransition(async () => {
+        const result = await createLead(data as CreateLeadData);
+        if (result) {
+            const updatedLeads = await getLeads();
+            setLocalLeads(updatedLeads);
+            handleLeadSelect(result); // Auto-select the new lead
+            toast({ title: "Lead Created", description: `Lead "${result.name}" has been created and selected.` });
+            setIsLeadFormOpen(false);
+        } else {
+            toast({ title: "Error", description: "Failed to create lead.", variant: "destructive" });
+        }
+    });
+  };
 
   useEffect(() => {
     if (isOpen) {
       if (proposal) { // Editing
-        form.reset({
-          ...proposal,
+        const formValues: ProposalFormValues = {
+          proposalNumber: proposal.proposalNumber,
           proposalDate: proposal.proposalDate ? format(parseISO(proposal.proposalDate), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-        });
+          name: proposal.name,
+          clientType: proposal.clientType,
+          contactPerson: proposal.contactPerson,
+          location: proposal.location,
+          capacity: proposal.capacity,
+          moduleType: proposal.moduleType,
+          moduleWattage: proposal.moduleWattage,
+          dcrStatus: proposal.dcrStatus,
+          inverterRating: proposal.inverterRating,
+          inverterQty: proposal.inverterQty,
+          ratePerWatt: proposal.ratePerWatt,
+          subsidyAmount: proposal.subsidyAmount,
+          unitRate: proposal.unitRate,
+          requiredSpace: proposal.requiredSpace,
+          generationPerDay: proposal.generationPerDay,
+          generationPerYear: proposal.generationPerYear,
+          savingsPerYear: proposal.savingsPerYear,
+          laKitQty: proposal.laKitQty,
+          acdbDcdbQty: proposal.acdbDcdbQty,
+          earthingKitQty: proposal.earthingKitQty,
+          clientId: proposal.clientId || undefined,
+          leadId: proposal.leadId || undefined,
+          templateId: proposal.templateId,
+        };
+        form.reset(formValues);
         setSelectedClientId(proposal.clientId || null);
         setSelectedLeadId(proposal.leadId || null);
       } else { // Creating from scratch
@@ -320,6 +397,8 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, templateId, 
       }
     });
   };
+  
+  const isCustomerSelected = !!selectedClientId || !!selectedLeadId;
 
   return (
     <>
@@ -328,20 +407,13 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, templateId, 
         <DialogHeader>
           <DialogTitle>{proposal ? 'Edit Proposal' : 'Create New Proposal'}</DialogTitle>
           <DialogDescription>
-            {proposal ? "Update the proposal's information." : 'Select a client/lead or enter new client details.'}
+            {proposal ? "Update the proposal's information." : 'Select an existing customer or create a new lead to begin.'}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4 py-2 pb-4 pr-2">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField name="proposalNumber" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Proposal Number</FormLabel><FormControl><Input placeholder="e.g., P-2024-001" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-              <Controller name="proposalDate" control={form.control} render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Proposal Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal",!field.value && "text-muted-foreground")}>{field.value ? (format(parseISO(field.value), "PPP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value ? parseISO(field.value) : undefined} onSelect={(date) => field.onChange(date ? format(date, 'yyyy-MM-dd') : '')} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )}/>
-            </div>
-            
-            <Separator className="my-6" />
             <h3 className="text-lg font-medium text-foreground">Customer Details</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
                 <CustomerCombobox
                     label="Select Client"
                     customers={clients}
@@ -352,93 +424,112 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, templateId, 
                 />
                 <CustomerCombobox
                     label="Select Lead"
-                    customers={leads}
+                    customers={localLeads}
                     selectedId={selectedLeadId}
                     onSelect={(customer) => handleLeadSelect(customer as Lead)}
                     onClear={() => setSelectedLeadId(null)}
                     disabled={!!selectedClientId || (!!proposal && !!proposal.clientId)}
                 />
             </div>
+            <div className="text-center text-muted-foreground my-2">OR</div>
+            <Button type="button" variant="outline" className="w-full" onClick={() => setIsLeadFormOpen(true)}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Create New Lead
+            </Button>
+
+            <Separator className="my-6" />
             
-            <FormField name="name" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Client/Company Name</FormLabel><FormControl><Input placeholder="Enter name" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <FormField name="clientType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Client Type</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select client type" /></SelectTrigger></FormControl><SelectContent>{CLIENT_TYPES.map(type => (<SelectItem key={type} value={type}>{type}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )}/>
-               <FormField name="contactPerson" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Contact Person</FormLabel><FormControl><Input placeholder="Enter contact person" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-            </div>
-            <FormField name="location" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Location / Site Address</FormLabel><FormControl><Textarea placeholder="Enter full site address" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+             {!isCustomerSelected && (
+                <div className="p-4 text-center bg-muted rounded-md text-muted-foreground">
+                    <p>Please select an existing customer or create a new lead to continue.</p>
+                </div>
+            )}
 
-            <Separator className="my-6" />
-            <h3 className="text-lg font-medium text-foreground">System Details</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-               <FormField name="capacity" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Capacity (kW)</FormLabel><FormControl><Input type="number" placeholder="e.g., 10" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl><FormMessage /></FormItem> )}/>
-               <FormField name="moduleType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Module Type</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select module type" /></SelectTrigger></FormControl><SelectContent>{MODULE_TYPES.map(type => (<SelectItem key={type} value={type}>{type}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )}/>
-               <FormField name="moduleWattage" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Module Wattage (W)</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Wattage" /></SelectTrigger></FormControl><SelectContent>{MODULE_WATTAGE_OPTIONS.map(wattage => (<SelectItem key={wattage} value={wattage}>{wattage} W</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )}/>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <FormField name="dcrStatus" control={form.control} render={({ field }) => ( <FormItem><FormLabel>DCR/Non-DCR</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isDcrDisabled}><FormControl><SelectTrigger><SelectValue placeholder="Select DCR status" /></SelectTrigger></FormControl><SelectContent>{DCR_STATUSES.map(status => ( <SelectItem key={status} value={status}>{status}</SelectItem> ))}</SelectContent></Select>{isDcrDisabled && <p className="text-xs text-muted-foreground">Auto-set to Non-DCR for Commercial/Industrial.</p>}<FormMessage /></FormItem> )}/>
-                <FormField name="inverterRating" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Inverter Rating (kW)</FormLabel><FormControl><Input type="number" placeholder="e.g., 10" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl><FormMessage /></FormItem> )}/>
-                <FormField name="inverterQty" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Inverter Quantity</FormLabel><FormControl><Input type="number" placeholder="e.g., 1" {...field} onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)} /></FormControl><FormMessage /></FormItem> )}/>
-            </div>
-            
-            <Separator className="my-6" />
-            <h3 className="text-lg font-medium text-foreground">Financials</h3>
-            <FormField name="ratePerWatt" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Rate per Watt (₹)</FormLabel><FormControl><Input type="number" placeholder="e.g., 40" {...field} step="0.01" onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl><FormMessage /></FormItem> )}/>
-            <div className="space-y-2 p-3 border rounded-md bg-muted/50">
-                <div className="flex justify-between items-center"><FormLabel>Base Amount</FormLabel><span className="font-semibold flex items-center"><IndianRupee className="h-4 w-4 mr-0.5"/>{calculatedValues.baseAmount.toFixed(2)}</span></div>
-                <div className="flex justify-between items-center"><FormLabel>CGST (6.9%)</FormLabel><span className="text-sm flex items-center"><IndianRupee className="h-3 w-3 mr-0.5"/>{calculatedValues.cgstAmount.toFixed(2)}</span></div>
-                <div className="flex justify-between items-center"><FormLabel>SGST (6.9%)</FormLabel><span className="text-sm flex items-center"><IndianRupee className="h-3 w-3 mr-0.5"/>{calculatedValues.sgstAmount.toFixed(2)}</span></div>
-                <Separator/><div className="flex justify-between items-center text-primary"><FormLabel className="font-medium text-lg">Final Proposal Amount (Pre-Subsidy)</FormLabel><span className="font-bold text-xl flex items-center"><IndianRupee className="h-5 w-5 mr-0.5"/>{calculatedValues.finalAmount.toFixed(2)}</span></div>
-            </div>
-            <FormField name="subsidyAmount" control={form.control} render={({ field }) => ( <FormItem className="mt-4"><FormLabel>Subsidy Amount (₹)</FormLabel><FormControl><Input type="number" placeholder="Auto-calculated" {...field} value={field.value ?? 0} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} readOnly className={'bg-muted cursor-not-allowed text-muted-foreground'} /></FormControl><p className="text-xs text-muted-foreground">Auto-calculated based on client type and capacity. Set to 0 for Non-DCR.</p><FormMessage /></FormItem> )}/>
-
-            <Separator className="my-6" />
-            <h3 className="text-lg font-medium text-foreground">Additional Details</h3>
-
-            <div className="p-3 border rounded-md bg-muted/50 space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <FormItem>
-                    <FormLabel>Required Space (Sq. Ft.)</FormLabel>
-                    <FormControl><Input readOnly value={`${calculatedAdditionalValues.requiredSpace.toFixed(0)} sq. ft.`} /></FormControl>
-                  </FormItem>
-                  <FormItem>
-                    <FormLabel>Generation/Day (Units)</FormLabel>
-                    <FormControl><Input readOnly value={`${calculatedAdditionalValues.generationPerDay.toFixed(2)} units`} /></FormControl>
-                  </FormItem>
-                   <FormItem>
-                    <FormLabel>Generation/Year (Units)</FormLabel>
-                    <FormControl><Input readOnly value={`${calculatedAdditionalValues.generationPerYear.toFixed(2)} units`} /></FormControl>
-                  </FormItem>
+            <fieldset disabled={!isCustomerSelected} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField name="proposalNumber" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Proposal Number</FormLabel><FormControl><Input placeholder="e.g., P-2024-001" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                <Controller name="proposalDate" control={form.control} render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Proposal Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal",!field.value && "text-muted-foreground")}>{field.value ? (format(parseISO(field.value), "PPP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value ? parseISO(field.value) : undefined} onSelect={(date) => field.onChange(date ? format(date, 'yyyy-MM-dd') : '')} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )}/>
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FormField name="unitRate" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Unit Rate (₹)</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}/></FormControl><FormMessage /></FormItem> )}/>
-                <FormItem>
-                    <FormLabel>Savings/Year (₹)</FormLabel>
-                    <FormControl><Input readOnly value={`₹ ${calculatedAdditionalValues.savingsPerYear.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`} /></FormControl>
-                </FormItem>
-            </div>
-            
-            <div className="p-3 border rounded-md bg-muted/50 space-y-3">
-               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <FormField name="name" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Client/Company Name</FormLabel><FormControl><Input placeholder="Enter name" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <FormField name="clientType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Client Type</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select client type" /></SelectTrigger></FormControl><SelectContent>{CLIENT_TYPES.map(type => (<SelectItem key={type} value={type}>{type}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )}/>
+                 <FormField name="contactPerson" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Contact Person</FormLabel><FormControl><Input placeholder="Enter contact person" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+              </div>
+              <FormField name="location" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Location / Site Address</FormLabel><FormControl><Textarea placeholder="Enter full site address" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+
+              <Separator className="my-6" />
+              <h3 className="text-lg font-medium text-foreground">System Details</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                 <FormField name="capacity" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Capacity (kW)</FormLabel><FormControl><Input type="number" placeholder="e.g., 10" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl><FormMessage /></FormItem> )}/>
+                 <FormField name="moduleType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Module Type</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select module type" /></SelectTrigger></FormControl><SelectContent>{MODULE_TYPES.map(type => (<SelectItem key={type} value={type}>{type}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )}/>
+                 <FormField name="moduleWattage" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Module Wattage (W)</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Wattage" /></SelectTrigger></FormControl><SelectContent>{MODULE_WATTAGE_OPTIONS.map(wattage => (<SelectItem key={wattage} value={wattage}>{wattage} W</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )}/>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <FormField name="dcrStatus" control={form.control} render={({ field }) => ( <FormItem><FormLabel>DCR/Non-DCR</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isDcrDisabled}><FormControl><SelectTrigger><SelectValue placeholder="Select DCR status" /></SelectTrigger></FormControl><SelectContent>{DCR_STATUSES.map(status => ( <SelectItem key={status} value={status}>{status}</SelectItem> ))}</SelectContent></Select>{isDcrDisabled && <p className="text-xs text-muted-foreground">Auto-set to Non-DCR for Commercial/Industrial.</p>}<FormMessage /></FormItem> )}/>
+                  <FormField name="inverterRating" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Inverter Rating (kW)</FormLabel><FormControl><Input type="number" placeholder="e.g., 10" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl><FormMessage /></FormItem> )}/>
+                  <FormField name="inverterQty" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Inverter Quantity</FormLabel><FormControl><Input type="number" placeholder="e.g., 1" {...field} onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)} /></FormControl><FormMessage /></FormItem> )}/>
+              </div>
+              
+              <Separator className="my-6" />
+              <h3 className="text-lg font-medium text-foreground">Financials</h3>
+              <FormField name="ratePerWatt" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Rate per Watt (₹)</FormLabel><FormControl><Input type="number" placeholder="e.g., 40" {...field} step="0.01" onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl><FormMessage /></FormItem> )}/>
+              <div className="space-y-2 p-3 border rounded-md bg-muted/50">
+                  <div className="flex justify-between items-center"><FormLabel>Base Amount</FormLabel><span className="font-semibold flex items-center"><IndianRupee className="h-4 w-4 mr-0.5"/>{calculatedValues.baseAmount.toFixed(2)}</span></div>
+                  <div className="flex justify-between items-center"><FormLabel>CGST (6.9%)</FormLabel><span className="text-sm flex items-center"><IndianRupee className="h-3 w-3 mr-0.5"/>{calculatedValues.cgstAmount.toFixed(2)}</span></div>
+                  <div className="flex justify-between items-center"><FormLabel>SGST (6.9%)</FormLabel><span className="text-sm flex items-center"><IndianRupee className="h-3 w-3 mr-0.5"/>{calculatedValues.sgstAmount.toFixed(2)}</span></div>
+                  <Separator/><div className="flex justify-between items-center text-primary"><FormLabel className="font-medium text-lg">Final Proposal Amount (Pre-Subsidy)</FormLabel><span className="font-bold text-xl flex items-center"><IndianRupee className="h-5 w-5 mr-0.5"/>{calculatedValues.finalAmount.toFixed(2)}</span></div>
+              </div>
+              <FormField name="subsidyAmount" control={form.control} render={({ field }) => ( <FormItem className="mt-4"><FormLabel>Subsidy Amount (₹)</FormLabel><FormControl><Input type="number" placeholder="Auto-calculated" {...field} value={field.value ?? 0} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} readOnly className={'bg-muted cursor-not-allowed text-muted-foreground'} /></FormControl><p className="text-xs text-muted-foreground">Auto-calculated based on client type and capacity. Set to 0 for Non-DCR.</p><FormMessage /></FormItem> )}/>
+
+              <Separator className="my-6" />
+              <h3 className="text-lg font-medium text-foreground">Additional Details</h3>
+
+              <div className="p-3 border rounded-md bg-muted/50 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <FormItem>
-                      <FormLabel>LA Kit Quantity</FormLabel>
-                      <FormControl><Input readOnly value={calculatedAdditionalValues.laKitQty} /></FormControl>
+                      <FormLabel>Required Space (Sq. Ft.)</FormLabel>
+                      <FormControl><Input readOnly value={`${calculatedAdditionalValues.requiredSpace.toFixed(0)} sq. ft.`} /></FormControl>
                     </FormItem>
                     <FormItem>
-                      <FormLabel>ACDB/DCDB Quantity</FormLabel>
-                      <FormControl><Input readOnly value={calculatedAdditionalValues.acdbDcdbQty} /></FormControl>
+                      <FormLabel>Generation/Day (Units)</FormLabel>
+                      <FormControl><Input readOnly value={`${calculatedAdditionalValues.generationPerDay.toFixed(2)} units`} /></FormControl>
                     </FormItem>
-                    <FormItem>
-                      <FormLabel>Earthing Kit Quantity</FormLabel>
-                      <FormControl><Input readOnly value={calculatedAdditionalValues.earthingKitQty} /></FormControl>
+                     <FormItem>
+                      <FormLabel>Generation/Year (Units)</FormLabel>
+                      <FormControl><Input readOnly value={`${calculatedAdditionalValues.generationPerYear.toFixed(2)} units`} /></FormControl>
                     </FormItem>
                 </div>
-            </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <FormField name="unitRate" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Unit Rate (₹)</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}/></FormControl><FormMessage /></FormItem> )}/>
+                  <FormItem>
+                      <FormLabel>Savings/Year (₹)</FormLabel>
+                      <FormControl><Input readOnly value={`₹ ${calculatedAdditionalValues.savingsPerYear.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`} /></FormControl>
+                  </FormItem>
+              </div>
+              
+              <div className="p-3 border rounded-md bg-muted/50 space-y-3">
+                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <FormItem>
+                        <FormLabel>LA Kit Quantity</FormLabel>
+                        <FormControl><Input readOnly value={calculatedAdditionalValues.laKitQty} /></FormControl>
+                      </FormItem>
+                      <FormItem>
+                        <FormLabel>ACDB/DCDB Quantity</FormLabel>
+                        <FormControl><Input readOnly value={calculatedAdditionalValues.acdbDcdbQty} /></FormControl>
+                      </FormItem>
+                      <FormItem>
+                        <FormLabel>Earthing Kit Quantity</FormLabel>
+                        <FormControl><Input readOnly value={calculatedAdditionalValues.earthingKitQty} /></FormControl>
+                      </FormItem>
+                  </div>
+              </div>
+            </fieldset>
             
             <DialogFooter className="pt-6">
               <Button type="button" variant="outline" onClick={onClose} disabled={isGenerating}>Cancel</Button>
-              <Button type="submit" disabled={isGenerating}>
+              <Button type="submit" disabled={isGenerating || !isCustomerSelected}>
                 {isGenerating && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
                 {proposal ? 'Save & Regenerate' : 'Generate Proposal PDF'}
               </Button>
@@ -447,6 +538,16 @@ export function ProposalForm({ isOpen, onClose, onSubmit, proposal, templateId, 
         </Form>
       </DialogContent>
     </Dialog>
+    {isLeadFormOpen && (
+        <LeadForm
+            isOpen={isLeadFormOpen}
+            onClose={() => setIsLeadFormOpen(false)}
+            onSubmit={handleLeadFormSubmit}
+            users={users}
+            statuses={leadStatuses}
+            sources={leadSources}
+        />
+    )}
     </>
   );
 }

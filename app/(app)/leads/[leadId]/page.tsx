@@ -1,9 +1,9 @@
 
 'use client';
 
-import { useEffect, useState, useTransition, useMemo } from 'react';
+import { useEffect, useState, useTransition, useMemo, ChangeEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -13,12 +13,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { LEAD_PRIORITY_OPTIONS, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, CLIENT_TYPES, DROP_REASON_OPTIONS } from '@/lib/constants';
-import type { Lead, User, UserOptionType, LeadSourceOptionType, LeadStatusType, LeadPriorityType, ClientType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateLeadData, AnyStatusType, DropReasonType, Proposal, CustomSetting } from '@/types';
+import type { Lead, User, LeadStatusType, LeadPriorityType, ClientType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateLeadData, DropReasonType, Proposal, CustomSetting, SiteSurvey } from '@/types';
 import { format, parseISO, isValid } from 'date-fns';
-import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, UserCircle2, FileText, ShoppingCart, Loader2, Save, Send, Video, Building, Repeat, Trash2, IndianRupee } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, UserCircle2, FileText, ShoppingCart, Loader2, Save, Send, Video, Building, Repeat, Trash2, IndianRupee, ClipboardEdit, Eye, UploadCloud } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { getLeadById, updateLead, addActivity, convertToClient, dropLead, getActivitiesForLead } from '@/app/(app)/leads-list/actions';
 import { getProposalsForLead, createOrUpdateProposal } from '@/app/(app)/proposals/actions';
+import { getSurveysForLead } from '@/app/(app)/site-survey/actions';
 import { getUsers } from '@/app/(app)/users/actions';
 import { getLeadStatuses, getLeadSources } from '@/app/(app)/settings/actions';
 import { LeadForm } from '@/app/(app)/leads/lead-form';
@@ -54,6 +55,44 @@ const ActivityIcon = ({ type, className }: { type: string, className?: string })
   }
 };
 
+const SurveyDetailsCard = ({ survey }: { survey: SiteSurvey }) => {
+    if (!survey) return null;
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                    <ClipboardEdit className="h-5 w-5 text-primary" />
+                    Site Survey Details
+                </CardTitle>
+                <CardDescription>Survey No: {survey.surveyNumber.slice(-8)}</CardDescription>
+            </CardHeader>
+            <CardContent className="text-xs space-y-3">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                    <div><strong>Survey Date:</strong> {format(parseISO(survey.date), 'dd MMM, yyyy')}</div>
+                    <div><strong>Surveyor:</strong> {survey.surveyorName}</div>
+                    <div><strong>Category:</strong> {survey.consumerCategory}</div>
+                    <div><strong>Roof Type:</strong> {survey.roofType}</div>
+                    <div><strong>Building Height:</strong> {survey.buildingHeight}</div>
+                    <div><strong>Shadow-Free Area:</strong> {survey.shadowFreeArea}</div>
+                    <div><strong>DISCOM:</strong> {survey.discom}</div>
+                    <div><strong>Sanctioned Load:</strong> {survey.sanctionedLoad || 'N/A'}</div>
+                    <div><strong>Meter Phase:</strong> {survey.meterPhase || 'N/A'}</div>
+                    <div><strong>No. of Meters:</strong> {survey.numberOfMeters}</div>
+                    <div><strong>Meter Rating:</strong> {survey.meterRating || 'N/A'}</div>
+                    <div><strong>Avg. Bill (₹):</strong> {survey.electricityAmount?.toLocaleString('en-IN') || 'N/A'}</div>
+                </div>
+                {survey.remark && (
+                    <div className="pt-1">
+                        <strong className="font-semibold">Remark:</strong>
+                        <p className="p-2 bg-muted rounded-md mt-1 text-xs">{survey.remark}</p>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+};
+
+
 export default function LeadDetailsPage() {
   const router = useRouter();
   const params = useParams();
@@ -66,9 +105,11 @@ export default function LeadDetailsPage() {
   const [isFormPending, startFormTransition] = useTransition();
   const [isUpdating, startUpdateTransition] = useTransition();
   const [isDropping, startDropTransition] = useTransition();
+  const [isUploadingBill, startBillUploadTransition] = useTransition();
   
   const [activities, setActivities] = useState<FollowUp[]>([]);
   const [isActivitiesLoading, setActivitiesLoading] = useState(true);
+  const [surveys, setSurveys] = useState<SiteSurvey[]>([]);
 
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
   const [isDropDialogOpen, setIsDropDialogOpen] = useState(false);
@@ -91,6 +132,7 @@ export default function LeadDetailsPage() {
 
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [selectedProposalForPreview, setSelectedProposalForPreview] = useState<Proposal | null>(null);
+  const [isBillPreviewOpen, setIsBillPreviewOpen] = useState(false);
 
   const dropForm = useForm<DropLeadFormValues>({
     resolver: zodResolver(dropLeadSchema),
@@ -108,16 +150,18 @@ export default function LeadDetailsPage() {
       const fetchLeadDetails = async () => {
         setLead(undefined);
         try {
-          const [fetchedLead, fetchedUsers, fetchedStatuses, fetchedSources] = await Promise.all([
+          const [fetchedLead, fetchedUsers, fetchedStatuses, fetchedSources, fetchedSurveys] = await Promise.all([
             getLeadById(leadId),
             getUsers(),
             getLeadStatuses(),
             getLeadSources(),
+            getSurveysForLead(leadId),
           ]);
           setLead(fetchedLead);
           setUsers(fetchedUsers);
           setLeadStatuses(fetchedStatuses);
           setLeadSources(fetchedSources);
+          setSurveys(fetchedSurveys);
 
           if (fetchedLead) {
             setActivityLeadStage(fetchedLead.status as LeadStatusType);
@@ -159,6 +203,45 @@ export default function LeadDetailsPage() {
         setActivityPriority(lead.priority as LeadPriorityType || undefined);
     }
   }, [lead]);
+
+  const handleBillUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !lead) return;
+
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      toast({ title: "File Too Large", description: "Please upload a file smaller than 5MB.", variant: "destructive" });
+      return;
+    }
+
+    startBillUploadTransition(async () => {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch('/api/templates/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to upload bill.');
+        }
+
+        const result = await response.json();
+        const updatedLead = await updateLead(lead.id, { electricityBillUrl: result.filePath });
+        
+        if (updatedLead) {
+          setLead(updatedLead);
+          toast({ title: "E-Bill Uploaded", description: "The electricity bill has been successfully attached." });
+        } else {
+          throw new Error("Failed to save the bill URL to the lead.");
+        }
+      } catch (error) {
+        toast({ title: "Upload Failed", description: (error as Error).message, variant: "destructive" });
+      }
+    });
+  };
 
   const handleProposalSubmit = async (data: Partial<Proposal>) => {
     startFormTransition(async () => {
@@ -484,56 +567,6 @@ export default function LeadDetailsPage() {
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-md">Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <Label htmlFor="leadSource" className="text-xs">Source</Label>
-                  <Input id="leadSource" value={lead.source || 'N/A'} disabled className="h-8 text-xs" />
-                </div>
-                <div>
-                  <Label className="text-xs">Address</Label>
-                  <p className="text-sm bg-muted p-2 rounded-md min-h-[40px]">{lead.address || 'Not specified'}</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-md">Lead Attributes</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                 <div>
-                  <Label htmlFor="customerType" className="text-xs">Customer Type</Label>
-                  <Select
-                    value={lead.clientType || undefined}
-                    onValueChange={(value) => handleAttributeChange('clientType', value as ClientType)}
-                    disabled={isUpdating}
-                  >
-                    <SelectTrigger id="customerType" className="h-8 text-xs">
-                      <SelectValue placeholder="Select customer type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CLIENT_TYPES.map(type => <SelectItem key={type} value={type} className="text-xs">{type}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="kilowatt" className="text-xs">Kilowatt</Label>
-                  <Input
-                    id="kilowatt"
-                    type="number"
-                    defaultValue={lead.kilowatt ?? ''}
-                    onBlur={(e) => handleAttributeChange('kilowatt', parseFloat(e.target.value) || 0)}
-                    className="h-8 text-xs"
-                    disabled={isUpdating}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
                 <CardTitle className="text-md">Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
@@ -656,6 +689,7 @@ export default function LeadDetailsPage() {
                 )}
               </CardContent>
             </Card>
+            {surveys.length > 0 && <SurveyDetailsCard survey={surveys[0]} />}
           </div>
 
           <div className="lg:col-span-3 space-y-6">
@@ -685,6 +719,25 @@ export default function LeadDetailsPage() {
                 </div>
                 <p className="text-xs text-muted-foreground ml-10">Created by</p>
               </CardContent>
+            </Card>
+            <Card>
+                <CardHeader className="pb-2 pt-4"><CardTitle className="text-md">E-Bill</CardTitle></CardHeader>
+                <CardContent className="space-y-2">
+                    {lead.electricityBillUrl ? (
+                        <Button variant="outline" size="sm" className="w-full" onClick={() => setIsBillPreviewOpen(true)}>
+                            <Eye className="mr-2 h-4 w-4" /> View Uploaded Bill
+                        </Button>
+                    ) : (
+                        <div className="text-center text-xs text-muted-foreground p-2">No bill uploaded.</div>
+                    )}
+                    <div>
+                        <Label htmlFor="bill-upload" className={cn(buttonVariants({variant: "secondary", size: "sm"}), "w-full cursor-pointer")}>
+                            {isUploadingBill ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <UploadCloud className="mr-2 h-4 w-4"/>}
+                            {lead.electricityBillUrl ? 'Replace Bill' : 'Upload Bill'}
+                        </Label>
+                        <Input id="bill-upload" type="file" className="hidden" accept=".pdf,.png,.jpg,.jpeg" onChange={handleBillUpload} disabled={isUploadingBill}/>
+                    </div>
+                </CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2 pt-4"><CardTitle className="text-md">Notes</CardTitle></CardHeader>
@@ -741,6 +794,14 @@ export default function LeadDetailsPage() {
           onClose={() => setIsPreviewOpen(false)}
           pdfUrl={selectedProposalForPreview.pdfUrl || null}
           docxUrl={selectedProposalForPreview.docxUrl || null}
+        />
+      )}
+      {isBillPreviewOpen && lead.electricityBillUrl && (
+        <ProposalPreviewDialog
+            isOpen={isBillPreviewOpen}
+            onClose={() => setIsBillPreviewOpen(false)}
+            pdfUrl={lead.electricityBillUrl}
+            docxUrl={null}
         />
       )}
     </div>

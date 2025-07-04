@@ -1,5 +1,5 @@
 
-import type { NavItem, Lead, Client, Proposal, Document, Communication, DocumentType, ClientType, LeadPriorityType, ClientPriorityType, UserOptionType, DropReasonType, Expense, Survey, UserRole, Template, ProposalOrDocumentType } from '@/types';
+import type { NavItem, Lead, Client, Proposal, Document, Communication, DocumentType, ClientType, LeadPriorityType, ClientPriorityType, UserOptionType, DropReasonType, Expense, UserRole, Template, ProposalOrDocumentType, SiteSurvey } from '@/types';
 import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard,
@@ -48,6 +48,7 @@ export const NAV_ITEMS: NavItem[] = [
 
 // Secondary Navigation for tools/other sections, in user profile dropdown
 export const TOOLS_NAV_ITEMS: NavItem[] = [
+  { href: '/survey-list', label: 'Survey List', icon: ClipboardList },
   { href: '/expenses', label: 'Expenses', icon: Notebook },
   { href: '/communications', label: 'Communications', icon: MessageSquareText },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays },
@@ -120,7 +121,6 @@ export const EXPENSE_CATEGORIES = ['Travel', 'Food', 'Supplies', 'Utilities', 'S
 export const MOCK_EXPENSES: Expense[] = [];
 export const SURVEY_STATUS_OPTIONS = ['Scheduled', 'In Progress', 'Completed', 'Cancelled', 'On Hold'] as const;
 export const SURVEY_TYPE_OPTIONS = ['Commercial', 'Residential', 'Industrial', 'Agricultural', 'Other'] as const;
-export const MOCK_SURVEYS: Survey[] = [];
 export const CONSUMER_CATEGORIES_OPTIONS = CLIENT_TYPES;
 export const METER_PHASES = ['Single Phase', 'Three Phase', 'Not Applicable'] as const;
 export const CONSUMER_LOAD_TYPES = ['LT', 'HT'] as const;
@@ -165,6 +165,10 @@ export const PLACEHOLDER_DEFINITIONS_PROPOSAL: PlaceholderGroup = {
     { placeholder: '{{la_kit_qty}}', description: 'Quantity of Lightning Arrester kits.' },
     { placeholder: '{{acdb_dcdb_qty}}', description: 'Quantity of ACDB/DCDB boxes.' },
     { placeholder: '{{earthing_kit_qty}}', description: 'Quantity of Earthing kits.' },
+  ],
+  'Charts & Graphs (Add to your template)': [
+    { placeholder: '{{monthly_generation_chart}}', description: 'A bar chart showing estimated monthly energy production for the year.' },
+    { placeholder: '{{yearly_savings_chart}}', description: 'A line chart projecting yearly savings over 30 years.' },
   ],
   'Date & Time': [
      { placeholder: '{{date_today}}', description: 'The current date when the document is generated.' },

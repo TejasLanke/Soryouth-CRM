@@ -1,12 +1,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
+import os from 'os';
 import fs from 'fs/promises';
 import { format, parseISO } from 'date-fns';
 import type { Proposal } from '@/types';
 import { getTemplateById } from '@/app/(app)/manage-templates/actions';
+import { uploadFileToS3, getFileFromS3 } from '@/lib/s3';
 
-// This function formats the data to match the placeholders in the DOCX template.
 function getTemplateData(proposal: Proposal) {
   return {
     name: proposal.name,
@@ -28,8 +29,6 @@ function getTemplateData(proposal: Proposal) {
     final_amount: proposal.finalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
     subsidy_amount: proposal.subsidyAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
     date_today: format(new Date(), 'dd MMM, yyyy'),
-
-    // Additional fields
     required_space: (proposal.requiredSpace ?? 0).toLocaleString('en-IN'),
     generation_per_day: (proposal.generationPerDay ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
     generation_per_year: (proposal.generationPerYear ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
@@ -43,6 +42,7 @@ function getTemplateData(proposal: Proposal) {
 
 
 export async function POST(request: NextRequest) {
+  let tempFilePath: string | null = null;
   try {
     const { templateId, data } = await request.json();
 
@@ -55,16 +55,24 @@ export async function POST(request: NextRequest) {
     if (!template || !template.originalDocxPath) {
       return NextResponse.json({ error: 'Template not found or has no associated file.' }, { status: 404 });
     }
+
+    // Use SDK to get the file from S3 instead of a public fetch
+    const s3Url = new URL(template.originalDocxPath);
+    const templateKey = s3Url.pathname.substring(1); // Remove leading '/'
+    const templateBuffer = await getFileFromS3(templateKey);
+    
+    const tempDir = os.tmpdir();
+    tempFilePath = path.join(tempDir, `template-${Date.now()}.docx`);
+    await fs.writeFile(tempFilePath, templateBuffer);
     
     const templateData = getTemplateData(data as Proposal);
 
-    // Call the Python microservice
     const pythonServiceUrl = 'http://127.0.0.1:5001/generate';
     const response = await fetch(pythonServiceUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            template_path: template.originalDocxPath,
+            template_path: tempFilePath, // Pass path to temp file
             data: templateData
         })
     });
@@ -80,32 +88,22 @@ export async function POST(request: NextRequest) {
       throw new Error("Python service returned an invalid payload.");
     }
     
-    // Decode base64 strings to buffers
     const pdfBuffer = Buffer.from(result.pdf_b64, 'base64');
     const docxBuffer = Buffer.from(result.docx_b64, 'base64');
 
-    // Prepare paths for saving
-    const generatedDir = path.join(process.cwd(), 'public', 'generated_proposals');
-    await fs.mkdir(generatedDir, { recursive: true });
-    
-    const baseFileName = `${data.proposalNumber}_${Date.now()}`;
-    const pdfFileName = `${baseFileName}.pdf`;
-    const docxFileName = `${baseFileName}.docx`;
+    const baseKey = `proposals/${data.proposalNumber}_${Date.now()}`;
+    const pdfKey = `${baseKey}.pdf`;
+    const docxKey = `${baseKey}.docx`;
 
-    const pdfFilePath = path.join(generatedDir, pdfFileName);
-    const docxFilePath = path.join(generatedDir, docxFileName);
-
-    // Save both files
-    await fs.writeFile(pdfFilePath, pdfBuffer);
-    await fs.writeFile(docxFilePath, docxBuffer);
-
-    const publicPdfUrl = `/generated_proposals/${pdfFileName}`;
-    const publicDocxUrl = `/generated_proposals/${docxFileName}`;
+    const [pdfUrl, docxUrl] = await Promise.all([
+        uploadFileToS3(pdfBuffer, pdfKey, 'application/pdf'),
+        uploadFileToS3(docxBuffer, docxKey, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    ]);
 
     return NextResponse.json({
       success: true,
-      pdfUrl: publicPdfUrl,
-      docxUrl: publicDocxUrl,
+      pdfUrl: pdfUrl,
+      docxUrl: docxUrl,
     });
 
   } catch (error) {
@@ -115,5 +113,10 @@ export async function POST(request: NextRequest) {
         errorMessage = error.message;
     }
     return NextResponse.json({ error: errorMessage }, { status: 500 });
+  } finally {
+    // Clean up the temporary file in all cases
+    if (tempFilePath) {
+      await fs.unlink(tempFilePath).catch(err => console.error(`Failed to delete temp file: ${tempFilePath}`, err));
+    }
   }
 }

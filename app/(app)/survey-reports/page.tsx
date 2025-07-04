@@ -1,31 +1,43 @@
 
 'use client';
 
-import { useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BarChart, Bar, PieChart, Pie, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, Legend as RechartsLegend, LabelList } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from '@/components/ui/chart';
-import { ClipboardList, CalendarDays, MapPin, Building, Home, Sun, List } from 'lucide-react';
+import { ClipboardList, CalendarDays, MapPin, Building, Home, Sun, List, Loader2 } from 'lucide-react';
 import { format, subDays, isWithinInterval, startOfDay, endOfDay, parseISO } from 'date-fns';
-import { MOCK_SURVEYS, USER_OPTIONS, SURVEY_TYPE_OPTIONS as SURVEY_TYPES_CONST } from '@/lib/constants'; // Use constant
-import type { Survey, SurveyTypeOption, UserOptionType } from '@/types';
-
+import { CONSUMER_CATEGORIES_OPTIONS } from '@/lib/constants';
+import type { SiteSurvey, ConsumerCategoryType } from '@/types';
+import { getSiteSurveys } from '@/app/(app)/site-survey/actions';
 
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
-
 export default function SurveyReportsPage() {
+  const [surveys, setSurveys] = useState<SiteSurvey[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      setIsLoading(true);
+      const fetchedSurveys = await getSiteSurveys();
+      setSurveys(fetchedSurveys);
+      setIsLoading(false);
+    }
+    fetchData();
+  }, []);
+
   const surveysInLast30Days = useMemo(() => {
     const today = startOfDay(new Date());
     const thirtyDaysAgo = startOfDay(subDays(today, 29)); 
-    return MOCK_SURVEYS.filter(survey => {
-      const surveyDate = parseISO(survey.surveyDate); // Use surveyDate
+    return surveys.filter(survey => {
+      const surveyDate = parseISO(survey.date);
       return isWithinInterval(surveyDate, { start: thirtyDaysAgo, end: endOfDay(today) });
     });
-  }, []);
+  }, [surveys]);
 
   const locationDistributionData = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -39,14 +51,14 @@ export default function SurveyReportsPage() {
 
   const typeDistributionData = useMemo(() => {
     const counts: Record<string, number> = {};
-    SURVEY_TYPES_CONST.forEach(type => counts[type] = 0);
+    CONSUMER_CATEGORIES_OPTIONS.forEach(type => counts[type] = 0);
 
     surveysInLast30Days.forEach(survey => {
-      if (counts[survey.type] !== undefined) {
-        counts[survey.type]++;
+      if (counts[survey.consumerCategory] !== undefined) {
+        counts[survey.consumerCategory]++;
       }
     });
-    return SURVEY_TYPES_CONST.map((type, index) => ({
+    return CONSUMER_CATEGORIES_OPTIONS.map((type, index) => ({
       name: type,
       value: counts[type] || 0,
       fill: COLORS[index % COLORS.length],
@@ -65,16 +77,24 @@ export default function SurveyReportsPage() {
     return config;
   }, [typeDistributionData]);
 
-
-  const SurveyTypeIconInternal = ({ type }: { type: SurveyTypeOption }) => {
+  const ConsumerCategoryIcon = ({ type }: { type: ConsumerCategoryType }) => {
     switch (type) {
       case 'Commercial': return <Building className="h-4 w-4 text-muted-foreground" />;
       case 'Industrial': return <Sun className="h-4 w-4 text-muted-foreground" />; 
-      case 'Residential': return <Home className="h-4 w-4 text-muted-foreground" />;
-      case 'Agricultural': return <ClipboardList className="h-4 w-4 text-muted-foreground" />; // Example for Agricultural
+      case 'Housing Society': return <Building className="h-4 w-4 text-muted-foreground" />;
+      case 'Individual/Bungalow': return <Home className="h-4 w-4 text-muted-foreground" />;
       default: return <ClipboardList className="h-4 w-4 text-muted-foreground" />;
     }
   };
+  
+  if (isLoading) {
+    return (
+        <div className="flex flex-1 items-center justify-center h-full">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            <p className="ml-4 text-lg text-muted-foreground">Loading Survey Reports...</p>
+        </div>
+    );
+  }
 
   return (
     <>
@@ -178,14 +198,14 @@ export default function SurveyReportsPage() {
                     {surveysInLast30Days.slice(0, 5).map(survey => ( 
                         <div key={survey.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50">
                             <div>
-                                <p className="font-medium text-sm">Survey No: {survey.surveyNumber}</p>
+                                <p className="font-medium text-sm">Survey No: {survey.surveyNumber.slice(-8)}</p>
                                 <p className="text-xs text-muted-foreground">
                                     <MapPin className="inline h-3 w-3 mr-1"/>{survey.location} - 
-                                    <SurveyTypeIconInternal type={survey.type as SurveyTypeOption}/> {survey.type}
+                                    <ConsumerCategoryIcon type={survey.consumerCategory as ConsumerCategoryType}/> {survey.consumerCategory}
                                 </p>
                             </div>
                             <div className="text-right">
-                                <p className="text-sm">{format(parseISO(survey.surveyDate), "dd MMM, yyyy")}</p>
+                                <p className="text-sm">{format(parseISO(survey.date), "dd MMM, yyyy")}</p>
                                 <p className="text-xs text-muted-foreground">By: {survey.surveyorName}</p>
                             </div>
                         </div>

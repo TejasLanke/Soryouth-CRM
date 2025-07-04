@@ -1,21 +1,8 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
-
-const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-
-const ensureUploadDirExists = async () => {
-    try {
-        await fs.access(uploadDir);
-    } catch (error) {
-        await fs.mkdir(uploadDir, { recursive: true });
-    }
-};
+import { uploadFileToS3 } from '@/lib/s3';
 
 export async function POST(request: NextRequest) {
-  await ensureUploadDirExists();
-
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
@@ -24,22 +11,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file uploaded.' }, { status: 400 });
     }
     
-    // Sanitize filename to prevent directory traversal
-    const safeFilename = path.basename(file.name);
-
-    // Generate a unique filename to prevent overwrites
-    const timestamp = Date.now();
-    const uniqueFilename = `${timestamp}-${safeFilename}`;
-    const filepath = path.join(uploadDir, uniqueFilename);
-    const publicFilePath = `/uploads/${uniqueFilename}`;
+    // Sanitize filename and create a unique key for S3
+    const safeFilename = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
+    const uniqueKey = `uploads/${Date.now()}-${safeFilename}`;
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    await fs.writeFile(filepath, buffer);
+
+    // Upload to S3 instead of local filesystem
+    const fileUrl = await uploadFileToS3(buffer, uniqueKey, file.type);
 
     return NextResponse.json({
       success: true,
-      filePath: publicFilePath,
+      filePath: fileUrl, // Return the S3 URL
     });
 
   } catch (error) {

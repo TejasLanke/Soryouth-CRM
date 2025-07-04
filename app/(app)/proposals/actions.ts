@@ -1,9 +1,11 @@
+
 'use server';
 
 import prisma from '@/lib/prisma';
 import type { Proposal } from '@/types';
 import { revalidatePath } from 'next/cache';
 import { parseISO } from 'date-fns';
+import { deleteFileFromS3 } from '@/lib/s3';
 
 // Helper to map Prisma proposal to frontend Proposal type
 function mapPrismaProposalToProposalType(prismaProposal: any): Proposal {
@@ -44,11 +46,37 @@ export async function createOrUpdateProposal(data: Partial<Proposal>): Promise<P
     try {
         let savedProposal;
         if (id) {
+            // Fetch the old proposal to get the old file URLs
+            const oldProposal = await prisma.proposal.findUnique({
+                where: { id },
+                select: { pdfUrl: true, docxUrl: true }
+            });
+
             // Update existing proposal
             savedProposal = await prisma.proposal.update({
                 where: { id },
                 data: dataToSave,
             });
+
+            // After successful update, delete old files if they exist and are different
+            if (oldProposal) {
+                if (oldProposal.pdfUrl && oldProposal.pdfUrl !== savedProposal.pdfUrl) {
+                    try {
+                        const pdfKey = new URL(oldProposal.pdfUrl).pathname.substring(1);
+                        await deleteFileFromS3(pdfKey);
+                    } catch (e) {
+                        console.error(`Failed to delete old PDF file: ${oldProposal.pdfUrl}`, e);
+                    }
+                }
+                if (oldProposal.docxUrl && oldProposal.docxUrl !== savedProposal.docxUrl) {
+                    try {
+                        const docxKey = new URL(oldProposal.docxUrl).pathname.substring(1);
+                        await deleteFileFromS3(docxKey);
+                    } catch (e) {
+                        console.error(`Failed to delete old DOCX file: ${oldProposal.docxUrl}`, e);
+                    }
+                }
+            }
         } else {
             // Create new proposal
             savedProposal = await prisma.proposal.create({

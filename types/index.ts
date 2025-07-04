@@ -87,8 +87,9 @@ export type CreateClientData = Omit<Client, 'id' | 'createdAt' | 'updatedAt' | '
 export interface Proposal {
   id: string;
   proposalNumber: string;
-  clientId?: string;
-  leadId?: string;
+  clientId?: string | null;
+  leadId?: string | null;
+  droppedLeadId?: string | null;
   templateId?: string;
   name: string;
   clientType: ClientType;
@@ -144,6 +145,15 @@ export interface Document {
   relatedProposalId?: string;
   createdAt: string;
   filePath?: string;
+}
+
+export interface GeneratedDocument {
+  id: string;
+  clientName: string;
+  documentType: string;
+  pdfUrl: string;
+  docxUrl: string;
+  createdAt: string;
 }
 
 export interface Communication {
@@ -250,39 +260,16 @@ export interface Expense {
 
 export type SurveyStatusType = typeof SURVEY_STATUS_OPTIONS[number];
 export type SurveyTypeOption = typeof SURVEY_TYPE_OPTIONS[number];
-
-export interface Survey {
-  id: string;
-  surveyNumber: string;
-  clientName: string;
-  location: string;
-  surveyDate: string;
-  surveyorName: UserOptionType;
-  status: SurveyStatusType;
-  type: SurveyTypeOption;
-  notes?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface SurveySortConfig {
-  key: keyof Survey;
-  direction: 'ascending' | 'descending';
-}
-
-export interface SurveyStatusFilterItem {
-  label: SurveyStatusType | 'Show all';
-  count: number;
-  value: SurveyStatusType | 'all';
-}
-
-export type ConsumerCategoryType = ClientType;
+export type ConsumerCategoryType = typeof CLIENT_TYPES[number];
 export type MeterPhaseType = typeof METER_PHASES[number];
 export type ConsumerLoadType = typeof CONSUMER_LOAD_TYPES[number];
 export type RoofType = typeof ROOF_TYPES[number];
 export type DiscomType = typeof DISCOM_OPTIONS[number];
 
-export interface SiteSurveyData {
+
+export interface SiteSurvey {
+  id: string;
+  surveyNumber: string;
   consumerName: string;
   date: string;
   consumerCategory: ConsumerCategoryType;
@@ -298,13 +285,46 @@ export interface SiteSurveyData {
   discom: DiscomType;
   sanctionedLoad?: string;
   remark?: string;
-  surveyorName: UserOptionType;
-  electricityBillFile?: File | null;
+  electricityBillFile?: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  leadId?: string | null;
+  clientId?: string | null;
+  droppedLeadId?: string | null;
+  surveyorName: string;
+  surveyorId: string;
 }
 
-export type SiteSurveyFormValues = Omit<SiteSurveyData, 'electricityBillFile'> & {
-  electricityBillFile?: FileList | null;
+export type CreateSiteSurveyData = Omit<SiteSurvey, 'id' | 'surveyNumber' | 'createdAt' | 'updatedAt' | 'surveyorName' | 'status' | 'consumerName' | 'location'> & {
+  leadId?: string | null;
+  clientId?: string | null;
+  surveyorId: string;
+  consumerName: string;
+  location: string;
+  status?: string;
 };
+
+
+export type SiteSurveyFormValues = Omit<SiteSurvey, 'id' | 'surveyNumber' | 'createdAt' | 'updatedAt' | 'surveyorName' | 'status' | 'electricityBillFile' | 'surveyorId' > & {
+  electricityBillFile?: FileList | null;
+  surveyorName: UserOptionType;
+  leadId?: string;
+  clientId?: string;
+};
+
+
+export interface SurveySortConfig {
+  key: keyof SiteSurvey;
+  direction: 'ascending' | 'descending';
+}
+
+export interface SurveyStatusFilterItem {
+  label: SurveyStatusType | 'Show all';
+  count: number;
+  value: SurveyStatusType | 'all';
+}
+
 
 export type ProposalOrDocumentType = 'Proposal' | DocumentType;
 
