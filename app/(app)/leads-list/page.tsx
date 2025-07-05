@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect, useTransition } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { LeadsTable } from '@/app/(app)/leads/leads-table';
 import { DROP_REASON_OPTIONS } from '@/lib/constants';
-import { Filter, Search, Upload, PlusCircle, Settings2, ListChecks, ListFilter, Rows, ChevronDown } from 'lucide-react';
+import { Loader2, Filter, Search, Upload, PlusCircle, Settings2, ListChecks, ListFilter, Rows, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LeadForm } from '@/app/(app)/leads/lead-form';
 import { SettingsDialog } from '@/app/(app)/settings/settings-dialog';
@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Lead, User, LeadStatusType, StatusFilterItem, LeadSortConfig, CreateLeadData, UserOptionType, LeadSourceOptionType, DropReasonType, CustomSetting } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { format, parseISO, startOfDay, isSameDay } from 'date-fns';
-import { getLeads, createLead, updateLead, deleteLead, bulkUpdateLeads, bulkDropLeads } from './actions';
+import { getLeads, createLead, updateLead, deleteLead, bulkUpdateLeads, bulkDropLeads, importLeads } from './actions';
 import { getUsers } from '@/app/(app)/users/actions';
 import { getLeadStatuses, getLeadSources } from '@/app/(app)/settings/actions';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuCheckboxItem, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu';
@@ -47,6 +47,79 @@ const dropLeadSchema = z.object({
 });
 type DropLeadFormValues = z.infer<typeof dropLeadSchema>;
 
+function BulkImportDialog({ isOpen, onClose, onImportSuccess }: { isOpen: boolean, onClose: () => void, onImportSuccess: () => void }) {
+  const [isUploading, startUploadTransition] = useTransition();
+  const { toast } = useToast();
+  const [file, setFile] = useState<File | null>(null);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const uploadedFile = event.target.files?.[0];
+    if (uploadedFile) {
+        if (uploadedFile.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || uploadedFile.type === 'application/vnd.ms-excel') {
+            setFile(uploadedFile);
+        } else {
+            toast({ title: "Invalid File Type", description: "Please upload a .xlsx file.", variant: "destructive" });
+        }
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!file) {
+      toast({ title: "No File Selected", description: "Please select a file to upload.", variant: "destructive" });
+      return;
+    }
+
+    startUploadTransition(async () => {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const result = await importLeads(formData);
+        
+        if (result.success) {
+            toast({
+                title: "Import Successful",
+                description: result.message,
+            });
+            onImportSuccess();
+            onClose();
+        } else {
+            toast({
+                title: "Import Failed",
+                description: result.message,
+                variant: "destructive",
+            });
+        }
+    });
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Bulk Import Data</DialogTitle>
+                <DialogDescription>Select an Excel (.xlsx) file to import leads data.</DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+                <div className="space-y-2">
+                    <Label htmlFor="import-file">Upload File</Label>
+                    <Input id="import-file" type="file" accept=".xlsx" onChange={handleFileChange} />
+                </div>
+                <a href="/api/leads/download-template" download="lead_import_template.xlsx" className="text-sm text-primary hover:underline">
+                    Click here to download excel import format.
+                </a>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={onClose} disabled={isUploading}>Cancel</Button>
+                <Button onClick={handleUpload} disabled={isUploading || !file}>
+                    {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                    Upload Data
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function LeadsListPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -55,6 +128,7 @@ export default function LeadsListPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [selectedLeadForEdit, setSelectedLeadForEdit] = useState<Lead | null>(null);
   const { toast } = useToast();
   const [activeFilter, setActiveFilter] = useState<LeadStatusType | 'all'>('all');
@@ -384,7 +458,7 @@ export default function LeadsListPage() {
                     <Button variant="outline" size="sm" onClick={() => setIsSearchOpen(true)}>
                     <Search className="mr-2 h-4 w-4" /> Search
                     </Button>
-                    <Button variant="outline" size="sm" disabled>
+                    <Button variant="outline" size="sm" onClick={() => setIsImportDialogOpen(true)}>
                     <Upload className="mr-2 h-4 w-4" /> Upload
                     </Button>
                 </>
@@ -511,6 +585,12 @@ export default function LeadsListPage() {
           </Button>
         </div>
       </div>
+
+      <BulkImportDialog 
+        isOpen={isImportDialogOpen}
+        onClose={() => setIsImportDialogOpen(false)}
+        onImportSuccess={refreshData}
+      />
 
       {isFormOpen && (
         <LeadForm

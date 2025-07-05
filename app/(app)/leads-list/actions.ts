@@ -1,4 +1,3 @@
-
 'use server';
 
 import prisma from '@/lib/prisma';
@@ -6,6 +5,8 @@ import type { Lead, FollowUp, AddActivityData, CreateLeadData, Client, DropReaso
 import { revalidatePath } from 'next/cache';
 import { format, parseISO } from 'date-fns';
 import { verifySession } from '@/lib/auth';
+import * as ExcelJS from 'exceljs';
+import { z } from 'zod';
 
 // Helper function to map Prisma lead to frontend Lead type
 function mapPrismaLeadToLeadType(prismaLead: any): Lead {
@@ -138,7 +139,8 @@ export async function createLead(data: CreateLeadData): Promise<Lead | null> {
       },
     });
     revalidatePath('/leads-list');
-    return mapPrismaLeadToLeadType(newLead);
+    const newLeadWithRelations = await getLeadById(newLead.id);
+    return newLeadWithRelations;
   } catch (error) {
     console.error("Failed to create lead:", error);
     return null;
@@ -177,7 +179,7 @@ export async function updateLead(id: string, data: Partial<Omit<Lead, 'id' | 'cr
     const updatedLeadFromDb = await prisma.lead.update({
       where: { id },
       data: prismaData,
-      include: { createdBy: true, assignedTo: true }
+      include: { createdBy: true, assignedTo: true, followUps: { select: { id: true } } }
     });
     
     revalidatePath('/leads-list');
@@ -332,6 +334,10 @@ export async function convertToClient(leadId: string): Promise<{ success: boolea
           electricityBillUrl: lead.electricityBillUrl,
           createdById: lead.createdById,
           assignedToId: lead.assignedToId,
+          lastCommentText: lead.lastCommentText,
+          lastCommentDate: lead.lastCommentDate,
+          nextFollowUpDate: lead.nextFollowUpDate,
+          nextFollowUpTime: lead.nextFollowUpTime,
         },
       });
 
@@ -377,7 +383,7 @@ export async function dropLead(leadId: string, dropReason: DropReasonType, dropC
     try {
         const leadToDrop = await prisma.lead.findUnique({
             where: { id: leadId },
-            include: { followUps: true }
+            include: { followUps: true, proposals: true, siteSurveys: true }
         });
 
         if (!leadToDrop) {
@@ -410,7 +416,6 @@ export async function dropLead(leadId: string, dropReason: DropReasonType, dropC
                 }
             });
             
-            // Re-associate follow-ups
             await tx.followUp.updateMany({
                 where: { leadId: leadToDrop.id },
                 data: {
@@ -418,24 +423,26 @@ export async function dropLead(leadId: string, dropReason: DropReasonType, dropC
                     leadId: null,
                 }
             });
-
-            // Re-associate proposals
-            await tx.proposal.updateMany({
-              where: { leadId: leadToDrop.id },
-              data: {
-                droppedLeadId: createdDroppedLead.id,
-                leadId: null,
-              }
-            });
-
-            // Re-associate site surveys
-            await tx.siteSurvey.updateMany({
+            
+            if (leadToDrop.proposals.length > 0) {
+              await tx.proposal.updateMany({
                 where: { leadId: leadToDrop.id },
                 data: {
-                    droppedLeadId: createdDroppedLead.id,
-                    leadId: null,
-                }
-            });
+                  droppedLeadId: createdDroppedLead.id,
+                  leadId: null,
+                },
+              });
+            }
+            
+            if (leadToDrop.siteSurveys.length > 0) {
+              await tx.siteSurvey.updateMany({
+                  where: { leadId: leadToDrop.id },
+                  data: {
+                      droppedLeadId: createdDroppedLead.id,
+                      leadId: null,
+                  }
+              });
+            }
 
             await tx.lead.delete({
                 where: { id: leadId }
@@ -511,5 +518,121 @@ export async function bulkDropLeads(leadIds: string[], dropReason: DropReasonTyp
     } catch (error) {
         console.error(`Failed to drop leads:`, error);
         return { success: false, count: 0, message: 'An unexpected error occurred while dropping leads.' };
+    }
+}
+
+const leadImportSchema = z.object({
+  Name: z.string().min(2),
+  Email: z.string().email().optional().or(z.literal('')),
+  Phone: z.string().optional().or(z.literal('')),
+  Status: z.string().optional().or(z.literal('')),
+  Source: z.string().optional().or(z.literal('')),
+  'Assigned To': z.string().optional().or(z.literal('')),
+  Kilowatt: z.coerce.number().optional(),
+  Address: z.string().optional().or(z.literal('')),
+  Priority: z.string().optional().or(z.literal('')),
+  'Customer Type': z.string().optional().or(z.literal('')),
+});
+
+export async function importLeads(formData: FormData): Promise<{ success: boolean; message: string; createdCount: number, errorCount: number }> {
+    const session = await verifySession();
+    if (!session?.userId) {
+        return { success: false, message: 'Authentication required.', createdCount: 0, errorCount: 0 };
+    }
+
+    const file = formData.get('file') as File;
+    if (!file) {
+        return { success: false, message: 'No file uploaded.', createdCount: 0, errorCount: 0 };
+    }
+
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(arrayBuffer);
+        
+        const worksheet = workbook.getWorksheet(1);
+        if (!worksheet) {
+             return { success: false, message: 'No worksheet found in the file.', createdCount: 0, errorCount: 0 };
+        }
+
+        const data: any[] = [];
+        const headerRow = worksheet.getRow(1);
+        
+        if (headerRow.actualCellCount === 0) {
+            return { success: false, message: 'The Excel file is empty or has an empty header row.', createdCount: 0, errorCount: 0 };
+        }
+
+        const headers: string[] = [];
+        headerRow.eachCell({ includeEmpty: false }, (cell) => {
+            headers.push(cell.text?.toString().trim() ?? '');
+        });
+
+        worksheet.eachRow((row, rowNumber) => {
+            if (rowNumber > 1) { // Skip header row
+                const rowObject: any = {};
+                row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+                    const header = headers[colNumber - 1];
+                    if (header) {
+                        rowObject[header] = cell.text;
+                    }
+                });
+                if (Object.values(rowObject).some(val => val !== null && val !== '')) {
+                    data.push(rowObject);
+                }
+            }
+        });
+
+        const users = await prisma.user.findMany();
+        const userMap = new Map(users.map(u => [u.name.toLowerCase(), u.id]));
+
+        const leadsToCreate = [];
+        let errorCount = 0;
+
+        for (const row of data) {
+            const validation = leadImportSchema.safeParse(row);
+            if (!validation.success) {
+                errorCount++;
+                continue;
+            }
+
+            const { data: validRow } = validation;
+            
+            let assignedToId: string | undefined = undefined;
+            if (validRow['Assigned To']) {
+                assignedToId = userMap.get(validRow['Assigned To'].toLowerCase());
+            }
+
+            const leadData = {
+                name: validRow.Name,
+                email: validRow.Email || null,
+                phone: String(validRow.Phone || ''),
+                status: validRow.Status || 'Fresher',
+                source: validRow.Source || 'Other',
+                kilowatt: validRow.Kilowatt || null,
+                address: validRow.Address || null,
+                priority: validRow.Priority || 'Average',
+                clientType: validRow['Customer Type'] || 'Other',
+                createdById: session.userId,
+                assignedToId: assignedToId || null,
+            };
+            leadsToCreate.push(leadData);
+        }
+
+        if (leadsToCreate.length > 0) {
+            await prisma.lead.createMany({
+                data: leadsToCreate,
+                skipDuplicates: true,
+            });
+        }
+        
+        revalidatePath('/leads-list');
+        
+        const message = `Import complete. ${leadsToCreate.length} leads successfully imported. ${errorCount > 0 ? `${errorCount} rows had errors and were skipped.` : ''}`;
+        return { success: true, message, createdCount: leadsToCreate.length, errorCount };
+
+    } catch (error) {
+        console.error("Failed to import leads:", error);
+        return { success: false, message: 'An unexpected error occurred during import.', createdCount: 0, errorCount: 0 };
     }
 }
