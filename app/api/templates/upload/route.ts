@@ -6,6 +6,7 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
+    const folder = formData.get('folder') as string | 'misc';
 
     if (!file) {
       return NextResponse.json({ error: 'No file uploaded.' }, { status: 400 });
@@ -13,7 +14,7 @@ export async function POST(request: NextRequest) {
     
     // Sanitize filename and create a unique key for S3
     const safeFilename = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '');
-    const uniqueKey = `uploads/${Date.now()}-${safeFilename}`;
+    const uniqueKey = `uploads/${folder}/${Date.now()}-${safeFilename}`;
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);

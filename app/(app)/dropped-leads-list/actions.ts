@@ -28,7 +28,7 @@ function mapPrismaDroppedLeadToDroppedLeadType(prismaLead: any): DroppedLead {
     dropReason: prismaLead.dropReason,
     dropComment: prismaLead.dropComment ?? undefined,
     clientType: prismaLead.clientType ?? undefined,
-    electricityBillUrl: prismaLead.electricityBillUrl ?? undefined,
+    electricityBillUrls: prismaLead.electricityBillUrls ?? [],
     followupCount: prismaLead.followUps?.length ?? 0,
   };
 }
@@ -74,7 +74,7 @@ function mapPrismaSurveyToSiteSurvey(survey: any): SiteSurvey {
     discom: survey.discom,
     sanctionedLoad: survey.sanctionedLoad ?? undefined,
     remark: survey.remark ?? undefined,
-    electricityBillFile: survey.electricityBillFile ?? undefined,
+    electricityBillFiles: survey.electricityBillFiles ?? [],
     status: survey.status,
     createdAt: survey.createdAt.toISOString(),
     updatedAt: survey.updatedAt.toISOString(),
@@ -219,7 +219,7 @@ export async function reactivateLead(droppedLeadId: string): Promise<{ success: 
                     address: droppedLead.address,
                     priority: droppedLead.priority,
                     clientType: droppedLead.clientType,
-                    electricityBillUrl: droppedLead.electricityBillUrl,
+                    electricityBillUrls: droppedLead.electricityBillUrls,
                     dropReason: droppedLead.dropReason,
                     createdById: droppedLead.createdById,
                     assignedToId: droppedLead.assignedToId,
@@ -271,11 +271,38 @@ export async function reactivateLead(droppedLeadId: string): Promise<{ success: 
     }
 }
 
-export async function updateDroppedLead(id: string, data: Partial<Pick<DroppedLead, 'electricityBillUrl'>>): Promise<DroppedLead | null> {
+export async function updateDroppedLead(id: string, data: Partial<Omit<DroppedLead, 'id' | 'createdAt' | 'droppedAt' | 'followupCount' | 'status'>>): Promise<DroppedLead | null> {
     try {
+        const prismaData: any = {};
+        const fieldsToIgnore = ['id', 'createdAt', 'droppedAt', 'followupCount', 'status', 'createdBy', 'assignedTo'];
+
+        for (const key in data) {
+            if (Object.prototype.hasOwnProperty.call(data, key)) {
+                if (fieldsToIgnore.includes(key)) {
+                    continue;
+                }
+
+                const typedKey = key as keyof typeof data;
+                if (typedKey === 'kilowatt') {
+                    prismaData.kilowatt = data.kilowatt === undefined ? null : Number(data.kilowatt);
+                } else if (typedKey === 'nextFollowUpDate' && data.nextFollowUpDate) {
+                    prismaData[typedKey] = parseISO(data.nextFollowUpDate);
+                } else if (typedKey === 'lastCommentDate' && data.lastCommentDate) {
+                    prismaData[typedKey] = parseISO(data.lastCommentDate.split('-').reverse().join('-'));
+                } else {
+                    prismaData[typedKey] = (data as any)[typedKey] ?? null;
+                }
+            }
+        }
+        
+        if (data.assignedTo) {
+            const user = await prisma.user.findFirst({ where: { name: data.assignedTo }});
+            prismaData.assignedToId = user ? user.id : null;
+        }
+
         const updatedLead = await prisma.droppedLead.update({
             where: { id },
-            data: data,
+            data: prismaData,
             include: { createdBy: true, assignedTo: true, followUps: true }
         });
         revalidatePath(`/dropped-leads/${id}`);

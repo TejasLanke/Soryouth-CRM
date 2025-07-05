@@ -26,7 +26,7 @@ function mapPrismaSurvey(survey: any): SiteSurvey {
     discom: survey.discom,
     sanctionedLoad: survey.sanctionedLoad ?? undefined,
     remark: survey.remark ?? undefined,
-    electricityBillFile: survey.electricityBillFile ?? undefined,
+    electricityBillFiles: survey.electricityBillFiles ?? [],
     status: survey.status,
     createdAt: survey.createdAt.toISOString(),
     updatedAt: survey.updatedAt.toISOString(),
@@ -70,7 +70,7 @@ export async function createSiteSurvey(data: CreateSiteSurveyData): Promise<Site
         discom: data.discom,
         sanctionedLoad: data.sanctionedLoad,
         remark: data.remark,
-        electricityBillFile: data.electricityBillFile,
+        electricityBillFiles: data.electricityBillFiles,
         status: 'Scheduled', // Default status for a new survey
         leadId: data.leadId,
         clientId: data.clientId,
@@ -82,16 +82,18 @@ export async function createSiteSurvey(data: CreateSiteSurveyData): Promise<Site
     });
 
     // After creating the survey, update the corresponding lead or client with the bill URL
-    if (newSurvey.electricityBillFile) {
+    if (newSurvey.electricityBillFiles && newSurvey.electricityBillFiles.length > 0) {
       if (newSurvey.leadId) {
+        const lead = await prisma.lead.findUnique({ where: { id: newSurvey.leadId } });
         await prisma.lead.update({
           where: { id: newSurvey.leadId },
-          data: { electricityBillUrl: newSurvey.electricityBillFile },
+          data: { electricityBillUrls: [...(lead?.electricityBillUrls || []), ...newSurvey.electricityBillFiles] },
         });
       } else if (newSurvey.clientId) {
+        const client = await prisma.client.findUnique({ where: { id: newSurvey.clientId } });
         await prisma.client.update({
           where: { id: newSurvey.clientId },
-          data: { electricityBillUrl: newSurvey.electricityBillFile },
+          data: { electricityBillUrls: [...(client?.electricityBillUrls || []), ...newSurvey.electricityBillFiles] },
         });
       }
     }

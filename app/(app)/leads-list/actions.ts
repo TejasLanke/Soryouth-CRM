@@ -1,3 +1,4 @@
+
 'use server';
 
 import prisma from '@/lib/prisma';
@@ -30,7 +31,7 @@ function mapPrismaLeadToLeadType(prismaLead: any): Lead {
     priority: prismaLead.priority ?? undefined,
     dropReason: prismaLead.dropReason ?? undefined,
     clientType: prismaLead.clientType ?? undefined,
-    electricityBillUrl: prismaLead.electricityBillUrl ?? undefined,
+    electricityBillUrls: prismaLead.electricityBillUrls ?? [],
     followupCount: prismaLead.followUps?.length ?? 0,
   } as Lead;
 }
@@ -133,7 +134,7 @@ export async function createLead(data: CreateLeadData): Promise<Lead | null> {
         priority: data.priority || null,
         dropReason: data.dropReason || null,
         clientType: data.clientType || null,
-        electricityBillUrl: data.electricityBillUrl || null,
+        electricityBillUrls: data.electricityBillUrls || [],
         createdById: session.userId,
         assignedToId: assignedToId,
       },
@@ -331,7 +332,7 @@ export async function convertToClient(leadId: string): Promise<{ success: boolea
           kilowatt: lead.kilowatt,
           address: lead.address,
           clientType: lead.clientType,
-          electricityBillUrl: lead.electricityBillUrl,
+          electricityBillUrls: lead.electricityBillUrls,
           createdById: lead.createdById,
           assignedToId: lead.assignedToId,
           lastCommentText: lead.lastCommentText,
@@ -408,7 +409,7 @@ export async function dropLead(leadId: string, dropReason: DropReasonType, dropC
                     address: leadToDrop.address,
                     priority: leadToDrop.priority,
                     clientType: leadToDrop.clientType,
-                    electricityBillUrl: leadToDrop.electricityBillUrl,
+                    electricityBillUrls: leadToDrop.electricityBillUrls,
                     dropReason: dropReason,
                     dropComment: dropComment,
                     createdById: leadToDrop.createdById,

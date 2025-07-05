@@ -61,8 +61,8 @@ model Lead {
   priority          String? // Corresponds to LeadPriorityType
   dropReason        String? // Corresponds to DropReasonType
   clientType        String? // Corresponds to ClientType
-  electricityBillUrl String?
-  followUpCount Int @default(0)
+  electricityBillUrls String[] @default([]) 
+  followUpCount     Int @default(0)
 
   followUps FollowUp[]
   proposals      Proposal[]
@@ -74,6 +74,11 @@ model Lead {
 
   assignedToId String?
   assignedTo   User?   @relation("AssignedLeads", fields: [assignedToId], references: [id])
+
+  //Indexing
+  @@index([assignedToId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model DroppedLead {
@@ -94,7 +99,7 @@ model DroppedLead {
   address            String?
   priority           String?
   clientType         String?
-  electricityBillUrl String?
+  electricityBillUrls String[] @default([])
   dropReason         String
   dropComment        String?
   droppedAt          DateTime   @default(now())
@@ -130,7 +135,7 @@ model Client {
   kilowatt           Float?
   address            String?
   clientType         String?
-  electricityBillUrl String?
+  electricityBillUrls String[] @default([])
   followUpCount Int @default(0)
   followUps          FollowUp[]
   proposals      Proposal[]
@@ -142,6 +147,11 @@ model Client {
 
   assignedToId String?
   assignedTo   User?   @relation("AssignedClients", fields: [assignedToId], references: [id])
+
+  //Indexing
+  @@index([assignedToId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model FollowUp {
@@ -173,6 +183,12 @@ model FollowUp {
   createdBy     User?   @relation("CreatedFollowUps", fields: [createdById], references: [id])
   taskForUserId String?
   taskForUser   User?   @relation("AssignedTasks", fields: [taskForUserId], references: [id])
+
+  //Indexing
+  @@index([leadId])
+  @@index([clientId])
+  @@index([droppedLeadId])
+  @@index([createdAt])
 
 }
 
@@ -231,6 +247,11 @@ model Proposal {
 
   template   Template? @relation(fields: [templateId], references: [id])
   templateId String?
+
+  //Indexing
+  @@index([leadId])
+  @@index([clientId])
+  @@index([droppedLeadId])
 }
 
 
@@ -241,6 +262,7 @@ model CustomSetting {
   createdAt DateTime    @default(now())
 
   @@unique([type, name])
+  @@index([type])
 }
 
 enum SettingType {
@@ -278,7 +300,7 @@ model SiteSurvey {
   discom              String
   sanctionedLoad      String?
   remark              String?
-  electricityBillFile String?
+  electricityBillFiles String[] @default([])
   status              String   @default("Pending")
 
   createdAt           DateTime @default(now())
@@ -296,8 +318,10 @@ model SiteSurvey {
   surveyorId          String
   surveyor            User     @relation(fields: [surveyorId], references: [id])
 
+  //Indexing
   @@index([leadId])
   @@index([clientId])
+  @@index([droppedLeadId])
   @@index([surveyorId])
 }
 
@@ -309,4 +333,7 @@ model GeneratedDocument {
   docxUrl      String
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  //Indexing
+  @@index([documentType])
 }

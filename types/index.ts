@@ -48,16 +48,17 @@ export interface Lead {
   priority?: LeadPriorityType | null;
   dropReason?: DropReasonType | null;
   clientType?: ClientType | null;
-  electricityBillUrl?: string | null;
+  electricityBillUrls: string[];
   followupCount?: number;
 }
 export type CreateLeadData = Omit<Lead, 'id' | 'createdAt' | 'updatedAt' | 'followupCount'>;
 
-export interface DroppedLead extends Omit<Lead, 'status' | 'updatedAt'> {
+export interface DroppedLead extends Omit<Lead, 'status' | 'updatedAt' | 'electricityBillUrl'> {
   status: 'Lost';
   dropReason: DropReasonType;
   dropComment?: string | null;
   droppedAt: string;
+  electricityBillUrls: string[];
 }
 
 export interface Client {
@@ -74,14 +75,16 @@ export interface Client {
   kilowatt?: number | null;
   address?: string | null;
   clientType?: ClientType | null;
-  electricityBillUrl?: string | null;
+  electricityBillUrls: string[];
   followupCount?: number;
   lastCommentText?: string | null;
   lastCommentDate?: string | null;
   nextFollowUpDate?: string | null;
   nextFollowUpTime?: string | null;
 }
-export type CreateClientData = Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'followupCount' | 'lastCommentText' | 'lastCommentDate' | 'nextFollowUpDate' | 'nextFollowUpTime'>;
+export type CreateClientData = Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'followupCount' | 'lastCommentText' | 'lastCommentDate' | 'nextFollowUpDate' | 'nextFollowUpTime' | 'electricityBillUrls'> & {
+    electricityBillUrls?: string[];
+};
 
 
 export interface Proposal {
@@ -285,7 +288,7 @@ export interface SiteSurvey {
   discom: DiscomType;
   sanctionedLoad?: string;
   remark?: string;
-  electricityBillFile?: string;
+  electricityBillFiles: string[];
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -306,8 +309,8 @@ export type CreateSiteSurveyData = Omit<SiteSurvey, 'id' | 'surveyNumber' | 'cre
 };
 
 
-export type SiteSurveyFormValues = Omit<SiteSurvey, 'id' | 'surveyNumber' | 'createdAt' | 'updatedAt' | 'surveyorName' | 'status' | 'electricityBillFile' | 'surveyorId' > & {
-  electricityBillFile?: FileList | null;
+export type SiteSurveyFormValues = Omit<SiteSurvey, 'id' | 'surveyNumber' | 'createdAt' | 'updatedAt' | 'surveyorName' | 'status' | 'electricityBillFiles' | 'surveyorId' > & {
+  electricityBillFiles?: FileList | null;
   surveyorName: UserOptionType;
   leadId?: string;
   clientId?: string;

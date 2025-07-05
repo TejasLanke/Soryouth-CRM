@@ -47,9 +47,21 @@ const getSiteSurveySchema = (userNames: string[]) => z.object({
   surveyorName: userNames.length > 0
     ? z.enum(userNames as [string, ...string[]], { required_error: "A surveyor must be selected." })
     : z.string({ required_error: "Surveyor name is required." }).refine(() => false, "Cannot submit: No surveyors are available in the system."),
-  electricityBillFile: z.instanceof(FileList).optional().nullable()
-    .refine(files => !files || files.length === 0 || files[0].size <= 5 * 1024 * 1024, `Max file size is 5MB.`)
-    .refine(files => !files || files.length === 0 || ['image/jpeg', 'image/png', 'application/pdf'].includes(files[0].type), '.jpg, .png, or .pdf files are accepted.'),
+  electricityBillFiles: z.instanceof(FileList).optional().nullable()
+    .refine(files => {
+        if (!files) return true;
+        for (const file of Array.from(files)) {
+            if (file.size > 5 * 1024 * 1024) return false;
+        }
+        return true;
+    }, `Max file size is 5MB.`)
+    .refine(files => {
+        if (!files) return true;
+        for (const file of Array.from(files)) {
+            if (!['image/jpeg', 'image/png', 'application/pdf'].includes(file.type)) return false;
+        }
+        return true;
+    }, '.jpg, .png, or .pdf files are accepted.'),
   leadId: z.string().optional(),
   clientId: z.string().optional(),
 });
@@ -137,7 +149,7 @@ export default function SiteSurveyPage() {
       sanctionedLoad: '',
       remark: '',
       surveyorName: undefined,
-      electricityBillFile: null,
+      electricityBillFiles: null,
       leadId: undefined,
       clientId: undefined,
     },
@@ -199,31 +211,32 @@ export default function SiteSurveyPage() {
             throw new Error('Selected surveyor not found.');
         }
 
-        let billFileUrl: string | undefined = undefined;
-        const billFile = values.electricityBillFile?.[0];
+        let billFileUrls: string[] = [];
+        const billFiles = values.electricityBillFiles;
 
-        if (billFile) {
-            const fileFormData = new FormData();
-            fileFormData.append('file', billFile);
-            
-            const response = await fetch('/api/templates/upload', {
-                method: 'POST',
-                body: fileFormData,
+        if (billFiles && billFiles.length > 0) {
+            const uploadPromises = Array.from(billFiles).map(file => {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('folder', 'e-bills');
+                return fetch('/api/templates/upload', {
+                    method: 'POST',
+                    body: formData,
+                }).then(res => res.json());
             });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to upload electricity bill.');
+            const results = await Promise.all(uploadPromises);
+            for (const result of results) {
+                if (!result.success) throw new Error(result.error || 'A file failed to upload.');
+                billFileUrls.push(result.filePath);
             }
-            const result = await response.json();
-            billFileUrl = result.filePath;
         }
 
-        const dataToSave = {
+        const dataToSave: CreateSiteSurveyData = {
           ...values,
           surveyorId: surveyor.id,
-          electricityBillFile: billFileUrl,
-        } as CreateSiteSurveyData;
+          electricityBillFiles: billFileUrls,
+        };
 
         const result = await createSiteSurvey(dataToSave);
 
@@ -500,22 +513,23 @@ export default function SiteSurveyPage() {
               
               <FormField
                 control={form.control}
-                name="electricityBillFile"
+                name="electricityBillFiles"
                 render={({ field: { value, onChange, ...fieldProps } }) => {
                     return (
                         <FormItem>
-                            <FormLabel>Upload Electricity Bill (Optional)</FormLabel>
+                            <FormLabel>Upload Electricity Bill(s) (Optional)</FormLabel>
                             <FormControl>
                                 <div className="flex items-center justify-center w-full">
                                     <label htmlFor="dropzone-file-bill" className="flex flex-col items-center justify-center w-full h-32 border-2 border-border border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted">
                                         <div className="flex flex-col items-center justify-center pt-5 pb-6">
                                             <UploadCloud className="w-8 h-8 mb-2 text-muted-foreground" />
                                             <p className="mb-1 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                                            <p className="text-xs text-muted-foreground">PDF, PNG, JPG (MAX. 5MB)</p>
+                                            <p className="text-xs text-muted-foreground">PDF, PNG, JPG (MAX. 5MB each)</p>
                                         </div>
                                         <Input 
                                         id="dropzone-file-bill" 
                                         type="file" 
+                                        multiple
                                         className="hidden" 
                                         accept=".pdf,.png,.jpg,.jpeg"
                                         onChange={(e) => onChange(e.target.files)} 
@@ -524,7 +538,7 @@ export default function SiteSurveyPage() {
                                     </label>
                                 </div> 
                             </FormControl>
-                             {value?.length && <p className="text-xs text-muted-foreground mt-1">File: {value[0].name}</p>}
+                             {value?.length && <p className="text-xs text-muted-foreground mt-1">{value.length} file(s) selected: {Array.from(value).map(f => f.name).join(', ')}</p>}
                             <FormMessage />
                         </FormItem>
                     )
@@ -552,5 +566,3 @@ export default function SiteSurveyPage() {
     </>
   );
 }
-
-    

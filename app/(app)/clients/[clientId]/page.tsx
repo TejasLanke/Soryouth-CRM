@@ -128,7 +128,7 @@ export default function ClientDetailsPage() {
 
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [selectedProposalForPreview, setSelectedProposalForPreview] = useState<Proposal | null>(null);
-  const [isBillPreviewOpen, setIsBillPreviewOpen] = useState(false);
+  const [billToPreview, setBillToPreview] = useState<string|null>(null);
 
   const fetchProposals = async () => {
     if (clientId) {
@@ -191,37 +191,47 @@ export default function ClientDetailsPage() {
   }, [client]);
 
   const handleBillUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !client) return;
+    const files = event.target.files;
+    if (!files || files.length === 0 || !client) return;
 
-    if (file.size > 5 * 1024 * 1024) { // 5MB limit
-      toast({ title: "File Too Large", description: "Please upload a file smaller than 5MB.", variant: "destructive" });
-      return;
+    for (const file of Array.from(files)) {
+        if (file.size > 5 * 1024 * 1024) { // 5MB limit per file
+            toast({ title: "File Too Large", description: `"${file.name}" is larger than 5MB.`, variant: "destructive" });
+            return;
+        }
     }
-
+    
     startBillUploadTransition(async () => {
       try {
-        const formData = new FormData();
-        formData.append('file', file);
-
-        const response = await fetch('/api/templates/upload', {
-          method: 'POST',
-          body: formData,
+        const uploadPromises = Array.from(files).map(file => {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('folder', 'e-bills');
+            return fetch('/api/templates/upload', {
+                method: 'POST',
+                body: formData,
+            }).then(res => res.json());
         });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to upload bill.');
+        const results = await Promise.all(uploadPromises);
+        
+        const newUrls: string[] = [];
+        for (const result of results) {
+            if (!result.success || !result.filePath) {
+                throw new Error(result.error || 'One or more files failed to upload.');
+            }
+            newUrls.push(result.filePath);
         }
 
-        const result = await response.json();
-        const updatedClient = await updateClient(client.id, { electricityBillUrl: result.filePath });
+        const updatedClient = await updateClient(client.id, { 
+            electricityBillUrls: [...(client.electricityBillUrls || []), ...newUrls] 
+        });
         
         if (updatedClient) {
           setClient(updatedClient);
-          toast({ title: "E-Bill Uploaded", description: "The electricity bill has been successfully attached." });
+          toast({ title: "E-Bills Uploaded", description: `${newUrls.length} bill(s) have been successfully attached.` });
         } else {
-          throw new Error("Failed to save the bill URL to the client.");
+          throw new Error("Failed to save the bill URLs to the client.");
         }
       } catch (error) {
         toast({ title: "Upload Failed", description: (error as Error).message, variant: "destructive" });
@@ -723,21 +733,26 @@ export default function ClientDetailsPage() {
               </CardContent>
             </Card>
              <Card>
-                <CardHeader className="pb-2 pt-4"><CardTitle className="text-md">E-Bill</CardTitle></CardHeader>
+                <CardHeader className="pb-2 pt-4"><CardTitle className="text-md">E-Bills ({client.electricityBillUrls?.length || 0})</CardTitle></CardHeader>
                 <CardContent className="space-y-2">
-                    {client.electricityBillUrl ? (
-                        <Button variant="outline" size="sm" className="w-full" onClick={() => setIsBillPreviewOpen(true)}>
-                            <Eye className="mr-2 h-4 w-4" /> View Uploaded Bill
-                        </Button>
+                    {client.electricityBillUrls && client.electricityBillUrls.length > 0 ? (
+                       <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
+                            {client.electricityBillUrls.map((url, index) => (
+                                <Button key={url} variant="outline" size="sm" className="w-full justify-start text-xs" onClick={() => setBillToPreview(url)}>
+                                    <Eye className="mr-2 h-4 w-4" /> 
+                                    <span className="truncate">View Bill {index + 1} ({url.split('-').pop()})</span>
+                                </Button>
+                            ))}
+                        </div>
                     ) : (
-                        <div className="text-center text-xs text-muted-foreground p-2">No bill uploaded.</div>
+                        <div className="text-center text-xs text-muted-foreground p-2">No bills uploaded.</div>
                     )}
                     <div>
                         <Label htmlFor="bill-upload" className={cn(buttonVariants({variant: "secondary", size: "sm"}), "w-full cursor-pointer")}>
                             {isUploadingBill ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <UploadCloud className="mr-2 h-4 w-4"/>}
-                            {client.electricityBillUrl ? 'Replace Bill' : 'Upload Bill'}
+                            {client.electricityBillUrls?.length ? 'Upload More Bills' : 'Upload Bills'}
                         </Label>
-                        <Input id="bill-upload" type="file" className="hidden" accept=".pdf,.png,.jpg,.jpeg" onChange={handleBillUpload} disabled={isUploadingBill}/>
+                        <Input id="bill-upload" type="file" multiple className="hidden" accept=".pdf,.png,.jpg,.jpeg" onChange={handleBillUpload} disabled={isUploadingBill}/>
                     </div>
                 </CardContent>
             </Card>
@@ -820,11 +835,11 @@ export default function ClientDetailsPage() {
         />
       )}
       
-      {isBillPreviewOpen && client.electricityBillUrl && (
+      {billToPreview && (
         <ProposalPreviewDialog
-            isOpen={isBillPreviewOpen}
-            onClose={() => setIsBillPreviewOpen(false)}
-            pdfUrl={client.electricityBillUrl}
+            isOpen={!!billToPreview}
+            onClose={() => setBillToPreview(null)}
+            pdfUrl={billToPreview}
             docxUrl={null}
         />
       )}
@@ -840,5 +855,3 @@ export default function ClientDetailsPage() {
     </div>
   );
 }
-
-    

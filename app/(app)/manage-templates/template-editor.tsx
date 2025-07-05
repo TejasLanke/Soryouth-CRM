@@ -79,6 +79,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
     setIsUploading(true);
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('folder', 'templates');
 
     try {
         const response = await fetch('/api/templates/upload', {

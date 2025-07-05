@@ -108,11 +108,12 @@ export function ClientForm({ isOpen, onClose, onSubmit, client, users, statuses 
   }, [client, form, isOpen, statuses]);
 
   const handleSubmit = (values: ClientFormValues) => {
-    const submissionData = { ...values };
+    const submissionData: Partial<Client> = { ...values };
     if (client) {
       onSubmit({ ...client, ...submissionData });
     } else {
-      onSubmit(submissionData);
+      submissionData.electricityBillUrls = [];
+      onSubmit(submissionData as CreateClientData);
     }
   };
 

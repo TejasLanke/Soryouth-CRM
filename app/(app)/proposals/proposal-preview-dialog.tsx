@@ -40,7 +40,7 @@ const fetchPresignedUrl = async (s3Url: string | null): Promise<string | null> =
 
 
 export function ProposalPreviewDialog({ isOpen, onClose, pdfUrl, docxUrl }: DocumentPreviewDialogProps) {
-  const [viewablePdfUrl, setViewablePdfUrl] = useState<string | null>(null);
+  const [viewableUrl, setViewableUrl] = useState<string | null>(null);
   const [downloadableDocxUrl, setDownloadableDocxUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,21 +49,22 @@ export function ProposalPreviewDialog({ isOpen, onClose, pdfUrl, docxUrl }: Docu
     if (isOpen) {
       setIsLoading(true);
       setError(null);
-      setViewablePdfUrl(null);
+      setViewableUrl(null);
       setDownloadableDocxUrl(null);
 
       const fetchAllUrls = async () => {
         try {
-          const [pdf, docx] = await Promise.all([
+          // pdfUrl can be a PDF or an image URL
+          const [primaryUrl, docx] = await Promise.all([
             fetchPresignedUrl(pdfUrl),
             fetchPresignedUrl(docxUrl),
           ]);
           
-          if (!pdf) {
-            setError("No PDF URL provided or failed to get a secure link for it.");
+          if (!primaryUrl) {
+            setError("No file URL provided or failed to get a secure link for it.");
           }
 
-          setViewablePdfUrl(pdf);
+          setViewableUrl(primaryUrl);
           setDownloadableDocxUrl(docx);
         } catch (err) {
           setError(err instanceof Error ? err.message : 'An unknown error occurred while fetching secure links.');
@@ -76,11 +77,32 @@ export function ProposalPreviewDialog({ isOpen, onClose, pdfUrl, docxUrl }: Docu
     }
   }, [isOpen, pdfUrl, docxUrl]);
 
+  const isImage = viewableUrl && /\.(jpg|jpeg|png|gif)$/i.test(new URL(viewableUrl).pathname);
+  const isPdf = viewableUrl && !isImage;
+
   const handlePrint = () => {
-    if (!viewablePdfUrl) return;
+    if (!viewableUrl) return;
+
+    if (isImage) {
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+            printWindow.document.write(`
+                <html>
+                    <head><title>Print</title></head>
+                    <body style="margin:0; text-align:center;">
+                        <img src="${viewableUrl}" style="max-width:100%; max-height:100vh;" onload="window.print();window.close();" />
+                    </body>
+                </html>
+            `);
+            printWindow.document.close();
+        }
+        return;
+    }
+    
+    // For PDF
     const iframe = document.createElement('iframe');
     iframe.style.display = 'none';
-    iframe.src = viewablePdfUrl;
+    iframe.src = viewableUrl;
     document.body.appendChild(iframe);
     iframe.onload = () => {
       setTimeout(() => {
@@ -89,7 +111,7 @@ export function ProposalPreviewDialog({ isOpen, onClose, pdfUrl, docxUrl }: Docu
           iframe.contentWindow?.print();
         } catch (error) {
             console.error("Printing failed:", error);
-            window.open(viewablePdfUrl, '_blank');
+            window.open(viewableUrl, '_blank');
         } finally {
             document.body.removeChild(iframe);
         }
@@ -109,21 +131,28 @@ export function ProposalPreviewDialog({ isOpen, onClose, pdfUrl, docxUrl }: Docu
         <div className="flex-grow border rounded-md overflow-hidden bg-muted/20 flex items-center justify-center">
           {isLoading && <Loader2 className="h-8 w-8 animate-spin" />}
           {error && <p className="text-destructive text-center p-4">Error loading preview: {error}</p>}
-          {!isLoading && !error && viewablePdfUrl && (
-            <iframe
-              src={viewablePdfUrl}
-              title="Document PDF Preview"
-              className="w-full h-full"
-              frameBorder="0"
-            />
+          {!isLoading && !error && viewableUrl && (
+            <>
+                {isImage && (
+                    <img src={viewableUrl} alt="Document Preview" className="w-full h-full object-contain p-2"/>
+                )}
+                {isPdf && (
+                    <iframe
+                        src={viewableUrl}
+                        title="Document PDF Preview"
+                        className="w-full h-full"
+                        frameBorder="0"
+                    />
+                )}
+            </>
           )}
         </div>
         <DialogFooter className="sm:justify-between pt-4 flex-wrap">
           <div className="flex flex-wrap gap-2">
-            <Button asChild variant="secondary" disabled={!viewablePdfUrl}>
-              <a href={viewablePdfUrl || '#'} download>
+            <Button asChild variant="secondary" disabled={!viewableUrl}>
+              <a href={viewableUrl || '#'} download>
                   <Download className="mr-2 h-4 w-4" />
-                  Download PDF
+                  Download {isImage ? 'Image' : 'PDF'}
               </a>
             </Button>
             {docxUrl && (
@@ -139,7 +168,7 @@ export function ProposalPreviewDialog({ isOpen, onClose, pdfUrl, docxUrl }: Docu
             <Button variant="outline" onClick={onClose}>
               Close
             </Button>
-            <Button onClick={handlePrint} disabled={!viewablePdfUrl}>
+            <Button onClick={handlePrint} disabled={!viewableUrl}>
               <Printer className="mr-2 h-4 w-4" />
               Print
             </Button>
