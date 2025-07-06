@@ -1,4 +1,3 @@
-
 import type { NavItem, Lead, Client, Proposal, Document, Communication, DocumentType, ClientType, LeadPriorityType, ClientPriorityType, UserOptionType, DropReasonType, Expense, UserRole, Template, ProposalOrDocumentType, SiteSurvey } from '@/types';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -28,6 +27,7 @@ import {
   Archive,
   Users,
   ClipboardPaste,
+  ClipboardCheck,
 } from 'lucide-react';
 import { format, parseISO, addDays, subDays } from 'date-fns';
 
@@ -50,6 +50,7 @@ export const NAV_ITEMS: NavItem[] = [
 export const TOOLS_NAV_ITEMS: NavItem[] = [
   { href: '/survey-list', label: 'Survey List', icon: ClipboardList },
   { href: '/expenses', label: 'Expenses', icon: Notebook },
+  { href: '/view-expenses', label: 'View Expenses', icon: ClipboardCheck },
   { href: '/communications', label: 'Communications', icon: MessageSquareText },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays },
   { href: '/survey-reports', label: 'Survey Reports', icon: MapPinnedIcon },
@@ -84,7 +85,7 @@ export const MOCK_LEADS: Lead[] = [
     status: 'Fresher', source: 'Facebook', createdAt: subDays(new Date(),5).toISOString(), updatedAt: new Date().toISOString(),
     lastCommentText: 'lb 8000/-', lastCommentDate: format(subDays(new Date(), 2), 'dd-MM-yyyy'),
     kilowatt: 10, clientType: 'Commercial', nextFollowUpDate: format(addDays(new Date(), 5), 'yyyy-MM-dd'), nextFollowUpTime: '10:00',
-    address: '123 Main St, Nagpur', priority: 'High', assignedTo: 'Mayur', createdBy: 'Admin', electricityBillUrl: '/mock-bills/pramod-bill.pdf', followupCount: 3,
+    address: '123 Main St, Nagpur', priority: 'High', assignedTo: 'Mayur', createdBy: 'Admin', electricityBillUrls: [], followupCount: 3,
   },
   {
     id: 'lead2', name: 'sir (Jane Smith)', email: 'jane.smith.lead@example.com', phone: '7001173134',
@@ -92,22 +93,22 @@ export const MOCK_LEADS: Lead[] = [
     createdAt: new Date(Date.now() - 86400000).toISOString(), updatedAt: new Date().toISOString(),
     lastCommentText: 'Not answering', lastCommentDate: format(subDays(new Date(), 1), 'dd-MM-yyyy'),
     kilowatt: 5, clientType: 'Individual/Bungalow', nextFollowUpDate: format(addDays(new Date(), 7), 'yyyy-MM-dd'), nextFollowUpTime: '14:30',
-    address: '456 Oak Ave, Mumbai', priority: 'Medium', electricityBillUrl: '/mock-bills/jane-bill.jpg', followupCount: 5,
+    address: '456 Oak Ave, Mumbai', priority: 'Medium', electricityBillUrls: [], followupCount: 5,
   },
 ];
 
 export const MOCK_CLIENTS: Client[] = [
    {
     id: 'client1', name: 'Green Valley Society', status: 'Deal Done', clientType: 'Housing Society', phone: '9876543210', assignedTo: 'Mayur',
-    createdAt: subDays(new Date(), 100).toISOString(), updatedAt: subDays(new Date(), 10).toISOString(), electricityBillUrl: '/mock-bills/greenvalley-bill.pdf', followupCount: 12
+    createdAt: subDays(new Date(), 100).toISOString(), updatedAt: subDays(new Date(), 10).toISOString(), electricityBillUrls: [], followupCount: 12
   },
   {
     id: 'client2', name: 'Mr. Anil Patel (Bungalow)', status: 'Deal Done', clientType: 'Individual/Bungalow', phone: '9876543211', assignedTo: 'Sales Rep A',
-    createdAt: subDays(new Date(), 120).toISOString(), updatedAt: subDays(new Date(), 5).toISOString(), followupCount: 8
+    createdAt: subDays(new Date(), 120).toISOString(), updatedAt: subDays(new Date(), 5).toISOString(), followupCount: 8, electricityBillUrls: [],
   },
   {
     id: 'client3', name: 'FutureTech Industries', status: 'Installer', clientType: 'Commercial', phone: '9876543212', assignedTo: 'Sales Rep B',
-    createdAt: subDays(new Date(), 80).toISOString(), updatedAt: subDays(new Date(), 1).toISOString(), followupCount: 15
+    createdAt: subDays(new Date(), 80).toISOString(), updatedAt: subDays(new Date(), 1).toISOString(), followupCount: 15, electricityBillUrls: [],
   },
 ];
 
@@ -118,6 +119,7 @@ export const DOCUMENT_TYPES_CONFIG: Array<{ type: DocumentType; icon: LucideIcon
 export const MOCK_DOCUMENTS: Document[] = [];
 export const MOCK_COMMUNICATIONS: Communication[] = [];
 export const EXPENSE_CATEGORIES = ['Travel', 'Food', 'Supplies', 'Utilities', 'Software', 'Training', 'Marketing', 'Other'] as const;
+export const EXPENSE_STATUSES = ['Pending', 'Approved', 'Rejected'] as const;
 export const MOCK_EXPENSES: Expense[] = [];
 export const SURVEY_STATUS_OPTIONS = ['Scheduled', 'In Progress', 'Completed', 'Cancelled', 'On Hold'] as const;
 export const SURVEY_TYPE_OPTIONS = ['Commercial', 'Residential', 'Industrial', 'Agricultural', 'Other'] as const;

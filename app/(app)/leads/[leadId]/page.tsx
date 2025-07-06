@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { LEAD_PRIORITY_OPTIONS, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, CLIENT_TYPES, DROP_REASON_OPTIONS } from '@/lib/constants';
-import type { Lead, User, LeadStatusType, LeadPriorityType, ClientType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateLeadData, DropReasonType, Proposal, CustomSetting, SiteSurvey } from '@/types';
+import type { Lead, User, LeadStatusType, LeadPriorityType, ClientType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateLeadData, DropReasonType, Proposal, CustomSetting, SiteSurvey, LeadSourceOptionType } from '@/types';
 import { format, parseISO, isValid } from 'date-fns';
 import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, UserCircle2, FileText, ShoppingCart, Loader2, Save, Send, Video, Building, Repeat, Trash2, IndianRupee, ClipboardEdit, Eye, UploadCloud } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -357,7 +357,7 @@ export default function LeadDetailsPage() {
   };
   
   const handleAttributeChange = (
-    key: 'status' | 'priority' | 'assignedTo' | 'clientType' | 'kilowatt',
+    key: 'status' | 'priority' | 'assignedTo' | 'clientType' | 'kilowatt' | 'source',
     value: string | number
   ) => {
     if (!lead || value === undefined || isUpdating) return;
@@ -573,6 +573,53 @@ export default function LeadDetailsPage() {
                 <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" disabled><Mail className="h-5 w-5" /></Button>
                 <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" disabled><MessageCircle className="h-5 w-5" /></Button>
               </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-md">Attributes</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div>
+                        <Label htmlFor="lead-source" className="text-xs font-medium">Source</Label>
+                        <Select value={lead.source || ''} onValueChange={(value) => handleAttributeChange('source', value as LeadSourceOptionType)} disabled={isUpdating}>
+                            <SelectTrigger id="lead-source" className="h-8 text-xs">
+                                <SelectValue placeholder="Select source" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {leadSources.map(source => <SelectItem key={source.id} value={source.name} className="text-xs">{source.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div>
+                        <Label htmlFor="lead-kw" className="text-xs font-medium">Capacity (KW)</Label>
+                        <Input
+                            id="lead-kw"
+                            key={lead.id}
+                            type="number"
+                            defaultValue={lead.kilowatt || ''}
+                            onBlur={(e) => {
+                                const value = parseFloat(e.target.value);
+                                if (!isNaN(value) && value !== lead.kilowatt) {
+                                    handleAttributeChange('kilowatt', value);
+                                }
+                            }}
+                            className="h-8 text-xs"
+                            disabled={isUpdating}
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="lead-client-type" className="text-xs font-medium">Customer Type</Label>
+                        <Select value={lead.clientType || ''} onValueChange={(value) => handleAttributeChange('clientType', value as ClientType)} disabled={isUpdating}>
+                            <SelectTrigger id="lead-client-type" className="h-8 text-xs">
+                                <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {CLIENT_TYPES.map(p => <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </CardContent>
             </Card>
 
             <Card>

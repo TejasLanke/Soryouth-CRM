@@ -1,5 +1,4 @@
-
-import type { LEAD_PRIORITY_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES, EXPENSE_CATEGORIES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS, SURVEY_STATUS_OPTIONS, SURVEY_TYPE_OPTIONS, METER_PHASES, CONSUMER_LOAD_TYPES, ROOF_TYPES, DISCOM_OPTIONS, CLIENT_PRIORITY_OPTIONS, USER_ROLES } from '@/lib/constants';
+import type { LEAD_PRIORITY_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES, EXPENSE_CATEGORIES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS, SURVEY_STATUS_OPTIONS, SURVEY_TYPE_OPTIONS, METER_PHASES, CONSUMER_LOAD_TYPES, ROOF_TYPES, DISCOM_OPTIONS, CLIENT_PRIORITY_OPTIONS, USER_ROLES, EXPENSE_STATUSES } from '@/lib/constants';
 
 // Deriving types from the const arrays ensures type safety and single source of truth
 export type LeadStatusType = string;
@@ -244,22 +243,26 @@ export interface Task {
 }
 
 export type ExpenseCategory = typeof EXPENSE_CATEGORIES[number];
-export type ExpenseStatus = 'Pending' | 'Approved' | 'Rejected';
+export type ExpenseStatus = typeof EXPENSE_STATUSES[number];
 
 export interface Expense {
   id: string;
   userId: string;
-  userName?: string;
-  date: string;
+  userName: string;
+  date: string; // ISO string
+  endDate?: string | null; // ISO string
   category: ExpenseCategory;
   amount: number;
   description: string;
-  receiptUrl?: string;
+  receiptUrl?: string | null;
   status: ExpenseStatus;
-  submittedAt: string;
-  reviewedBy?: UserOptionType;
-  reviewedAt?: string;
+  submittedAt: string; // ISO string
+  reviewedById?: string | null;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
 }
+
+export type CreateExpenseData = Omit<Expense, 'id' | 'userName' | 'submittedAt' | 'reviewedById' | 'reviewedBy' | 'reviewedAt' | 'status'>;
 
 export type SurveyStatusType = typeof SURVEY_STATUS_OPTIONS[number];
 export type SurveyTypeOption = typeof SURVEY_TYPE_OPTIONS[number];
@@ -350,3 +353,4 @@ export interface CustomSetting {
     name: string;
     createdAt: string;
 }
+

@@ -12,8 +12,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, CLIENT_PRIORITY_OPTIONS } from '@/lib/constants';
-import type { Client, User, UserOptionType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateClientData, ClientStatusType, ClientPriorityType, Proposal, CustomSetting, SiteSurvey, DocumentType } from '@/types';
+import { FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, CLIENT_PRIORITY_OPTIONS, CLIENT_TYPES } from '@/lib/constants';
+import type { Client, User, ClientType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateClientData, ClientStatusType, ClientPriorityType, Proposal, CustomSetting, SiteSurvey, DocumentType } from '@/types';
 import { format, parseISO, isValid } from 'date-fns';
 import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, UserCircle2, FileText, ShoppingCart, Loader2, Save, Send, Video, Building, Repeat, UserX, IndianRupee, ClipboardEdit, Eye, UploadCloud } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
@@ -346,7 +346,7 @@ export default function ClientDetailsPage() {
   };
   
   const handleAttributeChange = (
-    key: 'status' | 'priority' | 'assignedTo',
+    key: 'status' | 'priority' | 'assignedTo' | 'clientType' | 'kilowatt',
     value: string | number
   ) => {
     if (!client || value === undefined || isUpdating) return;
@@ -535,6 +535,42 @@ export default function ClientDetailsPage() {
               </CardContent>
             </Card>
 
+            <Card>
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-md">Attributes</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div>
+                        <Label htmlFor="client-kw" className="text-xs font-medium">Capacity (KW)</Label>
+                        <Input
+                            id="client-kw"
+                            key={client.id} // Re-renders the input when client data changes
+                            type="number"
+                            defaultValue={client.kilowatt || ''}
+                            onBlur={(e) => {
+                                const value = parseFloat(e.target.value);
+                                if (!isNaN(value) && value !== client.kilowatt) {
+                                    handleAttributeChange('kilowatt', value);
+                                }
+                            }}
+                            className="h-8 text-xs"
+                            disabled={isUpdating}
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="client-type" className="text-xs font-medium">Customer Type</Label>
+                        <Select value={client.clientType || ''} onValueChange={(value) => handleAttributeChange('clientType', value as ClientType)} disabled={isUpdating}>
+                            <SelectTrigger id="client-type" className="h-8 text-xs">
+                                <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {CLIENT_TYPES.map(p => <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </CardContent>
+            </Card>
+            
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-md">Quick Actions</CardTitle>

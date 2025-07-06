@@ -9,11 +9,14 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Label } from "@/components/ui/label";
 import { Input } from '@/components/ui/input';
-import type { DroppedLead, FollowUp, SiteSurvey, Proposal } from '@/types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { CLIENT_TYPES } from '@/lib/constants';
+import type { DroppedLead, FollowUp, SiteSurvey, Proposal, LeadSourceOptionType, ClientType, CustomSetting } from '@/types';
 import { format, parseISO, isValid } from 'date-fns';
 import { ChevronLeft, UserCircle2, Loader2, Send, Video, Building, Repeat, CalendarX2, Phone, MessageSquare, Mail, ClipboardEdit, Eye, UploadCloud, FileText, IndianRupee } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { getDroppedLeadById, getActivitiesForDroppedLead, reactivateLead, getSurveysForDroppedLead, getProposalsForDroppedLead, updateDroppedLead } from '@/app/(app)/dropped-leads-list/actions';
+import { getLeadSources } from '@/app/(app)/settings/actions';
 import { cn } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ProposalPreviewDialog } from '@/app/(app)/proposals/proposal-preview-dialog';
@@ -77,7 +80,9 @@ export default function DroppedLeadDetailsPage() {
   const droppedId = typeof params.droppedId === 'string' ? params.droppedId : null;
   const { toast } = useToast();
   const [droppedLead, setDroppedLead] = useState<DroppedLead | null | undefined>(undefined);
+  const [leadSources, setLeadSources] = useState<CustomSetting[]>([]);
   const [isReactivating, startReactivationTransition] = useTransition();
+  const [isUpdating, startUpdateTransition] = useTransition();
   const [activities, setActivities] = useState<FollowUp[]>([]);
   const [isActivitiesLoading, setActivitiesLoading] = useState(true);
   const [surveys, setSurveys] = useState<SiteSurvey[]>([]);
@@ -93,16 +98,18 @@ export default function DroppedLeadDetailsPage() {
         setDroppedLead(undefined);
         setActivitiesLoading(true);
         try {
-          const [fetchedLead, fetchedActivities, fetchedSurveys, fetchedProposals] = await Promise.all([
+          const [fetchedLead, fetchedActivities, fetchedSurveys, fetchedProposals, fetchedSources] = await Promise.all([
             getDroppedLeadById(droppedId),
             getActivitiesForDroppedLead(droppedId),
             getSurveysForDroppedLead(droppedId),
-            getProposalsForDroppedLead(droppedId)
+            getProposalsForDroppedLead(droppedId),
+            getLeadSources(),
           ]);
           setDroppedLead(fetchedLead);
           setActivities(fetchedActivities);
           setSurveys(fetchedSurveys);
           setProposals(fetchedProposals);
+          setLeadSources(fetchedSources);
         } catch (error) {
           console.error("Failed to fetch dropped lead details:", error);
           setDroppedLead(null);
@@ -292,6 +299,47 @@ export default function DroppedLeadDetailsPage() {
                   </AlertDialogContent>
                 </AlertDialog>
               </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-md">Attributes</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div>
+                        <Label htmlFor="lead-source" className="text-xs font-medium">Source</Label>
+                        <Select value={droppedLead.source || ''} disabled>
+                            <SelectTrigger id="lead-source" className="h-8 text-xs">
+                                <SelectValue placeholder="Select source" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {leadSources.map(source => <SelectItem key={source.id} value={source.name} className="text-xs">{source.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div>
+                        <Label htmlFor="lead-kw" className="text-xs font-medium">Capacity (KW)</Label>
+                        <Input
+                            id="lead-kw"
+                            key={droppedLead.id}
+                            type="number"
+                            defaultValue={droppedLead.kilowatt || ''}
+                            className="h-8 text-xs"
+                            disabled
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="lead-client-type" className="text-xs font-medium">Customer Type</Label>
+                        <Select value={droppedLead.clientType || ''} disabled>
+                            <SelectTrigger id="lead-client-type" className="h-8 text-xs">
+                                <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {CLIENT_TYPES.map(p => <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </CardContent>
             </Card>
 
           </div>

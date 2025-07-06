@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useTransition } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -13,69 +13,112 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { IndianRupee, Receipt, UploadCloud, Eye } from 'lucide-react';
-import { EXPENSE_CATEGORIES, MOCK_EXPENSES, USER_OPTIONS } from '@/lib/constants';
-import type { Expense, ExpenseCategory, ExpenseStatus } from '@/types';
+import { IndianRupee, Receipt, UploadCloud, Eye, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
+import { EXPENSE_CATEGORIES, EXPENSE_STATUSES } from '@/lib/constants';
+import type { Expense, ExpenseCategory, ExpenseStatus, CreateExpenseData } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO, isValid } from 'date-fns';
+import { format, isValid, parseISO } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import type { DateRange } from 'react-day-picker';
+import { cn } from '@/lib/utils';
+import { createExpense, getExpensesForCurrentUser } from './actions';
+import { ProposalPreviewDialog } from '@/app/(app)/proposals/proposal-preview-dialog';
 
 const expenseSchema = z.object({
-  date: z.string().refine((val) => isValid(parseISO(val)), { message: "A valid date is required." }),
+  dateRange: z.object({
+    from: z.date({ required_error: "A start date is required." }),
+    to: z.date().optional(),
+  }),
   category: z.enum(EXPENSE_CATEGORIES, { required_error: "Category is required." }),
   amount: z.coerce.number().positive({ message: 'Amount must be positive and greater than 0.' }),
   description: z.string().min(5, { message: 'Description must be at least 5 characters long.' }),
-  receipt: z.any().optional(), // Placeholder for file input
+  receipt: z.instanceof(File).optional().nullable()
+    .refine(file => !file || file.size <= 5 * 1024 * 1024, `Max file size is 5MB.`)
+    .refine(file => !file || ['image/jpeg', 'image/png', 'application/pdf'].includes(file.type), '.jpg, .png, or .pdf files are accepted.'),
 });
 
 type ExpenseFormValues = z.infer<typeof expenseSchema>;
 
 export default function ExpensesPage() {
-  const [submittedExpenses, setSubmittedExpenses] = useState<Expense[]>(MOCK_EXPENSES);
+  const [submittedExpenses, setSubmittedExpenses] = useState<Expense[]>([]);
+  const [isSubmitting, startSubmitTransition] = useTransition();
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const [receiptToPreview, setReceiptToPreview] = useState<string | null>(null);
 
   const form = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseSchema),
     defaultValues: {
-      date: format(new Date(), 'yyyy-MM-dd'),
+      dateRange: { from: new Date(), to: undefined },
       category: undefined,
       amount: 0,
       description: '',
-      receipt: undefined,
+      receipt: null,
     },
   });
+  
+  const fetchExpenses = async () => {
+    setIsLoading(true);
+    const expenses = await getExpensesForCurrentUser();
+    setSubmittedExpenses(expenses);
+    setIsLoading(false);
+  };
+  
+  useEffect(() => {
+    fetchExpenses();
+  }, []);
 
   const onSubmit = (values: ExpenseFormValues) => {
-    console.log('Expense Submitted:', values);
-    const newExpense: Expense = {
-      id: `exp-${Date.now()}`,
-      userId: 'currentUser', // In a real app, get current user ID
-      userName: USER_OPTIONS[Math.floor(Math.random() * USER_OPTIONS.length)], // Mock user name
-      date: values.date,
-      category: values.category,
-      amount: values.amount,
-      description: values.description,
-      // receiptUrl: 'mock-receipt.pdf', // Placeholder
-      status: 'Pending',
-      submittedAt: new Date().toISOString(),
-    };
-    setSubmittedExpenses(prev => [newExpense, ...prev]);
-    toast({
-      title: 'Expense Submitted',
-      description: `${values.category} expense of ₹${values.amount} submitted for review.`,
-    });
-    form.reset({ 
-        date: format(new Date(), 'yyyy-MM-dd'), 
-        category: undefined, 
-        amount: 0, 
-        description: '',
-        receipt: undefined 
+    startSubmitTransition(async () => {
+        try {
+            let receiptUrl: string | undefined = undefined;
+            if (values.receipt) {
+                const formData = new FormData();
+                formData.append('file', values.receipt);
+                formData.append('folder', 'expense-receipts');
+                const uploadResponse = await fetch('/api/templates/upload', {
+                    method: 'POST',
+                    body: formData,
+                });
+                const uploadResult = await uploadResponse.json();
+                if (!uploadResponse.ok || !uploadResult.success) {
+                    throw new Error(uploadResult.error || 'Failed to upload receipt.');
+                }
+                receiptUrl = uploadResult.filePath;
+            }
+
+            const dataToSave: CreateExpenseData = {
+                date: format(values.dateRange.from, 'yyyy-MM-dd'),
+                endDate: values.dateRange.to ? format(values.dateRange.to, 'yyyy-MM-dd') : undefined,
+                category: values.category,
+                amount: values.amount,
+                description: values.description,
+                receiptUrl,
+                userId: '', // This will be set on the server
+            };
+
+            const result = await createExpense(dataToSave);
+
+            if ('error' in result) {
+                throw new Error(result.error);
+            }
+            
+            toast({ title: 'Expense Submitted', description: 'Your expense has been submitted for review.' });
+            form.reset();
+            form.setValue('dateRange', { from: new Date(), to: undefined });
+            fetchExpenses();
+
+        } catch (error) {
+            toast({ title: 'Submission Failed', description: (error as Error).message, variant: 'destructive' });
+        }
     });
   };
 
   const getStatusBadgeVariant = (status: ExpenseStatus) => {
     switch (status) {
-      case 'Approved': return 'default'; // Or 'success' if you add that variant
+      case 'Approved': return 'default';
       case 'Pending': return 'secondary';
       case 'Rejected': return 'destructive';
       default: return 'outline';
@@ -95,20 +138,48 @@ export default function ExpensesPage() {
         <Card className="lg:col-span-1">
           <CardHeader>
             <CardTitle>Submit New Expense</CardTitle>
-            <CardDescription>Fill out the form to record a new expense.</CardDescription>
+            <CardDescription>Fill out the form to record a new expense. Select a single date or a date range.</CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <FormField
                   control={form.control}
-                  name="date"
+                  name="dateRange"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="flex flex-col">
                       <FormLabel>Date of Expense</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} />
-                      </FormControl>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={"outline"}
+                              className={cn("w-full justify-start text-left font-normal", !field.value.from && "text-muted-foreground")}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {field.value.from ? (
+                                field.value.to ? (
+                                  <> {format(field.value.from, "LLL dd, y")} - {format(field.value.to, "LLL dd, y")} </>
+                                ) : (
+                                  format(field.value.from, "LLL dd, y")
+                                )
+                              ) : (
+                                <span>Pick a date or range</span>
+                              )}
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            initialFocus
+                            mode="range"
+                            defaultMonth={field.value.from}
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            numberOfMonths={1}
+                          />
+                        </PopoverContent>
+                      </Popover>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -120,15 +191,9 @@ export default function ExpensesPage() {
                     <FormItem>
                       <FormLabel>Category</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select expense category" />
-                          </SelectTrigger>
-                        </FormControl>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Select expense category" /></SelectTrigger></FormControl>
                         <SelectContent>
-                          {EXPENSE_CATEGORIES.map(cat => (
-                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                          ))}
+                          {EXPENSE_CATEGORIES.map(cat => ( <SelectItem key={cat} value={cat}>{cat}</SelectItem> ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -157,9 +222,7 @@ export default function ExpensesPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Textarea placeholder="Detailed description of the expense..." {...field} />
-                      </FormControl>
+                      <FormControl><Textarea placeholder="Detailed description of the expense..." {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -167,28 +230,18 @@ export default function ExpensesPage() {
                 <FormField
                   control={form.control}
                   name="receipt"
-                  render={({ field }) => (
+                  render={({ field: { onChange, value, ...rest }}) => (
                     <FormItem>
                       <FormLabel>Upload Receipt (Optional)</FormLabel>
                       <FormControl>
-                        <div className="flex items-center justify-center w-full">
-                            <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-32 border-2 border-border border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted">
-                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                    <UploadCloud className="w-8 h-8 mb-2 text-muted-foreground" />
-                                    <p className="mb-1 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                                    <p className="text-xs text-muted-foreground">PNG, JPG, PDF (MAX. 5MB)</p>
-                                </div>
-                                <Input id="dropzone-file" type="file" className="hidden" onChange={(e) => field.onChange(e.target.files?.[0])} />
-                            </label>
-                        </div> 
+                        <Input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={(e) => onChange(e.target.files?.[0] || null)} {...rest} />
                       </FormControl>
-                      {field.value && <p className="text-xs text-muted-foreground mt-1">File: {(field.value as File).name}</p>}
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-                  {form.formState.isSubmitting ? 'Submitting...' : 'Submit Expense'}
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Submitting...</> : 'Submit Expense'}
                 </Button>
               </form>
             </Form>
@@ -201,7 +254,8 @@ export default function ExpensesPage() {
             <CardDescription>A list of your recently submitted expenses and their status.</CardDescription>
           </CardHeader>
           <CardContent>
-            {submittedExpenses.length === 0 ? (
+            {isLoading ? <div className="text-center p-8"><Loader2 className="h-6 w-6 animate-spin mx-auto"/></div> :
+            submittedExpenses.length === 0 ? (
                 <div className="text-center py-10 text-muted-foreground">
                     <Receipt className="mx-auto h-12 w-12 mb-4" />
                     <p>No expenses submitted yet.</p>
@@ -210,19 +264,17 @@ export default function ExpensesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
+                  <TableHead>Date(s)</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Submitted By</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-center">Actions</TableHead>
+                  <TableHead className="text-center">Receipt</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {submittedExpenses.map((expense) => (
                   <TableRow key={expense.id}>
-                    <TableCell>{format(parseISO(expense.date), 'dd MMM, yyyy')}</TableCell>
+                    <TableCell>{expense.endDate ? `${expense.date} to ${expense.endDate}`: expense.date}</TableCell>
                     <TableCell>{expense.category}</TableCell>
                     <TableCell className="text-right font-medium">
                       <div className="flex items-center justify-end">
@@ -230,15 +282,15 @@ export default function ExpensesPage() {
                         {expense.amount.toFixed(2)}
                       </div>
                     </TableCell>
-                    <TableCell className="max-w-[200px] truncate">{expense.description}</TableCell>
-                    <TableCell>{expense.userName || expense.userId}</TableCell>
                     <TableCell>
                       <Badge variant={getStatusBadgeVariant(expense.status)}>{expense.status}</Badge>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Button variant="ghost" size="icon" disabled={!expense.receiptUrl} title="View Receipt (Coming Soon)">
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      {expense.receiptUrl ? (
+                        <Button variant="ghost" size="icon" title="View Receipt" onClick={() => setReceiptToPreview(expense.receiptUrl!)}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      ) : '-'}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -248,6 +300,14 @@ export default function ExpensesPage() {
           </CardContent>
         </Card>
       </div>
+      {receiptToPreview && (
+        <ProposalPreviewDialog
+            isOpen={!!receiptToPreview}
+            onClose={() => setReceiptToPreview(null)}
+            pdfUrl={receiptToPreview}
+            docxUrl={null}
+        />
+      )}
     </>
   );
 }

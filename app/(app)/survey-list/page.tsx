@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -6,12 +7,38 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { SURVEY_STATUS_OPTIONS } from '@/lib/constants';
 import type { SiteSurvey, SurveyStatusType, SurveySortConfig, SurveyStatusFilterItem } from '@/types';
-import { format, parseISO } from 'date-fns';
-import { Filter, Search, PlusCircle, Settings2, ListChecks } from 'lucide-react';
+import { Filter, Search, PlusCircle, Settings2, ListChecks, Rows, ListFilter } from 'lucide-react';
 import { SurveysTable } from './surveys-table';
 import { useToast } from "@/hooks/use-toast";
 import { getSiteSurveys } from '@/app/(app)/site-survey/actions';
 import { useRouter } from 'next/navigation';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuCheckboxItem, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+
+// Define all possible columns for the survey list
+const allColumns: Record<keyof Omit<SiteSurvey, 'id' | 'createdAt' | 'updatedAt' | 'leadId' | 'clientId' | 'droppedLeadId' | 'surveyorId' | 'electricityBillFiles'>, string> = {
+    surveyNumber: 'Survey No.',
+    consumerName: 'Client Name',
+    location: 'Location',
+    date: 'Survey Date',
+    surveyorName: 'Surveyor',
+    consumerCategory: 'Category',
+    status: 'Status',
+    numberOfMeters: 'No. of Meters',
+    meterRating: 'Meter Rating',
+    meterPhase: 'Meter Phase',
+    electricityAmount: 'Avg. Bill (₹)',
+    consumerLoadType: 'Load Type',
+    roofType: 'Roof Type',
+    buildingHeight: 'Building Height',
+    shadowFreeArea: 'Shadow-Free Area',
+    discom: 'DISCOM',
+    sanctionedLoad: 'Sanctioned Load',
+    remark: 'Remark',
+};
+
 
 export default function SurveyListPage() {
   const router = useRouter();
@@ -20,6 +47,32 @@ export default function SurveyListPage() {
   const { toast } = useToast();
   const [activeFilter, setActiveFilter] = useState<SurveyStatusType | 'all'>('all');
   const [sortConfig, setSortConfig] = useState<SurveySortConfig | null>(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+  
+  const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({
+    surveyNumber: true,
+    consumerName: true,
+    location: true,
+    date: true,
+    surveyorName: true,
+    consumerCategory: true,
+    status: true,
+    numberOfMeters: false,
+    meterRating: false,
+    meterPhase: false,
+    electricityAmount: false,
+    consumerLoadType: false,
+    roofType: false,
+    buildingHeight: false,
+    shadowFreeArea: false,
+    discom: false,
+    sanctionedLoad: false,
+    remark: true,
+  });
 
   useEffect(() => {
     async function fetchData() {
@@ -39,6 +92,8 @@ export default function SurveyListPage() {
     surveys.forEach(survey => {
       if (counts[survey.status] !== undefined) {
         counts[survey.status]++;
+      } else {
+        counts[survey.status] = 1;
       }
     });
 
@@ -53,10 +108,21 @@ export default function SurveyListPage() {
   }, [surveys]);
 
 
-  const sortedAndFilteredSurveys = useMemo(() => {
+  const allFilteredSurveys = useMemo(() => {
     let currentSurveys = [...surveys];
+    
     if (activeFilter !== 'all') {
       currentSurveys = currentSurveys.filter(survey => survey.status === activeFilter);
+    }
+
+    if (searchTerm) {
+      const lowercasedTerm = searchTerm.toLowerCase();
+      currentSurveys = currentSurveys.filter(survey => 
+        survey.consumerName.toLowerCase().includes(lowercasedTerm) ||
+        survey.surveyNumber.toLowerCase().includes(lowercasedTerm) ||
+        survey.location.toLowerCase().includes(lowercasedTerm) ||
+        survey.surveyorName.toLowerCase().includes(lowercasedTerm)
+      );
     }
     
     if (sortConfig !== null) {
@@ -88,7 +154,15 @@ export default function SurveyListPage() {
       });
     }
     return currentSurveys;
-  }, [surveys, activeFilter, sortConfig]);
+  }, [surveys, activeFilter, sortConfig, searchTerm]);
+
+  const paginatedSurveys = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    const end = start + pageSize;
+    return allFilteredSurveys.slice(start, end);
+  }, [allFilteredSurveys, currentPage, pageSize]);
+
+  const totalPages = Math.ceil(allFilteredSurveys.length / pageSize);
 
   const requestSort = (key: keyof SiteSurvey) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -110,18 +184,62 @@ export default function SurveyListPage() {
         icon={ListChecks}
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" disabled>
-              <Filter className="mr-2 h-4 w-4" /> Filter
-            </Button>
-            <Button variant="outline" size="sm" disabled>
+            <Button variant="outline" size="sm" onClick={() => setIsSearchOpen(true)}>
               <Search className="mr-2 h-4 w-4" /> Search
             </Button>
             <Button size="sm" onClick={() => router.push('/site-survey')}>
               <PlusCircle className="mr-2 h-4 w-4" /> Add Survey
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => toast({title: "Settings Clicked", description: "Settings dialog not yet implemented."})}>
-              <Settings2 className="h-5 w-5" />
-            </Button>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-9 w-9">
+                    <Settings2 className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>View Options</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>
+                            <ListFilter className="mr-2 h-4 w-4" />
+                            <span>Columns</span>
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuPortal>
+                            <DropdownMenuSubContent>
+                                <DropdownMenuLabel>Toggle Columns</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                {Object.entries(allColumns).map(([key, label]) => (
+                                    <DropdownMenuCheckboxItem
+                                        key={key}
+                                        className="capitalize"
+                                        checked={columnVisibility[key]}
+                                        onCheckedChange={(value) =>
+                                            setColumnVisibility((prev) => ({ ...prev, [key]: !!value }))
+                                        }
+                                    >
+                                        {label}
+                                    </DropdownMenuCheckboxItem>
+                                ))}
+                            </DropdownMenuSubContent>
+                        </DropdownMenuPortal>
+                    </DropdownMenuSub>
+                    <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>
+                            <Rows className="mr-2 h-4 w-4" />
+                            <span>Rows per page</span>
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuPortal>
+                            <DropdownMenuSubContent>
+                                <DropdownMenuRadioGroup value={String(pageSize)} onValueChange={(value) => { setPageSize(Number(value)); setCurrentPage(1); }}>
+                                    {[10, 20, 50, 100].map(size => (
+                                        <DropdownMenuRadioItem key={size} value={String(size)}>{size}</DropdownMenuRadioItem>
+                                    ))}
+                                </DropdownMenuRadioGroup>
+                            </DropdownMenuSubContent>
+                        </DropdownMenuPortal>
+                    </DropdownMenuSub>
+                </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         }
       />
@@ -145,7 +263,7 @@ export default function SurveyListPage() {
       </div>
       
       <SurveysTable 
-        surveys={sortedAndFilteredSurveys} 
+        surveys={paginatedSurveys} 
         onEditSurvey={(survey) => { 
             toast({title: "Edit Survey Clicked", description: `Survey: ${survey.surveyNumber}. Form not implemented.`})
         }}
@@ -154,7 +272,48 @@ export default function SurveyListPage() {
         }}
         sortConfig={sortConfig}
         requestSort={requestSort}
+        columnVisibility={columnVisibility}
       />
+
+       <div className="flex items-center justify-between pt-4">
+        <div className="text-sm text-muted-foreground">
+          Showing {paginatedSurveys.length} of {allFilteredSurveys.length} surveys.
+        </div>
+        <div className="flex items-center space-x-2">
+          <Button variant="outline" size="sm" onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))} disabled={currentPage === 1}>
+            Previous
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))} disabled={currentPage >= totalPages}>
+            Next
+          </Button>
+        </div>
+      </div>
+       
+       {isSearchOpen && (
+        <AlertDialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Search Surveys</AlertDialogTitle>
+              <AlertDialogDescription>
+                Search by consumer name, survey number, location, or surveyor.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="py-4">
+              <Label htmlFor="search-input" className="sr-only">Search</Label>
+              <Input 
+                id="search-input"
+                placeholder="e.g. John Doe, SRV-123, Mumbai..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => {setSearchTerm(''); setIsSearchOpen(false);}}>Clear & Close</AlertDialogCancel>
+              <AlertDialogAction onClick={() => setIsSearchOpen(false)}>Apply</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </>
   );
 }

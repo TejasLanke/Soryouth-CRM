@@ -27,7 +27,7 @@ model User {
   role      String   @default("TechnoSales")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  surveys          SiteSurvey[]
+  surveys   SiteSurvey[]
 
 
   // Relations
@@ -39,6 +39,8 @@ model User {
   assignedClients      Client[]      @relation("AssignedClients")
   createdFollowUps     FollowUp[]    @relation("CreatedFollowUps")
   assignedTasks        FollowUp[]    @relation("AssignedTasks")
+  expenses             Expense[]
+  reviewedExpenses     Expense[]     @relation("ReviewedExpenses")
 }
 
 model Lead {
@@ -336,4 +338,26 @@ model GeneratedDocument {
 
   //Indexing
   @@index([documentType])
+}
+
+model Expense {
+  id           String    @id @default(cuid())
+  date         DateTime  @map("date")
+  endDate      DateTime? @map("end_date")
+  category     String
+  amount       Decimal   @db.Decimal(10, 2)
+  description  String
+  receiptUrl   String?   @map("receipt_url")
+  status       String    @default("Pending") // Pending, Approved, Rejected
+  submittedAt  DateTime  @default(now()) @map("submitted_at")
+  reviewedAt   DateTime? @map("reviewed_at")
+
+  user         User      @relation(fields: [userId], references: [id])
+  userId       String    @map("user_id")
+
+  reviewedBy   User?     @relation("ReviewedExpenses", fields: [reviewedById], references: [id])
+  reviewedById String?   @map("reviewed_by_id")
+
+  @@index([userId])
+  @@index([reviewedById])
 }
