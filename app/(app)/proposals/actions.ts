@@ -88,6 +88,7 @@ export async function createOrUpdateProposal(data: Partial<Proposal>): Promise<P
         if (data.leadId) revalidatePath(`/leads/${data.leadId}`);
         if (data.clientId) revalidatePath(`/clients/${data.clientId}`);
         revalidatePath('/proposals');
+        revalidatePath(`/proposals/${data.clientId || data.leadId}`);
         
         return mapPrismaProposalToProposalType(savedProposal);
 
@@ -95,6 +96,52 @@ export async function createOrUpdateProposal(data: Partial<Proposal>): Promise<P
         console.error("Failed to create or update proposal:", error);
         return null;
     }
+}
+
+export async function deleteProposal(proposalId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const proposal = await prisma.proposal.findUnique({
+      where: { id: proposalId },
+    });
+
+    if (!proposal) {
+      return { success: false, error: 'Proposal not found.' };
+    }
+
+    // Delete files from S3 if they exist
+    if (proposal.pdfUrl) {
+      try {
+        const pdfKey = new URL(proposal.pdfUrl).pathname.substring(1);
+        await deleteFileFromS3(pdfKey);
+      } catch (e) {
+        console.error(`Failed to delete PDF from S3: ${proposal.pdfUrl}`, e);
+      }
+    }
+    if (proposal.docxUrl) {
+      try {
+        const docxKey = new URL(proposal.docxUrl).pathname.substring(1);
+        await deleteFileFromS3(docxKey);
+      } catch(e) {
+        console.error(`Failed to delete DOCX from S3: ${proposal.docxUrl}`, e);
+      }
+    }
+
+    // Delete from DB
+    await prisma.proposal.delete({
+      where: { id: proposalId },
+    });
+
+    revalidatePath('/proposals');
+    if (proposal.clientId) revalidatePath(`/proposals/${proposal.clientId}`);
+    if (proposal.leadId) revalidatePath(`/proposals/${proposal.leadId}`);
+    if (proposal.droppedLeadId) revalidatePath(`/proposals/${proposal.droppedLeadId}`);
+    
+    return { success: true };
+
+  } catch (error) {
+    console.error('Failed to delete proposal:', error);
+    return { success: false, error: 'An unexpected error occurred.' };
+  }
 }
 
 export async function bulkCreateProposals(proposals: Partial<Proposal>[]): Promise<{ success: boolean; count: number; message?: string }> {
