@@ -29,6 +29,7 @@ function mapPrismaProposalToProposalType(prismaProposal: any): Proposal {
     generationPerDay: prismaProposal.generationPerDay ? Number(prismaProposal.generationPerDay) : undefined,
     generationPerYear: prismaProposal.generationPerYear ? Number(prismaProposal.generationPerYear) : undefined,
     savingsPerYear: prismaProposal.savingsPerYear ? Number(prismaProposal.savingsPerYear) : undefined,
+    droppedLeadId: prismaProposal.droppedLeadId ?? undefined,
   };
 }
 
@@ -94,6 +95,66 @@ export async function createOrUpdateProposal(data: Partial<Proposal>): Promise<P
         console.error("Failed to create or update proposal:", error);
         return null;
     }
+}
+
+export async function bulkCreateProposals(proposals: Partial<Proposal>[]): Promise<{ success: boolean; count: number; message?: string }> {
+  try {
+    const dataToSave = proposals.map(p => {
+        // Explicitly build the object with only valid fields for the Proposal model
+        return {
+          proposalNumber: p.proposalNumber!,
+          name: p.name!,
+          clientType: p.clientType!,
+          contactPerson: p.contactPerson!,
+          location: p.location!,
+          capacity: p.capacity!,
+          moduleType: p.moduleType!,
+          moduleWattage: p.moduleWattage!,
+          dcrStatus: p.dcrStatus!,
+          inverterRating: p.inverterRating!,
+          inverterQty: p.inverterQty!,
+          ratePerWatt: p.ratePerWatt!,
+          proposalDate: p.proposalDate ? parseISO(p.proposalDate) : new Date(),
+          baseAmount: p.baseAmount!,
+          cgstAmount: p.cgstAmount!,
+          sgstAmount: p.sgstAmount!,
+          subtotalAmount: p.subtotalAmount!,
+          finalAmount: p.finalAmount!,
+          subsidyAmount: p.subsidyAmount!,
+          requiredSpace: p.requiredSpace,
+          generationPerDay: p.generationPerDay,
+          generationPerYear: p.generationPerYear,
+          unitRate: p.unitRate,
+          savingsPerYear: p.savingsPerYear,
+          laKitQty: p.laKitQty,
+          acdbDcdbQty: p.acdbDcdbQty,
+          earthingKitQty: p.earthingKitQty,
+          pdfUrl: p.pdfUrl,
+          docxUrl: p.docxUrl,
+          templateId: p.templateId,
+          leadId: p.leadId || null,
+          clientId: p.clientId || null,
+        };
+    });
+
+    const result = await prisma.proposal.createMany({
+      data: dataToSave,
+      skipDuplicates: true
+    });
+    
+    revalidatePath('/proposals');
+    proposals.forEach(p => {
+        if (p.leadId) revalidatePath(`/leads/${p.leadId}`);
+        if (p.clientId) revalidatePath(`/clients/${p.clientId}`);
+    });
+    
+    return { success: true, count: result.count };
+
+  } catch (error) {
+    console.error("Failed to bulk create proposals:", error);
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+    return { success: false, count: 0, message: errorMessage };
+  }
 }
 
 export async function getProposalsForLead(leadId: string): Promise<Proposal[]> {

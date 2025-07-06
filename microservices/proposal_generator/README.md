@@ -1,4 +1,3 @@
-
 # Proposal Generation Microservice
 
 This Python Flask microservice handles the generation of proposals from `.docx` templates.
@@ -7,8 +6,8 @@ This Python Flask microservice handles the generation of proposals from `.docx` 
 
 - Receives a request with the path to a template and a JSON data payload.
 - Uses `docxtpl` to populate the `.docx` template with the provided data.
-- Converts the populated `.docx` file to a `.pdf` file.
-- Returns the final `.pdf` file in the response.
+- Converts the populated `.docx` file to a `.pdf` file using LibreOffice.
+- Returns both the generated DOCX and PDF files in the response.
 
 ## Setup
 
@@ -41,16 +40,32 @@ This Python Flask microservice handles the generation of proposals from `.docx` 
 
 ## Running the Service
 
-Because our application file is named `main.py`, you need to tell Flask where to find it. Run the following command from within the `microservices/proposal_generator` directory:
+You can run this service using different WSGI servers depending on your operating system and environment.
+
+### For Production (Linux)
+
+For a production environment on Linux, it is recommended to use `gunicorn`.
+
+```bash
+gunicorn --workers 3 --bind 0.0.0.0:5001 main:app
+```
+
+### For Development & Testing (Windows & cross-platform)
+
+For local development or testing concurrent requests on Windows, `waitress` is an excellent choice.
+
+```bash
+waitress-serve --host 127.0.0.1 --port=5001 main:app
+```
+
+You can also use the built-in Flask development server for basic testing (not suitable for multiple requests):
 
 ```bash
 flask --app main run --port 5001
 ```
 
-The service will start on `http://127.0.0.1:5001`.
-
 ## Important Note on Dependencies
 
-This service uses the `docx2pdf` library, which relies on the **Microsoft Office COM interface**. This means it will **only work on a Windows machine with Microsoft Word installed**.
+This service uses **LibreOffice** for PDF conversion. This means **LibreOffice must be installed on the machine** where this microservice is running. 
 
-For Linux or macOS environments, you would need to replace `docx2pdf` with a solution that uses LibreOffice headless mode, which requires LibreOffice to be installed on the server.
+The Python script will automatically try to find the correct executable (`soffice.exe` on Windows, `libreoffice` or `soffice` on Linux/macOS). For this to work, ensure the LibreOffice program directory is in your system's `PATH`, or that it's installed in a standard location (like `C:\Program Files\LibreOffice\program` on Windows).
