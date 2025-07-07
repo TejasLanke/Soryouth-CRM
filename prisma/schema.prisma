@@ -28,6 +28,7 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   surveys   SiteSurvey[]
+  attendances  Attendance[]
 
 
   // Relations
@@ -360,4 +361,18 @@ model Expense {
 
   @@index([userId])
   @@index([reviewedById])
+}
+
+model Attendance {
+  id               String    @id @default(cuid())
+  punchInTime      DateTime  @default(now())
+  punchOutTime     DateTime?
+  punchInLocation  String
+  punchOutLocation String?
+  workDuration     Int? // Stored in minutes
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  @@index([userId, punchInTime])
 }

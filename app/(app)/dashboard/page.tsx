@@ -15,7 +15,8 @@ import {
   Users, 
   CalendarRange, 
   Sigma,
-  Loader2
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
@@ -25,6 +26,10 @@ import { getLeads } from '@/app/(app)/leads-list/actions';
 import { getDroppedLeads } from '@/app/(app)/dropped-leads-list/actions';
 import { getActiveClients, getInactiveClients } from '@/app/(app)/clients-list/actions';
 import { getUsers } from '@/app/(app)/users/actions';
+import { useToast } from '@/hooks/use-toast';
+import { punchIn, punchOut, getCurrentUserAttendanceStatus } from '@/app/(app)/attendance/actions';
+import { format } from 'date-fns';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
@@ -39,6 +44,18 @@ export default function DashboardOverviewPage() {
     leadsByUser: [] as { name: string; value: number; fill: string }[],
   });
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Attendance State
+  const [isPunchedIn, setIsPunchedIn] = useState(false);
+  const [punchInTime, setPunchInTime] = useState<string | null>(null);
+
+  const refreshAttendanceStatus = async () => {
+    const status = await getCurrentUserAttendanceStatus();
+    setIsPunchedIn(status.isPunchedIn);
+    setPunchInTime(status.punchInTime || null);
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -74,6 +91,9 @@ export default function DashboardOverviewPage() {
             leadsByUser,
             dealsByUser,
         });
+
+        await refreshAttendanceStatus();
+        
       } catch (error) {
         console.error("Failed to fetch dashboard data:", error);
       } finally {
@@ -84,14 +104,41 @@ export default function DashboardOverviewPage() {
     fetchData();
   }, []);
 
-  const [attendanceStatus, setAttendanceStatus] = useState('Not Punched In');
-  const [isPunchedIn, setIsPunchedIn] = useState(false);
-
   const handlePunchInOut = () => {
-    setIsPunchedIn(!isPunchedIn);
-    setAttendanceStatus(isPunchedIn ? 'Not Punched In' : 'Punched In');
-  };
+    setIsProcessing(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const location = { latitude, longitude };
+          
+          const action = isPunchedIn ? punchOut : punchIn;
+          const result = await action(location);
 
+          if (result && result.success) {
+            toast({ title: 'Success', description: `You have successfully punched ${isPunchedIn ? 'out' : 'in'}.` });
+            await refreshAttendanceStatus();
+          } else {
+            toast({ title: 'Error', description: result?.error || 'An unknown error occurred.', variant: 'destructive' });
+          }
+        } catch (e) {
+            console.error("Punch in/out failed:", e);
+            toast({ title: 'Error', description: 'An unexpected server error occurred.', variant: 'destructive' });
+        } finally {
+            setIsProcessing(false);
+        }
+      },
+      (error) => {
+        toast({
+          title: 'Location Error',
+          description: `Could not get your location: ${error.message}. Please enable location services.`,
+          variant: 'destructive',
+        });
+        setIsProcessing(false);
+      }
+    );
+  };
+  
   const dealsByUserChartConfig = useMemo(() => {
     const config: ChartConfig = {};
     dashboardData.dealsByUser.forEach(item => {
@@ -153,9 +200,22 @@ export default function DashboardOverviewPage() {
             <CardDescription>Track your work hours</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col items-center space-y-3">
-            <p className="text-lg">Current Status: <span className={`font-semibold ${isPunchedIn ? 'text-green-600' : 'text-red-600'}`}>{attendanceStatus}</span></p>
-            <Button onClick={handlePunchInOut} className="w-full">
-              {isPunchedIn ? 'Punch Out' : 'Punch In'}
+             {isPunchedIn ? (
+                <Alert variant="default" className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-center">
+                    <AlertTitle className="text-green-800 dark:text-green-300">You are Punched In</AlertTitle>
+                    <AlertDescription className="text-green-700 dark:text-green-400">
+                        Punched in at: <span className="font-semibold">{punchInTime}</span>
+                    </AlertDescription>
+                </Alert>
+             ) : (
+                 <Alert variant="destructive" className="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-center">
+                    <AlertCircle className="h-4 w-4 !left-1/2 -translate-x-1/2 !top-2"/>
+                    <AlertTitle className="text-red-800 dark:text-red-300 pt-4">You are Punched Out</AlertTitle>
+                </Alert>
+             )}
+            <Button onClick={handlePunchInOut} className="w-full" disabled={isProcessing}>
+                {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                {isPunchedIn ? 'Punch Out' : 'Punch In'}
             </Button>
           </CardContent>
         </Card>

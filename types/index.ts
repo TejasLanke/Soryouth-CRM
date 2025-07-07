@@ -354,3 +354,13 @@ export interface CustomSetting {
     createdAt: string;
 }
 
+export interface Attendance {
+  id: string;
+  userId: string;
+  userName: string;
+  punchInTime: string;
+  punchOutTime?: string | null;
+  punchInLocation: string;
+  punchOutLocation?: string | null;
+  workDuration?: string | null; // e.g., "8h 30m"
+}
