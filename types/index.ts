@@ -1,4 +1,5 @@
-import type { LEAD_PRIORITY_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES, EXPENSE_CATEGORIES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS, SURVEY_STATUS_OPTIONS, SURVEY_TYPE_OPTIONS, METER_PHASES, CONSUMER_LOAD_TYPES, ROOF_TYPES, DISCOM_OPTIONS, CLIENT_PRIORITY_OPTIONS, USER_ROLES, EXPENSE_STATUSES } from '@/lib/constants';
+
+import type { LEAD_PRIORITY_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES, EXPENSE_CATEGORIES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS, SURVEY_STATUS_OPTIONS, SURVEY_TYPE_OPTIONS, METER_PHASES, CONSUMER_LOAD_TYPES, ROOF_TYPES, DISCOM_OPTIONS, CLIENT_PRIORITY_OPTIONS, USER_ROLES, EXPENSE_STATUSES, DEAL_PIPELINES, DEAL_STAGES_SOLAR, DEAL_STAGES_AMC } from '@/lib/constants';
 
 // Deriving types from the const arrays ensures type safety and single source of truth
 export type LeadStatusType = string;
@@ -363,4 +364,22 @@ export interface Attendance {
   punchInLocation: string;
   punchOutLocation?: string | null;
   workDuration?: string | null; // e.g., "8h 30m"
+}
+
+export type DealPipelineType = keyof typeof DEAL_PIPELINES;
+export type DealStage = typeof DEAL_STAGES_SOLAR[number] | typeof DEAL_STAGES_AMC[number];
+
+export interface Deal {
+  id: string;
+  clientName: string;
+  contactPerson: string;
+  email?: string | null;
+  phone?: string | null;
+  pipeline: DealPipelineType;
+  stage: DealStage;
+  dealValue: number;
+  assignedTo?: string | null;
+  poWoDate: string; // ISO string
+  createdAt: string;
+  updatedAt: string;
 }

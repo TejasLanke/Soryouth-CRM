@@ -28,6 +28,7 @@ import {
   Users,
   ClipboardPaste,
   ClipboardCheck,
+  Handshake,
 } from 'lucide-react';
 import { format, parseISO, addDays, subDays } from 'date-fns';
 
@@ -38,6 +39,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/leads-list', label: 'Leads', icon: UsersRound },
   { href: '/clients-list', label: 'Clients', icon: Briefcase },
+  { href: '/deals', label: 'Deals', icon: Handshake },
   { href: '/proposals', label: 'Proposals', icon: FileText },
   { href: '/dropped-leads-list', label: 'Dropped Leads', icon: UserX },
   { href: '/inactive-clients', label: 'Inactive Clients', icon: Archive },
@@ -62,6 +64,17 @@ export const TOOLS_NAV_ITEMS: NavItem[] = [
   { href: '/document-customizer', label: 'AI Document Customizer', icon: WandSparkles },
   { href: '/automation', label: 'Automation Scripts', icon: TerminalSquare },
 ];
+
+export const DEAL_STAGES_SOLAR = ['Deal Done', 'Procurement', 'Installation', 'Commissioning', 'Handover'] as const;
+export const DEAL_STAGES_AMC = ['New AMC', 'Quoted', 'Agreement', 'Active', 'Expired'] as const;
+
+export const DEAL_PIPELINES = {
+    'Solar PV Plant': DEAL_STAGES_SOLAR,
+    'AMC': DEAL_STAGES_AMC,
+} as const;
+
+export type DealPipelineType = keyof typeof DEAL_PIPELINES;
+export type DealStage = typeof DEAL_STAGES_SOLAR[number] | typeof DEAL_STAGES_AMC[number];
 
 export const USER_ROLES = ['Admin', 'TechnoSales', 'Designing', 'Procurement', 'ProjectManager', 'LiasoningExecutive', 'OperationAndMaintainance'] as const;
 export const CLIENT_TYPES = ['Individual/Bungalow', 'Housing Society', 'Commercial', 'Industrial', 'Other'] as const;
