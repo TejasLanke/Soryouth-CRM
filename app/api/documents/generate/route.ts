@@ -6,7 +6,7 @@ import fs from 'fs/promises';
 import { format, parseISO } from 'date-fns';
 import { getTemplateById } from '@/app/(app)/manage-templates/actions';
 import type { DocumentType } from '@/types';
-import { uploadFileToS3, getFileFromS3 } from '@/lib/s3';
+import { uploadFileToS3, getFileFromS3, deleteFileFromS3 } from '@/lib/s3';
 import prisma from '@/lib/prisma';
 import { verifySession } from '@/lib/auth';
 
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { templateId, formData, documentType } = await request.json();
+    const { templateId, formData, documentType, documentIdToUpdate } = await request.json();
 
     if (!templateId || !formData || !documentType) {
       return NextResponse.json({ error: 'Missing templateId, formData, or documentType' }, { status: 400 });
@@ -59,7 +59,6 @@ export async function POST(request: NextRequest) {
 
     const templateData = getTemplateData(formData, documentType);
     
-    // Default to the proposal generator service for now
     const pythonServiceUrl = process.env.PYTHON_MICROSERVICE_URL || 'http://127.0.0.1:5001/generate';
     const response = await fetch(pythonServiceUrl, {
         method: 'POST',
@@ -84,24 +83,52 @@ export async function POST(request: NextRequest) {
     const pdfBuffer = Buffer.from(result.pdf_b64, 'base64');
     const docxBuffer = Buffer.from(result.docx_b64, 'base64');
 
-    const clientName = formData.client_name || formData.clientName || 'document';
+    const clientName = (formData.client_name || formData.clientName || 'document').toString();
     const baseKey = `documents/${clientName.replace(/\s/g, '_')}_${documentType.replace(/\s/g, '_')}_${Date.now()}`;
     const pdfKey = `${baseKey}.pdf`;
     const docxKey = `${baseKey}.docx`;
+
+    // If updating, delete old files from S3 first
+    if (documentIdToUpdate) {
+        const oldDoc = await prisma.generatedDocument.findUnique({ where: { id: documentIdToUpdate } });
+        if (oldDoc) {
+            await Promise.all([
+                deleteFileFromS3(new URL(oldDoc.pdfUrl).pathname.substring(1)),
+                deleteFileFromS3(new URL(oldDoc.docxUrl).pathname.substring(1)),
+            ]);
+        }
+    }
 
     const [pdfUrl, docxUrl] = await Promise.all([
         uploadFileToS3(pdfBuffer, pdfKey, 'application/pdf'),
         uploadFileToS3(docxBuffer, docxKey, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
     ]);
 
-    await prisma.generatedDocument.create({
-      data: {
-        clientName: clientName,
-        documentType: documentType,
-        pdfUrl: pdfUrl,
-        docxUrl: docxUrl,
-      },
-    });
+    if (documentIdToUpdate) {
+        await prisma.generatedDocument.update({
+            where: { id: documentIdToUpdate },
+            data: {
+                clientName: clientName,
+                documentType: documentType,
+                pdfUrl: pdfUrl,
+                docxUrl: docxUrl,
+                templateId: template.id,
+                formData: JSON.stringify(formData),
+            },
+        });
+    } else {
+        await prisma.generatedDocument.create({
+            data: {
+                clientName: clientName,
+                documentType: documentType,
+                pdfUrl: pdfUrl,
+                docxUrl: docxUrl,
+                templateId: template.id,
+                formData: JSON.stringify(formData),
+            },
+        });
+    }
+
 
     return NextResponse.json({
       success: true,

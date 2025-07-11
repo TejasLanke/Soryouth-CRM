@@ -7,7 +7,7 @@ import { PageHeader } from '@/components/page-header';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { DOCUMENT_TYPES_CONFIG } from '@/lib/constants';
-import { Loader2, ArrowLeft, FileText, Trash2, Eye } from 'lucide-react';
+import { Loader2, ArrowLeft, FileText, Trash2, Eye, Edit } from 'lucide-react';
 import { getGeneratedDocuments, deleteGeneratedDocument } from '../actions';
 import type { GeneratedDocument, CustomSetting } from '@/types';
 import { format } from 'date-fns';
@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ProposalPreviewDialog } from '@/app/(app)/proposals/proposal-preview-dialog';
 import { getDocumentTypes } from '@/app/(app)/settings/actions';
+import { DocumentCreationDialog } from '../document-creation-dialog';
 
 export default function GeneratedDocumentsPage() {
     const router = useRouter();
@@ -30,8 +31,18 @@ export default function GeneratedDocumentsPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [previewUrls, setPreviewUrls] = useState<{ pdfUrl: string, docxUrl: string } | null>(null);
 
+    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+    const [documentToEdit, setDocumentToEdit] = useState<GeneratedDocument | null>(null);
+
     const documentConfig = documentType ? DOCUMENT_TYPES_CONFIG.find(dt => dt.type === documentType) : undefined;
 
+    const refreshDocuments = async () => {
+        if (documentType) {
+            const fetchedDocs = await getGeneratedDocuments(documentType);
+            setDocuments(fetchedDocs);
+        }
+    };
+    
     useEffect(() => {
         const fetchPageData = async () => {
             setIsLoading(true);
@@ -58,6 +69,23 @@ export default function GeneratedDocumentsPage() {
                 toast({ title: 'Error', description: result.error || 'Failed to delete the document.', variant: 'destructive' });
             }
         });
+    };
+
+    const handleEdit = (doc: GeneratedDocument) => {
+        setDocumentToEdit(doc);
+        setIsCreateDialogOpen(true);
+    };
+
+    const handleGenerationSuccess = (urls: { pdfUrl: string, docxUrl: string }) => {
+        setIsCreateDialogOpen(false);
+        setDocumentToEdit(null);
+        refreshDocuments();
+        setPreviewUrls(urls);
+    };
+
+    const closeCreationDialogs = () => {
+        setIsCreateDialogOpen(false);
+        setDocumentToEdit(null);
     };
 
     if (isLoading) {
@@ -123,7 +151,10 @@ export default function GeneratedDocumentsPage() {
                             <CardContent className="flex-grow" />
                             <CardFooter className="flex justify-end gap-2">
                                 <Button variant="outline" size="sm" onClick={() => setPreviewUrls({ pdfUrl: doc.pdfUrl, docxUrl: doc.docxUrl })}>
-                                    <Eye className="mr-2 h-4 w-4" /> View & Download
+                                    <Eye className="mr-2 h-4 w-4" /> View
+                                </Button>
+                                <Button variant="secondary" size="sm" onClick={() => handleEdit(doc)}>
+                                    <Edit className="mr-2 h-4 w-4" /> Edit & Regenerate
                                 </Button>
                                 <AlertDialog>
                                     <AlertDialogTrigger asChild>
@@ -157,6 +188,16 @@ export default function GeneratedDocumentsPage() {
                     onClose={() => setPreviewUrls(null)}
                     pdfUrl={previewUrls.pdfUrl}
                     docxUrl={previewUrls.docxUrl}
+                />
+            )}
+            {isCreateDialogOpen && (
+                <DocumentCreationDialog
+                  isOpen={isCreateDialogOpen}
+                  onClose={closeCreationDialogs}
+                  documentType={documentToEdit?.documentType || documentType}
+                  templateId={documentToEdit?.templateId || null}
+                  documentToEdit={documentToEdit}
+                  onSuccess={handleGenerationSuccess}
                 />
             )}
         </>

@@ -11,8 +11,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { CustomSetting, SettingType } from '@/types';
-import { getSettingsByType, addSetting, deleteSetting } from './actions';
+import { getSettingsByType, addSetting, deleteSetting, getDeletionImpactForDocumentType, deleteDocumentTypeAndContents } from './actions';
 import { CustomizationSection } from './customization-section';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -27,6 +28,10 @@ export function SettingsDialog({ isOpen, onClose, settingTypes }: SettingsDialog
   const [settings, setSettings] = useState<Record<SettingType, CustomSetting[]>>({} as Record<SettingType, CustomSetting[]>);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+
+  const [isAlertOpen, setIsAlertOpen] = useState(false);
+  const [deleteCandidate, setDeleteCandidate] = useState<{ id: string, name: string, type: SettingType } | null>(null);
+  const [deleteImpact, setDeleteImpact] = useState<{ templateCount: number, documentCount: number } | null>(null);
 
   const fetchAllSettings = useCallback(async () => {
     setIsLoading(true);
@@ -50,29 +55,46 @@ export function SettingsDialog({ isOpen, onClose, settingTypes }: SettingsDialog
       toast({ title: `Error adding item`, description: result.error, variant: "destructive" });
     } else {
       toast({ title: 'Success', description: `${result.name} added.` });
-      // Update state locally instead of refetching everything
-      setSettings(prev => ({
-        ...prev,
-        [type]: [...(prev[type] || []), result].sort((a,b) => a.name.localeCompare(b.name))
-      }));
+      fetchAllSettings();
     }
   };
 
-  const handleDeleteItem = async (type: SettingType, id: string, name: string) => {
-    const result = await deleteSetting(id);
+  const handleDeleteRequest = async (id: string, name: string, type: SettingType) => {
+    setDeleteCandidate({ id, name, type });
+    if (type === 'DOCUMENT_TYPE') {
+        const impact = await getDeletionImpactForDocumentType(name);
+        setDeleteImpact(impact);
+    }
+    setIsAlertOpen(true);
+  };
+  
+  const confirmDeletion = async () => {
+    if (!deleteCandidate) return;
+
+    let result;
+    if (deleteCandidate.type === 'DOCUMENT_TYPE') {
+        result = await deleteDocumentTypeAndContents(deleteCandidate.id);
+    } else {
+        result = await deleteSetting(deleteCandidate.id);
+    }
+
     if (result.success) {
-      toast({ title: 'Success', description: `${name} removed.` });
-      // Update state locally
-      setSettings(prev => ({
-        ...prev,
-        [type]: prev[type].filter(item => item.id !== id)
-      }));
+      toast({ title: 'Success', description: `${deleteCandidate.name} and all its contents removed.` });
+      fetchAllSettings();
     } else {
       toast({ title: `Error removing item`, description: result.error, variant: "destructive" });
     }
+    resetDeleteState();
+  };
+
+  const resetDeleteState = () => {
+    setIsAlertOpen(false);
+    setDeleteCandidate(null);
+    setDeleteImpact(null);
   };
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
@@ -94,7 +116,7 @@ export function SettingsDialog({ isOpen, onClose, settingTypes }: SettingsDialog
                 title={title}
                 items={settings[type] || []}
                 onAddItem={(name) => handleAddItem(type, name)}
-                onDeleteItem={(id, name) => handleDeleteItem(type, id, name)}
+                onDeleteItem={(id, name) => handleDeleteRequest(id, name, type)}
               />
             ))}
           </div>
@@ -107,5 +129,32 @@ export function SettingsDialog({ isOpen, onClose, settingTypes }: SettingsDialog
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    
+    <AlertDialog open={isAlertOpen} onOpenChange={resetDeleteState}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. You are about to delete the type "{deleteCandidate?.name}".
+                </AlertDialogDescription>
+                {deleteImpact && (deleteImpact.templateCount > 0 || deleteImpact.documentCount > 0) && (
+                    <div className="text-sm font-semibold text-destructive pt-2">
+                       This will also permanently delete:
+                       <ul className="list-disc pl-5 mt-1 font-normal">
+                           {deleteImpact.templateCount > 0 && <li>{deleteImpact.templateCount} template(s)</li>}
+                           {deleteImpact.documentCount > 0 && <li>{deleteImpact.documentCount} generated document(s)</li>}
+                       </ul>
+                    </div>
+                )}
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel onClick={resetDeleteState}>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={confirmDeletion}>
+                    Yes, Delete
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

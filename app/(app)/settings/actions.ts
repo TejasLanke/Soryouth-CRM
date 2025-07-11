@@ -2,8 +2,10 @@
 'use server';
 
 import prisma from '@/lib/prisma';
-import type { CustomSetting, SettingType } from '@/types';
+import type { CustomSetting, SettingType, Template } from '@/types';
 import { revalidatePath } from 'next/cache';
+import { deleteGeneratedDocument } from '@/app/(app)/documents/actions';
+import { deleteTemplate as deleteTemplateFile } from '@/app/(app)/manage-templates/actions';
 
 // Helper to map Prisma CustomSetting to frontend CustomSetting type
 function mapPrismaCustomSetting(setting: any): CustomSetting {
@@ -19,7 +21,7 @@ export async function getSettingsByType(type: SettingType): Promise<CustomSettin
     try {
         const settings = await prisma.customSetting.findMany({
             where: { type },
-            orderBy: { createdAt: 'asc' },
+            orderBy: { name: 'asc' },
         });
         return settings.map(mapPrismaCustomSetting);
     } catch (error) {
@@ -60,7 +62,10 @@ export async function addSetting(type: SettingType, name: string): Promise<Custo
         // Revalidate relevant paths
         if (type === 'LEAD_STATUS' || type === 'LEAD_SOURCE') revalidatePath('/leads-list');
         if (type === 'CLIENT_STATUS') revalidatePath('/clients-list');
-        if (type === 'DOCUMENT_TYPE') revalidatePath('/documents');
+        if (type === 'DOCUMENT_TYPE') {
+            revalidatePath('/documents');
+            revalidatePath('/manage-templates');
+        }
         
         return mapPrismaCustomSetting(newSetting);
     } catch (error: any) {
@@ -85,11 +90,67 @@ export async function deleteSetting(id: string): Promise<{ success: boolean; err
         
         if (settingToDelete.type === 'LEAD_STATUS' || settingToDelete.type === 'LEAD_SOURCE') revalidatePath('/leads-list');
         if (settingToDelete.type === 'CLIENT_STATUS') revalidatePath('/clients-list');
-        if (settingToDelete.type === 'DOCUMENT_TYPE') revalidatePath('/documents');
+        if (settingToDelete.type === 'DOCUMENT_TYPE') {
+            revalidatePath('/documents');
+            revalidatePath('/manage-templates');
+        }
 
         return { success: true };
     } catch (error) {
         console.error('Failed to delete setting:', error);
         return { success: false, error: 'An unexpected error occurred.' };
+    }
+}
+
+export async function getDeletionImpactForDocumentType(typeName: string): Promise<{ templateCount: number, documentCount: number }> {
+    const templateCount = await prisma.template.count({
+        where: { type: typeName }
+    });
+    const documentCount = await prisma.generatedDocument.count({
+        where: { documentType: typeName }
+    });
+    return { templateCount, documentCount };
+}
+
+export async function deleteDocumentTypeAndContents(settingId: string): Promise<{ success: boolean, error?: string }> {
+    try {
+        const settingToDelete = await prisma.customSetting.findUnique({ where: { id: settingId } });
+        if (!settingToDelete || settingToDelete.type !== 'DOCUMENT_TYPE') {
+            return { success: false, error: 'Document type setting not found.' };
+        }
+        
+        const typeName = settingToDelete.name;
+
+        // Find all generated documents of this type
+        const documentsToDelete = await prisma.generatedDocument.findMany({
+            where: { documentType: typeName },
+        });
+
+        // Delete all associated files from S3 and records from DB
+        for (const doc of documentsToDelete) {
+            await deleteGeneratedDocument(doc.pdfUrl); // This handles both S3 files and DB record
+        }
+        
+        // Find all templates of this type
+        const templatesToDelete = await prisma.template.findMany({
+            where: { type: typeName },
+        });
+
+        // Delete all associated template files from S3 and records from DB
+        for (const template of templatesToDelete) {
+            await deleteTemplateFile(template.id);
+        }
+
+        // Finally, delete the setting itself
+        await prisma.customSetting.delete({ where: { id: settingId } });
+        
+        revalidatePath('/documents');
+        revalidatePath('/manage-templates');
+
+        return { success: true };
+
+    } catch (error) {
+        console.error('Failed to delete document type and its contents:', error);
+        return { success: false, error: 'An unexpected error occurred during deletion.' };
     }
 }

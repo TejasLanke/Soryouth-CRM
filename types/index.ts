@@ -1,3 +1,4 @@
+
 import type { LEAD_PRIORITY_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES, EXPENSE_CATEGORIES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS, SURVEY_STATUS_OPTIONS, SURVEY_TYPE_OPTIONS, METER_PHASES, CONSUMER_LOAD_TYPES, ROOF_TYPES, DISCOM_OPTIONS, CLIENT_PRIORITY_OPTIONS, USER_ROLES, EXPENSE_STATUSES, DEAL_PIPELINES, DEAL_STAGES_SOLAR, DEAL_STAGES_AMC } from '@/lib/constants';
 
 // Deriving types from the const arrays ensures type safety and single source of truth
@@ -147,6 +148,8 @@ export interface GeneratedDocument {
   documentType: string;
   pdfUrl: string;
   docxUrl: string;
+  templateId: string;
+  formData: string; // JSON string
   createdAt: string;
 }
 

@@ -23,18 +23,19 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import type { DocumentType, Template } from '@/types';
+import type { DocumentType, Template, GeneratedDocument } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { getTemplateById } from '@/app/(app)/manage-templates/actions';
+import { DocumentTemplateSelectionDialog } from './document-template-selection-dialog';
 
 interface DocumentCreationDialogProps {
   isOpen: boolean;
   onClose: () => void;
   documentType: DocumentType;
-  templateId: string;
+  templateId: string | null;
   onSuccess: (urls: { pdfUrl: string; docxUrl: string }) => void;
+  documentToEdit?: GeneratedDocument | null;
 }
 
 // Helper to clean placeholder keys for form and label
@@ -44,16 +45,17 @@ function formatPlaceholder(placeholder: string) {
     return { key, label };
 }
 
-export function DocumentCreationDialog({ isOpen, onClose, documentType, templateId, onSuccess }: DocumentCreationDialogProps) {
+export function DocumentCreationDialog({ isOpen, onClose, documentType, templateId, onSuccess, documentToEdit }: DocumentCreationDialogProps) {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
   const [template, setTemplate] = useState<Template | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(!templateId);
 
   // Dynamically build Zod schema from placeholders
   const formSchema = useMemo(() => {
     if (!template || !template.placeholdersJson) {
-      return z.object({ clientName: z.string().min(1, 'Client name is required') });
+      return z.object({}).catchall(z.string()); // Allow any string key
     }
     const placeholders = JSON.parse(template.placeholdersJson) as string[];
     const shape: { [key: string]: z.ZodString } = {};
@@ -69,37 +71,59 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType, template
     resolver: zodResolver(formSchema),
     defaultValues: {},
   });
+  
+  const currentTemplateId = documentToEdit?.templateId || templateId;
 
   useEffect(() => {
     const fetchTemplate = async () => {
-      if (isOpen && templateId) {
+      if (isOpen && currentTemplateId) {
         setIsLoading(true);
-        const fetchedTemplate = await getTemplateById(templateId);
+        const fetchedTemplate = await getTemplateById(currentTemplateId);
         setTemplate(fetchedTemplate);
         if (fetchedTemplate?.placeholdersJson) {
             const placeholders = JSON.parse(fetchedTemplate.placeholdersJson) as string[];
-            const defaultVals: any = {};
-            placeholders.forEach(p => {
-                defaultVals[formatPlaceholder(p).key] = '';
-            });
+            let defaultVals: any = {};
+            if (documentToEdit?.formData) {
+                defaultVals = JSON.parse(documentToEdit.formData);
+            } else {
+                 placeholders.forEach(p => {
+                    defaultVals[formatPlaceholder(p).key] = '';
+                });
+            }
             form.reset(defaultVals);
         }
         setIsLoading(false);
+      } else if (isOpen && !currentTemplateId) {
+        setIsLoading(false);
+        setIsTemplateDialogOpen(true);
       }
     };
     fetchTemplate();
-  }, [isOpen, templateId, form]);
+  }, [isOpen, currentTemplateId, form, documentToEdit]);
 
+  const handleTemplateSelected = async (selectedTemplateId: string) => {
+      setIsLoading(true);
+      setIsTemplateDialogOpen(false);
+      const fetchedTemplate = await getTemplateById(selectedTemplateId);
+      setTemplate(fetchedTemplate);
+      setIsLoading(false);
+  };
+  
   const onSubmit = async (values: FormValues) => {
+    if (!template?.id) {
+        toast({ title: 'Error', description: 'No template is associated with this document.', variant: 'destructive'});
+        return;
+    }
     startTransition(async () => {
       try {
         const response = await fetch('/api/documents/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            templateId,
+            templateId: template.id,
             formData: values,
             documentType,
+            documentIdToUpdate: documentToEdit?.id,
           }),
         });
 
@@ -129,32 +153,46 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType, template
   
   const placeholders = useMemo(() => {
     if (!template?.placeholdersJson) return [];
-    return JSON.parse(template.placeholdersJson) as string[];
+    try {
+        return JSON.parse(template.placeholdersJson) as string[];
+    } catch {
+        return [];
+    }
   }, [template]);
 
+  if (isTemplateDialogOpen) {
+    return (
+        <DocumentTemplateSelectionDialog
+          isOpen={isTemplateDialogOpen}
+          onClose={onClose}
+          onSelect={handleTemplateSelected}
+          documentType={documentType}
+        />
+    )
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Create New {documentType}</DialogTitle>
+          <DialogTitle>{documentToEdit ? `Edit: ${documentToEdit.clientName}` : `Create New ${documentType}`}</DialogTitle>
           <DialogDescription>
-            Fill in the details below based on your selected template: "{template?.name || '...'}".
+            {documentToEdit ? `Editing document based on template: "${template?.name || '...'}"` : `Fill in the details below based on your selected template: "${template?.name || '...'}"`}
           </DialogDescription>
         </DialogHeader>
         {isLoading ? (
             <div className="flex justify-center items-center h-48">
                 <Loader2 className="h-8 w-8 animate-spin" />
             </div>
-        ) : placeholders.length === 0 ? (
-            <div className="py-8 text-center text-muted-foreground">
-                <p>This template has no placeholders.</p>
-                <p className="text-sm">You can still generate it, but no data will be replaced.</p>
-            </div>
         ) : (
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-2 pb-4 max-h-[70vh] overflow-y-auto pr-2">
-              {placeholders.map((p) => {
+              {placeholders.length === 0 ? (
+                 <div className="py-8 text-center text-muted-foreground">
+                    <p>This template has no placeholders.</p>
+                    <p className="text-sm">Click "Generate Document" to create it as is.</p>
+                </div>
+              ) : placeholders.map((p) => {
                  const { key, label } = formatPlaceholder(p);
                  return (
                      <FormField
