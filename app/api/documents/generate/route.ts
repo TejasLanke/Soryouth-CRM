@@ -8,86 +8,34 @@ import { getTemplateById } from '@/app/(app)/manage-templates/actions';
 import type { DocumentType } from '@/types';
 import { uploadFileToS3, getFileFromS3 } from '@/lib/s3';
 import prisma from '@/lib/prisma';
+import { verifySession } from '@/lib/auth';
 
-function getDocumentTemplateData(formData: any, documentType: DocumentType) {
-    const formattedData: Record<string, any> = {
-        date_today: format(new Date(), 'dd MMM, yyyy'),
-        client_name: formData.clientName,
-        client_address: formData.clientAddress,
-    };
-
-    switch (documentType) {
-        case 'Purchase Order':
-            Object.assign(formattedData, {
-                po_date: formData.poDate ? format(parseISO(formData.poDate), 'dd MMM, yyyy') : '',
-                capacity: formData.capacity,
-                rate_per_watt: formData.ratePerWatt,
-                total_amount: formData.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-                gst_amount: formData.gstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-                grand_total_amount: formData.grandTotalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-            });
-            break;
-        case 'Warranty Certificate':
-            Object.assign(formattedData, {
-                capacity: formData.capacity,
-                module_make: formData.moduleMake,
-                module_wattage: formData.moduleWattage,
-                inverter_make: formData.inverterMake,
-                inverter_rating: formData.inverterRating,
-                date_of_commissioning: formData.dateOfCommissioning ? format(parseISO(formData.dateOfCommissioning), 'dd MMM, yyyy') : '',
-            });
-            break;
-        case 'Work Completion Report':
-             Object.assign(formattedData, {
-                consumer_number: formData.consumerNumber,
-                sanction_number: formData.sanctionNumber,
-                sanction_date: formData.sanctionDate ? format(parseISO(formData.sanctionDate), 'dd MMM, yyyy') : '',
-                work_completion_date: formData.workCompletionDate ? format(parseISO(formData.workCompletionDate), 'dd MMM, yyyy') : '',
-            });
-            break;
-        case 'Net Metering Agreement':
-            Object.assign(formattedData, {
-                consumer_number: formData.consumerNumber,
-                agreement_date: formData.agreementDate ? format(parseISO(formData.agreementDate), 'dd MMM, yyyy') : '',
-                capacity: formData.capacity,
-                discom_section: formData.discomSection,
-                discom_subdivision: formData.discomSubdivision,
-            });
-            break;
-        case 'Annexure I':
-             Object.assign(formattedData, {
-                capacity: formData.capacity,
-                sanctioned_capacity: formData.sanctionedCapacity,
-                capacity_type: formData.capacityType,
-                date_of_installation: formData.dateOfInstallation ? format(parseISO(formData.dateOfInstallation), 'dd MMM, yyyy') : '',
-                phone_number: formData.phoneNumber,
-                consumer_number: formData.consumerNumber,
-                email: formData.email,
-                inverter_details: formData.inverterDetails,
-                inverter_rating: formData.inverterRating,
-                module_wattage: formData.moduleWattage,
-                number_of_modules: formData.numberOfModules,
-                project_model: formData.projectModel,
-                district: formData.district,
-            });
-            break;
-        case 'DCR Declaration':
-            Object.assign(formattedData, {
-                title: formData.title,
-                details: formData.details
-            });
-            break;
-        default:
-            Object.assign(formattedData, formData);
-            break;
-    }
-
-    return formattedData;
+function camelCaseToTitleCase(text: string) {
+    const result = text.replace(/([A-Z])/g, " $1");
+    return result.charAt(0).toUpperCase() + result.slice(1);
 }
 
+function getTemplateData(formData: any, documentType: DocumentType) {
+    const data: Record<string, any> = {
+        date_today: format(new Date(), 'dd MMM, yyyy'),
+    };
+    for (const key in formData) {
+        if (Object.prototype.hasOwnProperty.call(formData, key)) {
+            const value = formData[key];
+            const placeholderKey = key.replace(/ /g, '_').toLowerCase();
+            data[placeholderKey] = value;
+        }
+    }
+    return data;
+}
 
 export async function POST(request: NextRequest) {
   let tempFilePath: string | null = null;
+  const session = await verifySession();
+  if (!session?.userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const { templateId, formData, documentType } = await request.json();
 
@@ -101,23 +49,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Template not found or has no associated file.' }, { status: 404 });
     }
     
-    // Use SDK to get the file from S3 instead of a public fetch
     const s3Url = new URL(template.originalDocxPath);
-    const templateKey = s3Url.pathname.substring(1); // Remove leading '/'
+    const templateKey = s3Url.pathname.substring(1);
     const templateBuffer = await getFileFromS3(templateKey);
     
     const tempDir = os.tmpdir();
     tempFilePath = path.join(tempDir, `template-${Date.now()}.docx`);
     await fs.writeFile(tempFilePath, templateBuffer);
 
-    const templateData = getDocumentTemplateData(formData, documentType);
+    const templateData = getTemplateData(formData, documentType);
     
-    const pythonServiceUrl = 'http://127.0.0.1:5001/generate';
+    // Default to the proposal generator service for now
+    const pythonServiceUrl = process.env.PYTHON_MICROSERVICE_URL || 'http://127.0.0.1:5001/generate';
     const response = await fetch(pythonServiceUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            // Pass the path to the temporary local file
             template_path: tempFilePath,
             data: templateData
         })
@@ -137,7 +84,8 @@ export async function POST(request: NextRequest) {
     const pdfBuffer = Buffer.from(result.pdf_b64, 'base64');
     const docxBuffer = Buffer.from(result.docx_b64, 'base64');
 
-    const baseKey = `documents/${formData.clientName?.replace(/\s/g, '_') || 'document'}_${documentType.replace(/\s/g, '_')}_${Date.now()}`;
+    const clientName = formData.client_name || formData.clientName || 'document';
+    const baseKey = `documents/${clientName.replace(/\s/g, '_')}_${documentType.replace(/\s/g, '_')}_${Date.now()}`;
     const pdfKey = `${baseKey}.pdf`;
     const docxKey = `${baseKey}.docx`;
 
@@ -146,10 +94,9 @@ export async function POST(request: NextRequest) {
         uploadFileToS3(docxBuffer, docxKey, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
     ]);
 
-    // Save metadata to the new GeneratedDocument table
     await prisma.generatedDocument.create({
       data: {
-        clientName: formData.clientName,
+        clientName: clientName,
         documentType: documentType,
         pdfUrl: pdfUrl,
         docxUrl: docxUrl,
@@ -170,7 +117,6 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   } finally {
-      // Clean up the temporary file
       if (tempFilePath) {
           await fs.unlink(tempFilePath).catch(err => console.error(`Failed to delete temp file: ${tempFilePath}`, err));
       }

@@ -13,6 +13,7 @@ function mapPrismaTemplateToTemplateType(prismaTemplate: any): Template {
     name: prismaTemplate.name,
     type: prismaTemplate.type,
     originalDocxPath: prismaTemplate.originalDocxPath,
+    placeholdersJson: prismaTemplate.placeholdersJson ?? null,
     createdAt: prismaTemplate.createdAt.toISOString(),
     updatedAt: prismaTemplate.updatedAt.toISOString(),
   };
@@ -45,9 +46,16 @@ export async function getTemplateById(id: string): Promise<Template | null> {
   }
 }
 
-export async function saveTemplate(data: { id?: string; name: string; type: 'Proposal' | 'Document'; originalDocxPath: string }): Promise<Template | null> {
+export async function saveTemplate(data: { id?: string; name: string; type: 'Proposal' | 'Document'; originalDocxPath: string, placeholdersJson?: string }): Promise<Template | null> {
   try {
     let savedTemplate;
+    const dataToSave = {
+        name: data.name,
+        type: data.type,
+        originalDocxPath: data.originalDocxPath,
+        placeholdersJson: data.placeholdersJson,
+    };
+
     if (data.id) {
       // Fetch the old template to get the old file path
       const oldTemplate = await prisma.template.findUnique({
@@ -57,11 +65,7 @@ export async function saveTemplate(data: { id?: string; name: string; type: 'Pro
       // Update existing template
       savedTemplate = await prisma.template.update({
         where: { id: data.id },
-        data: {
-          name: data.name,
-          type: data.type,
-          originalDocxPath: data.originalDocxPath,
-        },
+        data: dataToSave,
       });
 
       // If the path has changed and an old path existed, delete the old file from S3
@@ -79,11 +83,7 @@ export async function saveTemplate(data: { id?: string; name: string; type: 'Pro
     } else {
       // Create new template
       savedTemplate = await prisma.template.create({
-        data: {
-          name: data.name,
-          type: data.type,
-          originalDocxPath: data.originalDocxPath,
-        },
+        data: dataToSave,
       });
     }
     revalidatePath('/manage-templates');

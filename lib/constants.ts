@@ -1,3 +1,4 @@
+
 import type { NavItem, Lead, Client, Proposal, Document, Communication, DocumentType, ClientType, LeadPriorityType, ClientPriorityType, UserOptionType, DropReasonType, Expense, UserRole, Template, ProposalOrDocumentType, SiteSurvey } from '@/types';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -126,9 +127,7 @@ export const MOCK_CLIENTS: Client[] = [
   },
 ];
 
-export const DOCUMENT_TYPES_CONFIG: Array<{ type: DocumentType; icon: LucideIcon; description: string }> = [
-  { type: 'Work Completion Report', icon: CheckSquare, description: 'Reports confirming project completion.' }, { type: 'Purchase Order', icon: FileText, description: 'Purchase orders for goods or services.' }, { type: 'Annexure I', icon: FileSignature, description: 'Annexure I documents for compliance.' }, { type: 'DCR Declaration', icon: Edit, description: 'Declarations related to domestic content requirement.' }, { type: 'Net Metering Agreement', icon: Eye, description: 'Agreements for net metering services.' }, { type: 'Warranty Certificate', icon: Award, description: 'Certificates for product/service warranties.' },
-];
+export const DOCUMENT_TYPES_CONFIG: Array<{ type: DocumentType; icon: React.ComponentType<{ className?: string }>; description: string }> = [];
 
 export const MOCK_DOCUMENTS: Document[] = [];
 export const MOCK_COMMUNICATIONS: Communication[] = [];

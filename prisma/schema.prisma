@@ -196,10 +196,11 @@ model FollowUp {
 }
 
 model Template {
-  id               String   @id @default(cuid())
+  id               String  @id @default(cuid())
   name             String
-  type             String // "Proposal" or "Document"
+  type             String // Proposal or DocumentType
   originalDocxPath String
+  placeholdersJson String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -272,6 +273,7 @@ enum SettingType {
   LEAD_STATUS
   LEAD_SOURCE
   CLIENT_STATUS
+  DOCUMENT_TYPE
 }
 
 enum UserRole {

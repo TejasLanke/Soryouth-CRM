@@ -40,6 +40,10 @@ export async function getClientStatuses(): Promise<CustomSetting[]> {
     return getSettingsByType('CLIENT_STATUS');
 }
 
+export async function getDocumentTypes(): Promise<CustomSetting[]> {
+    return getSettingsByType('DOCUMENT_TYPE');
+}
+
 
 export async function addSetting(type: SettingType, name: string): Promise<CustomSetting | { error: string }> {
     if (!name || name.trim().length === 0) {
@@ -56,6 +60,7 @@ export async function addSetting(type: SettingType, name: string): Promise<Custo
         // Revalidate relevant paths
         if (type === 'LEAD_STATUS' || type === 'LEAD_SOURCE') revalidatePath('/leads-list');
         if (type === 'CLIENT_STATUS') revalidatePath('/clients-list');
+        if (type === 'DOCUMENT_TYPE') revalidatePath('/documents');
         
         return mapPrismaCustomSetting(newSetting);
     } catch (error: any) {
@@ -80,6 +85,7 @@ export async function deleteSetting(id: string): Promise<{ success: boolean; err
         
         if (settingToDelete.type === 'LEAD_STATUS' || settingToDelete.type === 'LEAD_SOURCE') revalidatePath('/leads-list');
         if (settingToDelete.type === 'CLIENT_STATUS') revalidatePath('/clients-list');
+        if (settingToDelete.type === 'DOCUMENT_TYPE') revalidatePath('/documents');
 
         return { success: true };
     } catch (error) {

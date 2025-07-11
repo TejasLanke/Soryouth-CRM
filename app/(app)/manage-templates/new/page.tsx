@@ -7,9 +7,33 @@ import { TemplateEditor } from '../template-editor';
 import { PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { getDocumentTypes } from '@/app/(app)/settings/actions';
+import type { CustomSetting } from '@/types';
+import { Loader2 } from 'lucide-react';
 
 export default function NewTemplatePage() {
   const router = useRouter();
+  const [documentTypes, setDocumentTypes] = useState<CustomSetting[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+      const fetchTypes = async () => {
+          setIsLoading(true);
+          const types = await getDocumentTypes();
+          setDocumentTypes(types);
+          setIsLoading(false);
+      }
+      fetchTypes();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <>
@@ -20,7 +44,7 @@ export default function NewTemplatePage() {
         </Button>
         <PageHeader title="Create New Template" icon={PlusCircle} />
       </div>
-      <TemplateEditor template={null} />
+      <TemplateEditor template={null} documentTypes={documentTypes} />
     </>
   );
 }

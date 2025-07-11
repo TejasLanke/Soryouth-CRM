@@ -1,10 +1,10 @@
-
 import type { LEAD_PRIORITY_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES, EXPENSE_CATEGORIES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS, SURVEY_STATUS_OPTIONS, SURVEY_TYPE_OPTIONS, METER_PHASES, CONSUMER_LOAD_TYPES, ROOF_TYPES, DISCOM_OPTIONS, CLIENT_PRIORITY_OPTIONS, USER_ROLES, EXPENSE_STATUSES, DEAL_PIPELINES, DEAL_STAGES_SOLAR, DEAL_STAGES_AMC } from '@/lib/constants';
 
 // Deriving types from the const arrays ensures type safety and single source of truth
 export type LeadStatusType = string;
 export type LeadSourceOptionType = string;
 export type ClientStatusType = string;
+export type DocumentType = string;
 
 export type LeadPriorityType = typeof LEAD_PRIORITY_OPTIONS[number];
 export type UserOptionType = typeof USER_OPTIONS[number];
@@ -129,15 +129,6 @@ export interface Proposal {
   acdbDcdbQty?: number;
   earthingKitQty?: number;
 }
-
-export type DocumentType =
-  | 'Work Completion Report'
-  | 'Purchase Order'
-  | 'Annexure I'
-  | 'DCR Declaration'
-  | 'Net Metering Agreement'
-  | 'Warranty Certificate'
-  | 'Other';
 
 export interface Document {
   id: string;
@@ -340,13 +331,14 @@ export interface Template {
   name: string;
   type: ProposalOrDocumentType;
   originalDocxPath: string;
+  placeholdersJson?: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
 export type CreateTemplateData = Omit<Template, 'id' | 'createdAt' | 'updatedAt'>;
 
-export type SettingType = 'LEAD_STATUS' | 'LEAD_SOURCE' | 'CLIENT_STATUS';
+export type SettingType = 'LEAD_STATUS' | 'LEAD_SOURCE' | 'CLIENT_STATUS' | 'DOCUMENT_TYPE';
 
 export interface CustomSetting {
     id: string;

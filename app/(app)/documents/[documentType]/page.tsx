@@ -9,11 +9,12 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { DOCUMENT_TYPES_CONFIG } from '@/lib/constants';
 import { Loader2, ArrowLeft, FileText, Trash2, Eye } from 'lucide-react';
 import { getGeneratedDocuments, deleteGeneratedDocument } from '../actions';
-import type { GeneratedDocument } from '@/types';
+import type { GeneratedDocument, CustomSetting } from '@/types';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ProposalPreviewDialog } from '@/app/(app)/proposals/proposal-preview-dialog';
+import { getDocumentTypes } from '@/app/(app)/settings/actions';
 
 export default function GeneratedDocumentsPage() {
     const router = useRouter();
@@ -25,24 +26,27 @@ export default function GeneratedDocumentsPage() {
     const documentType = documentTypeParam ? decodeURIComponent(Array.isArray(documentTypeParam) ? documentTypeParam[0] : documentTypeParam) : undefined;
     
     const [documents, setDocuments] = useState<GeneratedDocument[]>([]);
+    const [documentTypes, setDocumentTypes] = useState<CustomSetting[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [previewUrls, setPreviewUrls] = useState<{ pdfUrl: string, docxUrl: string } | null>(null);
 
     const documentConfig = documentType ? DOCUMENT_TYPES_CONFIG.find(dt => dt.type === documentType) : undefined;
 
     useEffect(() => {
-        if (documentType) {
-            const fetchDocuments = async () => {
-                setIsLoading(true);
-                const fetchedDocs = await getGeneratedDocuments(documentType);
-                setDocuments(fetchedDocs);
-                setIsLoading(false);
-            };
-            fetchDocuments();
-        } else {
+        const fetchPageData = async () => {
+            setIsLoading(true);
+            const [fetchedDocTypes, fetchedDocs] = await Promise.all([
+                getDocumentTypes(),
+                documentType ? getGeneratedDocuments(documentType) : Promise.resolve([]),
+            ]);
+            setDocumentTypes(fetchedDocTypes);
+            setDocuments(fetchedDocs);
             setIsLoading(false);
-        }
+        };
+        fetchPageData();
     }, [documentType]);
+    
+    const isValidDocType = documentType && documentTypes.some(dt => dt.name === documentType);
 
     const handleDelete = (doc: GeneratedDocument) => {
         startDeleteTransition(async () => {
@@ -64,7 +68,7 @@ export default function GeneratedDocumentsPage() {
         );
     }
     
-    if (!documentConfig || !documentType) {
+    if (!isValidDocType || !documentType) {
          return (
              <>
                 <PageHeader
@@ -79,7 +83,7 @@ export default function GeneratedDocumentsPage() {
                 />
                  <Card className="mt-6">
                     <CardContent className="pt-6 text-center text-muted-foreground">
-                        <p>Please select a valid document type.</p>
+                        <p>Please select a valid document type from the Documents page.</p>
                     </CardContent>
                 </Card>
             </>
@@ -91,18 +95,14 @@ export default function GeneratedDocumentsPage() {
             <PageHeader
                 title={documentType!}
                 description={`Manage all generated ${documentType!.toLowerCase()} documents.`}
-                icon={documentConfig.icon || FileText}
+                icon={documentConfig?.icon || FileText}
                 actions={
                     <Button onClick={() => router.push('/documents')} variant="outline">
                         <ArrowLeft className="mr-2 h-4 w-4" /> Back to Document Types
                     </Button>
                 }
             />
-            {isLoading ? (
-                 <div className="flex h-64 items-center justify-center">
-                    <Loader2 className="h-8 w-8 animate-spin" />
-                </div>
-            ) : documents.length === 0 ? (
+            {documents.length === 0 ? (
                 <Card className="mt-6">
                     <CardContent className="pt-6 text-center text-muted-foreground">
                         <FileText className="mx-auto h-12 w-12 mb-4" />

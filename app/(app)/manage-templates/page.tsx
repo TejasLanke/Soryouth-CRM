@@ -7,29 +7,37 @@ import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ClipboardPaste, PlusCircle, Edit, Trash2, FileText } from 'lucide-react';
-import type { Template } from '@/types';
+import { ClipboardPaste, PlusCircle, Edit, Trash2, FileText, Settings } from 'lucide-react';
+import type { Template, CustomSetting } from '@/types';
 import { getTemplates, deleteTemplate } from './actions';
+import { getDocumentTypes } from '@/app/(app)/settings/actions';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { SettingsDialog } from '@/app/(app)/settings/settings-dialog';
 
 export default function ManageTemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [documentTypes, setDocumentTypes] = useState<CustomSetting[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, startDeleteTransition] = useTransition();
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const { toast } = useToast();
 
-  const fetchTemplates = async () => {
+  const fetchData = async () => {
     setIsLoading(true);
-    const fetchedTemplates = await getTemplates();
+    const [fetchedTemplates, fetchedDocTypes] = await Promise.all([
+      getTemplates(),
+      getDocumentTypes(),
+    ]);
     setTemplates(fetchedTemplates);
+    setDocumentTypes(fetchedDocTypes);
     setIsLoading(false);
   };
 
   useEffect(() => {
-    fetchTemplates();
+    fetchData();
   }, []);
 
   const handleDelete = (templateId: string) => {
@@ -37,7 +45,7 @@ export default function ManageTemplatesPage() {
       const result = await deleteTemplate(templateId);
       if (result.success) {
         toast({ title: 'Template Deleted', description: 'The template has been successfully deleted.' });
-        fetchTemplates(); // Re-fetch templates to update the list
+        fetchData(); // Re-fetch templates to update the list
       } else {
         toast({ title: 'Error', description: 'Failed to delete the template.', variant: 'destructive' });
       }
@@ -111,12 +119,18 @@ export default function ManageTemplatesPage() {
         description="Create, edit, and manage your proposal and document templates."
         icon={ClipboardPaste}
         actions={
-          <Button asChild>
-            <Link href="/manage-templates/new">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Create New Template
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+             <Button variant="outline" onClick={() => setIsSettingsOpen(true)}>
+              <Settings className="mr-2 h-4 w-4" />
+              Manage Document Types
+            </Button>
+            <Button asChild>
+              <Link href="/manage-templates/new">
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Create New Template
+              </Link>
+            </Button>
+          </div>
         }
       />
       <Tabs defaultValue="proposal">
@@ -131,6 +145,14 @@ export default function ManageTemplatesPage() {
           {renderTemplateList(documentTemplates)}
         </TabsContent>
       </Tabs>
+      <SettingsDialog 
+        isOpen={isSettingsOpen}
+        onClose={() => {
+            setIsSettingsOpen(false);
+            fetchData();
+        }}
+        settingTypes={[{ title: 'Document Types', type: 'DOCUMENT_TYPE'}]}
+      />
     </>
   );
 }

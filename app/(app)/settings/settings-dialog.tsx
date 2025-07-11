@@ -53,7 +53,7 @@ export function SettingsDialog({ isOpen, onClose, settingTypes }: SettingsDialog
       // Update state locally instead of refetching everything
       setSettings(prev => ({
         ...prev,
-        [type]: [...(prev[type] || []), result]
+        [type]: [...(prev[type] || []), result].sort((a,b) => a.name.localeCompare(b.name))
       }));
     }
   };

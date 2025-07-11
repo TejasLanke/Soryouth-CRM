@@ -6,10 +6,11 @@ import { useParams, useRouter } from 'next/navigation';
 import { getTemplateById } from '../actions';
 import { PageHeader } from '@/components/page-header';
 import { TemplateEditor } from '../template-editor';
-import { Template } from '@/types';
+import type { Template, CustomSetting } from '@/types';
 import { Loader2, ClipboardPaste, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
+import { getDocumentTypes } from '@/app/(app)/settings/actions';
 
 export default function TemplateEditorPage() {
   const router = useRouter();
@@ -17,20 +18,25 @@ export default function TemplateEditorPage() {
   const templateId = Array.isArray(params.templateId) ? params.templateId[0] : params.templateId;
 
   const [template, setTemplate] = useState<Template | null>(null);
+  const [documentTypes, setDocumentTypes] = useState<CustomSetting[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const isNew = templateId === 'new';
 
   useEffect(() => {
-    if (!isNew && templateId) {
-      setIsLoading(true);
-      getTemplateById(templateId).then(data => {
-        setTemplate(data);
+    const fetchData = async () => {
+        setIsLoading(true);
+        let templateData = null;
+        if (!isNew && templateId) {
+            templateData = await getTemplateById(templateId);
+        }
+        const docTypes = await getDocumentTypes();
+        
+        setDocumentTypes(docTypes);
+        setTemplate(templateData);
         setIsLoading(false);
-      });
-    } else {
-      setIsLoading(false);
-    }
+    };
+    fetchData();
   }, [templateId, isNew]);
 
   if (isLoading) {
@@ -53,7 +59,7 @@ export default function TemplateEditorPage() {
         </Button>
         <PageHeader title={pageTitle} icon={pageIcon} />
       </div>
-      <TemplateEditor template={template} />
+      <TemplateEditor template={template} documentTypes={documentTypes} />
     </>
   );
 }

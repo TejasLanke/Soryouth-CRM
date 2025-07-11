@@ -14,27 +14,31 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { saveTemplate } from './actions';
-import type { Template, DocumentType, ProposalOrDocumentType } from '@/types';
-import { PLACEHOLDER_DEFINITIONS_PROPOSAL, PLACEHOLDER_DEFINITIONS_DOCUMENTS, DOCUMENT_TYPES_CONFIG } from '@/lib/constants';
+import type { Template, DocumentType, CustomSetting } from '@/types';
+import { PLACEHOLDER_DEFINITIONS_PROPOSAL} from '@/lib/constants';
 import { Copy, Loader2, UploadCloud, File, Download } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 const templateSchema = z.object({
   name: z.string().min(3, 'Template name must be at least 3 characters long.'),
   type: z.string().min(1, 'Please select a template type.'),
   originalDocxPath: z.string().min(1, 'A document must be uploaded.'),
+  placeholdersJson: z.string().optional(),
 });
 
 type TemplateFormValues = z.infer<typeof templateSchema>;
 
 interface TemplateEditorProps {
   template: Template | null;
+  documentTypes: CustomSetting[];
 }
 
-export function TemplateEditor({ template }: TemplateEditorProps) {
+export function TemplateEditor({ template, documentTypes }: TemplateEditorProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [isUploading, setIsUploading] = useState(false);
+  const [extractedPlaceholders, setExtractedPlaceholders] = useState<string[]>([]);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(template?.originalDocxPath || null);
 
   const form = useForm<TemplateFormValues>({
@@ -43,6 +47,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
       name: template?.name || '',
       type: template?.type || undefined,
       originalDocxPath: template?.originalDocxPath || '',
+      placeholdersJson: template?.placeholdersJson || '[]',
     },
   });
   
@@ -54,8 +59,12 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
         name: template.name,
         type: template.type,
         originalDocxPath: template.originalDocxPath,
+        placeholdersJson: template.placeholdersJson || '[]',
       });
       setUploadedFileName(template.originalDocxPath);
+      if (template.placeholdersJson) {
+        setExtractedPlaceholders(JSON.parse(template.placeholdersJson));
+      }
     }
   }, [template, form]);
 
@@ -77,33 +86,47 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
     }
 
     setIsUploading(true);
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('folder', 'templates');
+    setExtractedPlaceholders([]);
+    
+    const uploadFormData = new FormData();
+    uploadFormData.append('file', file);
+    uploadFormData.append('folder', 'templates');
 
     try {
-        const response = await fetch('/api/templates/upload', {
+        const uploadResponse = await fetch('/api/templates/upload', {
             method: 'POST',
-            body: formData,
+            body: uploadFormData,
         });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to upload file.');
-        }
-
-        const result = await response.json();
-        form.setValue('originalDocxPath', result.filePath, { shouldValidate: true, shouldDirty: true });
+        if (!uploadResponse.ok) throw new Error('Failed to upload file.');
+        const uploadResult = await uploadResponse.json();
+        
+        form.setValue('originalDocxPath', uploadResult.filePath, { shouldValidate: true, shouldDirty: true });
         setUploadedFileName(file.name);
         
         if (!form.getValues('name')) {
             form.setValue('name', file.name.replace(/\.(docx|dotx)$/i, ''));
         }
         toast({ title: "Upload Successful", description: `File '${file.name}' has been uploaded.` });
+        
+        // If not a proposal, extract placeholders
+        if (form.getValues('type') !== 'Proposal') {
+            const extractFormData = new FormData();
+            extractFormData.append('file', file);
+            const extractResponse = await fetch('/api/templates/extract-placeholders', {
+                method: 'POST',
+                body: extractFormData,
+            });
+            if (!extractResponse.ok) throw new Error('Failed to extract placeholders.');
+            const extractResult = await extractResponse.json();
+            setExtractedPlaceholders(extractResult.placeholders || []);
+            form.setValue('placeholdersJson', JSON.stringify(extractResult.placeholders || []));
+            toast({ title: "Placeholders Extracted", description: `${extractResult.placeholders?.length || 0} placeholders found.`});
+        }
 
     } catch (error) {
         toast({
-            title: "Upload Failed",
+            title: "Processing Failed",
             description: (error as Error).message,
             variant: "destructive",
         });
@@ -138,39 +161,51 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
   };
 
   const renderPlaceholders = () => {
-    let placeholders: any = {};
     if (watchedTemplateType === 'Proposal') {
-      placeholders = PLACEHOLDER_DEFINITIONS_PROPOSAL;
-    } else if (watchedTemplateType && PLACEHOLDER_DEFINITIONS_DOCUMENTS[watchedTemplateType as DocumentType]) {
-      placeholders = PLACEHOLDER_DEFINITIONS_DOCUMENTS[watchedTemplateType as DocumentType];
-    } else {
-      return <p className="text-sm text-muted-foreground">Select a template type to see available placeholders.</p>;
-    }
-
-    return (
-      <Accordion type="multiple" className="w-full">
-        {Object.entries(placeholders).map(([groupName, groupPlaceholders]) => (
-          <AccordionItem value={groupName} key={groupName}>
-            <AccordionTrigger>{groupName}</AccordionTrigger>
-            <AccordionContent>
-              <div className="space-y-2">
-                {(groupPlaceholders as any[]).map(p => (
-                  <div key={p.placeholder} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
-                    <div>
-                      <p className="font-mono text-xs font-semibold">{p.placeholder}</p>
-                      <p className="text-xs text-muted-foreground">{p.description}</p>
-                    </div>
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleCopyPlaceholder(p.placeholder)}>
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
+      const placeholders = PLACEHOLDER_DEFINITIONS_PROPOSAL;
+      return (
+          <Accordion type="multiple" className="w-full">
+            {Object.entries(placeholders).map(([groupName, groupPlaceholders]) => (
+              <AccordionItem value={groupName} key={groupName}>
+                <AccordionTrigger>{groupName}</AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-2">
+                    {(groupPlaceholders as any[]).map(p => (
+                      <div key={p.placeholder} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
+                        <div>
+                          <p className="font-mono text-xs font-semibold">{p.placeholder}</p>
+                          <p className="text-xs text-muted-foreground">{p.description}</p>
+                        </div>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleCopyPlaceholder(p.placeholder)}>
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+      );
+    }
+    
+    if (extractedPlaceholders.length > 0) {
+      return (
+        <div className="space-y-2">
+          <h4 className="font-medium">Extracted Placeholders</h4>
+           {extractedPlaceholders.map(p => (
+              <div key={p} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
+                <p className="font-mono text-xs font-semibold">{p}</p>
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleCopyPlaceholder(p)}>
+                  <Copy className="h-3.5 w-3.5" />
+                </Button>
               </div>
-            </AccordionContent>
-          </AccordionItem>
-        ))}
-      </Accordion>
-    );
+            ))}
+        </div>
+      );
+    }
+    
+    return <p className="text-sm text-muted-foreground">Select a template type and upload a file to see available placeholders.</p>;
   }
 
   return (
@@ -182,7 +217,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
               <CardHeader>
                 <CardTitle>Template Details</CardTitle>
                  <CardDescription>
-                  Upload a DOCX or DOTX file to be used as a template. The structure, styling, and images will be preserved. Edit placeholders in MS Word before uploading.
+                  Upload a DOCX file to be used as a template. The structure and styling will be preserved. For non-proposal documents, placeholders will be automatically extracted.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -214,8 +249,8 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="Proposal">Proposal</SelectItem>
-                            {DOCUMENT_TYPES_CONFIG.map(docType => (
-                                <SelectItem key={docType.type} value={docType.type}>{docType.type}</SelectItem>
+                            {documentTypes.map(docType => (
+                                <SelectItem key={docType.id} value={docType.name}>{docType.name}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -268,7 +303,7 @@ export function TemplateEditor({ template }: TemplateEditorProps) {
         <Card>
           <CardHeader>
             <CardTitle>Available Placeholders</CardTitle>
-            <CardDescription>Click to copy and then paste them (including the `{` `}` brackets) into your Word document template.</CardDescription>
+            <CardDescription>Click to copy and then paste them (including the 'Curly' brackets) into your Word document template.</CardDescription>
           </CardHeader>
           <CardContent>
             {renderPlaceholders()}

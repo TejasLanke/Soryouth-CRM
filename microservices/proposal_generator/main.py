@@ -6,6 +6,7 @@ import base64
 import subprocess
 import platform
 import shutil
+import re
 import matplotlib
 matplotlib.use('Agg')  # Use non-interactive backend for servers
 from matplotlib.figure import Figure
@@ -14,6 +15,7 @@ import matplotlib.ticker as mticker
 from flask import Flask, request, jsonify
 from docxtpl import DocxTemplate, InlineImage
 from docx.shared import Inches
+import docx # From python-docx
 
 app = Flask(__name__)
 
@@ -89,6 +91,39 @@ def create_yearly_savings_chart(doc, capacity_kw, unit_rate):
 
     return InlineImage(doc, memfile, width=Inches(6.0))
 
+@app.route('/extract-placeholders', methods=['POST'])
+def extract_placeholders():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+    if file:
+        try:
+            document = docx.Document(io.BytesIO(file.read()))
+            placeholders = set()
+            # Regex to find {{placeholder}}
+            pattern = re.compile(r'\{\{([^}]+)\}\}')
+            
+            for para in document.paragraphs:
+                matches = pattern.findall(para.text)
+                for match in matches:
+                    placeholders.add(f"{{{{{match}}}}}")
+            
+            for table in document.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for para in cell.paragraphs:
+                            matches = pattern.findall(para.text)
+                            for match in matches:
+                                placeholders.add(f"{{{{{match}}}}}")
+
+            return jsonify({"success": True, "placeholders": sorted(list(placeholders))})
+        except Exception as e:
+            return jsonify({"error": f"Error processing file: {str(e)}"}), 500
+    return jsonify({"error": "File processing failed"}), 500
+
+
 @app.route('/generate', methods=['POST'])
 def generate_proposal():
     original_mplconfigdir = os.environ.get('MPLCONFIGDIR')
@@ -113,24 +148,19 @@ def generate_proposal():
             # --- Find LibreOffice/SOffice executable ---
             def find_soffice_command():
                 if platform.system() == "Windows":
-                    # Check PATH first using shutil.which for 'soffice.exe'
                     command = shutil.which("soffice.exe")
                     if command:
                         return command
-                    
-                    # If not in PATH, check default installation directory
                     default_path = r"C:\Program Files\LibreOffice\program\soffice.exe"
                     if os.path.exists(default_path):
                         return default_path
-                else:  # For Linux/macOS
-                    # Check for 'libreoffice' first, then 'soffice'
+                else:
                     command = shutil.which("libreoffice")
                     if command:
                         return command
                     command = shutil.which("soffice")
                     if command:
                         return command
-                
                 return None
 
             soffice_cmd = find_soffice_command()
@@ -161,28 +191,26 @@ def generate_proposal():
                 except (ValueError, TypeError):
                     unit_rate = 0
                     
-            monthly_chart_image = create_monthly_generation_chart(doc, capacity_kw)
-            if monthly_chart_image:
-                context['monthly_generation_chart'] = monthly_chart_image
+            if 'monthly_generation_chart' in doc.get_undeclared_template_variables():
+                monthly_chart_image = create_monthly_generation_chart(doc, capacity_kw)
+                if monthly_chart_image:
+                    context['monthly_generation_chart'] = monthly_chart_image
             
-            yearly_savings_chart_image = create_yearly_savings_chart(doc, capacity_kw, unit_rate)
-            if yearly_savings_chart_image:
-                context['yearly_savings_chart'] = yearly_savings_chart_image
+            if 'yearly_savings_chart' in doc.get_undeclared_template_variables():
+                yearly_savings_chart_image = create_yearly_savings_chart(doc, capacity_kw, unit_rate)
+                if yearly_savings_chart_image:
+                    context['yearly_savings_chart'] = yearly_savings_chart_image
             # --- End Graph Generation ---
 
             doc.render(context)
             
-            # Create a unique user profile dir for this LibreOffice instance
-            # to prevent conflicts during parallel execution.
             user_profile_dir = os.path.join(temp_dir, 'lo_profile')
             os.makedirs(user_profile_dir, exist_ok=True)
-            # The path needs to be in URL format for the -env flag
             user_profile_url = f'file:///{user_profile_dir.replace(os.sep, "/")}'
 
             temp_docx_path = os.path.join(temp_dir, 'output.docx')
             doc.save(temp_docx_path)
             
-            # --- Use LibreOffice to convert DOCX to PDF ---
             try:
                 subprocess.run(
                     [
@@ -198,8 +226,8 @@ def generate_proposal():
                     check=True,
                     timeout=30
                 )
-            except FileNotFoundError: # Should be less likely now, but good to keep as a fallback.
-                return jsonify({"error": f"'{soffice_cmd}' command not found, though it was detected. Check PATH and permissions. LibreOffice must be installed to generate PDFs."}), 500
+            except FileNotFoundError:
+                return jsonify({"error": f"'{soffice_cmd}' command not found. Check PATH and permissions. LibreOffice must be installed to generate PDFs."}), 500
             except subprocess.CalledProcessError as e:
                 return jsonify({"error": f"PDF conversion failed with LibreOffice. Error: {e}"}), 500
             except subprocess.TimeoutExpired:
@@ -227,7 +255,6 @@ def generate_proposal():
         print(f"An error occurred: {e}")
         return jsonify({"error": f"Python service error: {str(e)}"}), 500
     finally:
-        # Restore the original MPLCONFIGDIR environment variable if it existed
         if original_mplconfigdir is not None:
             os.environ['MPLCONFIGDIR'] = original_mplconfigdir
         elif 'MPLCONFIGDIR' in os.environ:
