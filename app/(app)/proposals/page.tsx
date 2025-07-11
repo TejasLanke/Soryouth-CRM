@@ -18,6 +18,7 @@ import { TemplateSelectionDialog } from './template-selection-dialog';
 import { Badge } from '@/components/ui/badge';
 import { ProposalForm } from './proposal-form';
 import { Input } from '@/components/ui/input';
+import { useRouter } from 'next/navigation';
 
 type Customer = (Client | Lead | DroppedLead) & { isDropped?: boolean; isInactive?: boolean };
 
@@ -42,6 +43,7 @@ const CustomerTypeIcon = ({ type, isDropped }: { type: ClientType, isDropped?: b
 };
 
 export default function ProposalsListPage() {
+  const router = useRouter();
   const { toast } = useToast();
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -51,6 +53,7 @@ export default function ProposalsListPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
+  const [isBatchTemplateDialogOpen, setIsBatchTemplateDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
 
@@ -126,6 +129,11 @@ export default function ProposalsListPage() {
     setIsTemplateDialogOpen(false);
     setIsFormOpen(true);
   };
+  
+  const handleBatchTemplateSelected = (templateId: string) => {
+    setIsBatchTemplateDialogOpen(false);
+    router.push(`/proposals/batch?templateId=${templateId}`);
+  };
 
   return (
     <>
@@ -145,10 +153,8 @@ export default function ProposalsListPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-             <Button asChild variant="outline">
-                <Link href="/proposals/batch">
-                    <Rows className="mr-2 h-4 w-4" /> Batch Proposals
-                </Link>
+             <Button variant="outline" onClick={() => setIsBatchTemplateDialogOpen(true)}>
+                <Rows className="mr-2 h-4 w-4" /> Batch Proposals
             </Button>
             <Button onClick={handleCreateNewProposal}>
               <PlusCircle className="mr-2 h-4 w-4" /> Create New Proposal
@@ -209,6 +215,12 @@ export default function ProposalsListPage() {
         isOpen={isTemplateDialogOpen}
         onClose={() => setIsTemplateDialogOpen(false)}
         onSelect={handleTemplateSelected}
+      />
+
+      <TemplateSelectionDialog
+        isOpen={isBatchTemplateDialogOpen}
+        onClose={() => setIsBatchTemplateDialogOpen(false)}
+        onSelect={handleBatchTemplateSelected}
       />
       
       {isFormOpen && (
