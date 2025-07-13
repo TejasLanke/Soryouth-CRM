@@ -6,6 +6,7 @@ import type { Client, FollowUp, AddActivityData, CreateClientData, LeadStatusTyp
 import { revalidatePath } from 'next/cache';
 import { format, parseISO } from 'date-fns';
 import { verifySession } from '@/lib/auth';
+import type { Prisma } from '@prisma/client';
 
 // Helper to map Prisma client to frontend Client type
 function mapPrismaClientToClientType(prismaClient: any): Client {
@@ -29,6 +30,7 @@ function mapPrismaClientToClientType(prismaClient: any): Client {
     lastCommentDate: prismaClient.followUps?.[0]?.createdAt ? format(prismaClient.followUps[0].createdAt, 'dd-MM-yyyy') : undefined,
     nextFollowUpDate: prismaClient.nextFollowUpDate ? format(prismaClient.nextFollowUpDate, 'yyyy-MM-dd') : undefined,
     nextFollowUpTime: prismaClient.nextFollowUpTime ?? undefined,
+    totalDealValue: Number(prismaClient.totalDealValue) || 0,
   };
 }
 
@@ -152,6 +154,7 @@ export async function createClient(data: CreateClientData): Promise<Client | nul
             }
         });
         revalidatePath('/clients-list');
+        revalidatePath('/deals'); // Revalidate deals page as new clients can be selected
         const newClientWithRelations = await getClientById(newClient.id);
         return newClientWithRelations;
     } catch (error) {
@@ -163,7 +166,7 @@ export async function createClient(data: CreateClientData): Promise<Client | nul
 export async function updateClient(id: string, data: Partial<Omit<Client, 'id' | 'createdAt' | 'updatedAt' | 'followupCount'>>): Promise<Client | null> {
     try {
         const prismaData: any = {};
-        const fieldsToIgnore = ['id', 'createdAt', 'updatedAt', 'followupCount', 'lastCommentText', 'lastCommentDate', 'nextFollowUpDate', 'nextFollowUpTime', 'createdBy', 'assignedTo'];
+        const fieldsToIgnore = ['id', 'createdAt', 'updatedAt', 'followupCount', 'lastCommentText', 'lastCommentDate', 'nextFollowUpDate', 'nextFollowUpTime', 'createdBy', 'assignedTo', 'totalDealValue'];
         
         for (const key in data) {
             if (Object.prototype.hasOwnProperty.call(data, key)) {
@@ -326,7 +329,7 @@ export async function convertClientToLead(clientId: string): Promise<{ success: 
         leadStatus = 'Follow-up';
     }
 
-    const newLead = await prisma.$transaction(async (tx) => {
+    const newLead = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const createdLead = await tx.lead.create({
         data: {
           name: client.name,
@@ -346,6 +349,7 @@ export async function convertClientToLead(clientId: string): Promise<{ success: 
           lastCommentDate: client.followUps[0]?.createdAt ?? new Date(),
           createdById: client.createdById,
           assignedToId: client.assignedToId,
+          totalDealValue: client.totalDealValue,
         },
       });
 
@@ -364,6 +368,15 @@ export async function convertClientToLead(clientId: string): Promise<{ success: 
         data: {
           leadId: createdLead.id,
           clientId: null,
+        },
+      });
+      
+      await tx.deal.updateMany({
+        where: { clientId: client.id },
+        data: {
+          clientId: null,
+          // You might want to decide if deals should be linked to the new lead.
+          // For now, we are just unlinking them from the client.
         },
       });
 

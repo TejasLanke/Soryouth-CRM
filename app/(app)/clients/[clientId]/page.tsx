@@ -12,17 +12,19 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, CLIENT_PRIORITY_OPTIONS, CLIENT_TYPES } from '@/lib/constants';
-import type { Client, User, ClientType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateClientData, ClientStatusType, ClientPriorityType, Proposal, CustomSetting, SiteSurvey, DocumentType } from '@/types';
+import { FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, CLIENT_PRIORITY_OPTIONS, CLIENT_TYPES, DEAL_PIPELINES } from '@/lib/constants';
+import type { Client, User, UserOptionType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateClientData, ClientStatusType, ClientPriorityType, Proposal, CustomSetting, SiteSurvey, DocumentType, Deal, DealPipelineType, DealStage, ClientType } from '@/types';
 import { format, parseISO, isValid } from 'date-fns';
-import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, UserCircle2, FileText, ShoppingCart, Loader2, Save, Send, Video, Building, Repeat, UserX, IndianRupee, ClipboardEdit, Eye, UploadCloud } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, UserCircle2, FileText, ShoppingCart, Loader2, Save, Send, Video, Building, Repeat, UserX, IndianRupee, ClipboardEdit, Eye, UploadCloud, PlusCircle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { getClientById, updateClient, addClientActivity, getActivitiesForClient, convertClientToLead } from '@/app/(app)/clients-list/actions';
 import { getProposalsForClient, createOrUpdateProposal } from '@/app/(app)/proposals/actions';
+import { getDealsForClient, createOrUpdateDeal } from '@/app/(app)/deals/actions';
 import { getSurveysForClient } from '@/app/(app)/site-survey/actions';
 import { getUsers } from '@/app/(app)/users/actions';
 import { getClientStatuses } from '@/app/(app)/settings/actions';
 import { ClientForm } from '@/app/(app)/clients/client-form';
+import { DealForm, type DealFormValues } from '@/app/(app)/deals/deal-form';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -103,10 +105,12 @@ export default function ClientDetailsPage() {
   const [surveys, setSurveys] = useState<SiteSurvey[]>([]);
 
   const [isProposalFormOpen, setIsProposalFormOpen] = useState(false);
+  const [isDealFormOpen, setIsDealFormOpen] = useState(false);
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
   const [isProposalTemplateDialogOpen, setIsProposalTemplateDialogOpen] = useState(false);
   const [selectedProposalTemplateId, setSelectedProposalTemplateId] = useState<string | null>(null);
   const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [deals, setDeals] = useState<Deal[]>([]);
   const [activityComment, setActivityComment] = useState('');
 
   const [isDocumentDialogOpen, setIsDocumentDialogOpen] = useState(false);
@@ -136,17 +140,25 @@ export default function ClientDetailsPage() {
       setProposals(fetchedProposals);
     }
   };
+  
+  const fetchDeals = async () => {
+      if (clientId) {
+          const fetchedDeals = await getDealsForClient(clientId);
+          setDeals(fetchedDeals);
+      }
+  };
 
   useEffect(() => {
     if (clientId) {
       const fetchDetails = async () => {
         setClient(undefined);
         try {
-           const [fetchedClient, fetchedUsers, fetchedActivities, fetchedProposals, fetchedStatuses, fetchedSurveys] = await Promise.all([
+           const [fetchedClient, fetchedUsers, fetchedActivities, fetchedProposals, fetchedDeals, fetchedStatuses, fetchedSurveys] = await Promise.all([
             getClientById(clientId),
             getUsers(),
             getActivitiesForClient(clientId),
             getProposalsForClient(clientId),
+            getDealsForClient(clientId),
             getClientStatuses(),
             getSurveysForClient(clientId),
           ]);
@@ -155,6 +167,7 @@ export default function ClientDetailsPage() {
           setUsers(fetchedUsers);
           setActivities(fetchedActivities);
           setProposals(fetchedProposals);
+          setDeals(fetchedDeals);
           setStatuses(fetchedStatuses);
           setSurveys(fetchedSurveys);
 
@@ -259,6 +272,30 @@ export default function ClientDetailsPage() {
     setIsProposalFormOpen(false);
     setSelectedProposalTemplateId(null);
   };
+  
+  const handleDealSubmit = (data: DealFormValues) => {
+    if (!clientId) return;
+    startFormTransition(async () => {
+      const result = await createOrUpdateDeal({
+        ...data,
+        poWoDate: format(data.poWoDate, 'yyyy-MM-dd'),
+        clientId,
+      });
+      if (result) {
+        toast({
+          title: "Deal Saved",
+          description: `Deal for ${result.clientName} has been saved.`,
+        });
+        await fetchDeals(); // Refresh deals
+        const updatedClient = await getClientById(clientId);
+        setClient(updatedClient);
+      } else {
+        toast({ title: "Error", description: "Could not save deal.", variant: "destructive" });
+      }
+    });
+    setIsDealFormOpen(false);
+  };
+
 
   const handleCreateNewProposal = () => {
       setIsProposalTemplateDialogOpen(true);
@@ -768,6 +805,29 @@ export default function ClientDetailsPage() {
                 <p className="text-xs text-muted-foreground ml-10">Created by</p>
               </CardContent>
             </Card>
+            <Card className="bg-primary/10 border-primary/20">
+                <CardContent className="pt-6 text-center">
+                    <p className="text-sm text-primary font-semibold">Total Deal Value</p>
+                    <p className="text-3xl font-bold text-primary flex items-center justify-center">
+                        <IndianRupee className="h-7 w-7 mr-1" />
+                        {client.totalDealValue?.toLocaleString('en-IN') || 0}
+                    </p>
+                </CardContent>
+            </Card>
+             <Card>
+                <CardHeader>
+                    <CardTitle className="text-md">Add New Deal</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <Button
+                        variant="outline"
+                        className="w-full h-20 border-dashed"
+                        onClick={() => setIsDealFormOpen(true)}
+                    >
+                        <PlusCircle className="h-8 w-8 text-muted-foreground" />
+                    </Button>
+                </CardContent>
+            </Card>
              <Card>
                 <CardHeader className="pb-2 pt-4"><CardTitle className="text-md">E-Bills ({client.electricityBillUrls?.length || 0})</CardTitle></CardHeader>
                 <CardContent className="space-y-2">
@@ -835,6 +895,15 @@ export default function ClientDetailsPage() {
             templateId={selectedProposalTemplateId}
         />
       )}
+       {isDealFormOpen && client && (
+         <DealForm
+            isOpen={isDealFormOpen}
+            onClose={() => setIsDealFormOpen(false)}
+            onSubmit={handleDealSubmit}
+            users={users}
+            clients={[client]}
+         />
+       )}
       <TemplateSelectionDialog
         isOpen={isProposalTemplateDialogOpen}
         onClose={() => setIsProposalTemplateDialogOpen(false)}

@@ -29,39 +29,61 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import React, { useEffect, useMemo } from 'react';
-import { DEAL_PIPELINES, type DealPipelineType, type DealStage } from '@/lib/constants';
-import type { User } from '@/types';
-import { IndianRupee, Calendar as CalendarIcon } from 'lucide-react';
+import React, { useEffect, useMemo, useState, useTransition } from 'react';
+import { DEAL_PIPELINES, ALL_DEAL_STAGES, type DealPipelineType, type DealStage } from '@/lib/constants';
+import type { User, Client, CreateClientData, CustomSetting, LeadSourceOptionType } from '@/types';
+import { IndianRupee, Calendar as CalendarIcon, ChevronsUpDown, Check, PlusCircle } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { ClientForm } from '@/app/(app)/clients/client-form';
+import { createClient } from '@/app/(app)/clients-list/actions';
+import { getClientStatuses, getLeadSources } from '@/app/(app)/settings/actions';
+import { useToast } from '@/hooks/use-toast';
 
-const dealSchema = z.object({
+const getDealSchema = (sources: string[]) => z.object({
+  clientId: z.string().optional(),
   clientName: z.string().min(2, { message: "Client name must be at least 2 characters." }),
   contactPerson: z.string().min(2, { message: "Contact person must be at least 2 characters." }),
   email: z.string().email({ message: "Invalid email address." }).optional().or(z.literal('')),
   phone: z.string().min(10, { message: "Phone number must be at least 10 digits." }).optional().or(z.literal('')),
   pipeline: z.enum(Object.keys(DEAL_PIPELINES) as [DealPipelineType, ...DealPipelineType[]]),
-  stage: z.string().min(1, { message: "Stage is required." }),
+  dealFor: z.string().optional(),
+  source: z.string().optional().refine(val => !val || sources.includes(val), { message: "Please select a valid source." }),
+  stage: z.enum(ALL_DEAL_STAGES, { required_error: "Stage is required." }),
   dealValue: z.coerce.number().min(0, { message: "Deal value cannot be negative." }),
   assignedTo: z.string().optional(),
   poWoDate: z.date({ required_error: "A PO/WO date is required." }),
 });
 
-export type DealFormValues = z.infer<typeof dealSchema>;
+export type DealFormValues = z.infer<ReturnType<typeof getDealSchema>>;
 
 interface DealFormProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: DealFormValues) => void;
   users: User[];
-  pipeline: DealPipelineType;
+  clients: Client[];
+  deal?: Partial<DealFormValues & { id?: string }>;
+  pipeline?: DealPipelineType;
   initialStage?: DealStage;
 }
 
-export function DealForm({ isOpen, onClose, onSubmit, users, pipeline, initialStage }: DealFormProps) {
+export function DealForm({ isOpen, onClose, onSubmit, users, clients, deal, pipeline, initialStage }: DealFormProps) {
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [isClientFormOpen, setClientFormOpen] = useState(false);
+  const [clientStatuses, setClientStatuses] = useState<any[]>([]);
+  const [sources, setSources] = useState<CustomSetting[]>([]);
+  const { toast } = useToast();
+  const [isCreatingClient, startClientCreation] = useTransition();
+
+  const dealSchema = useMemo(() => {
+    const sourceNames = sources.map(s => s.name);
+    return getDealSchema(sourceNames);
+  }, [sources]);
+  
   const form = useForm<DealFormValues>({
     resolver: zodResolver(dealSchema),
     defaultValues: {
@@ -69,59 +91,126 @@ export function DealForm({ isOpen, onClose, onSubmit, users, pipeline, initialSt
       contactPerson: '',
       email: '',
       phone: '',
-      pipeline: pipeline,
-      stage: initialStage || DEAL_PIPELINES[pipeline][0],
+      pipeline: pipeline || 'Solar PV Plant',
+      dealFor: '',
+      source: undefined,
+      stage: initialStage || (pipeline ? DEAL_PIPELINES[pipeline][0] : DEAL_PIPELINES['Solar PV Plant'][0]),
       dealValue: 0,
       assignedTo: undefined,
       poWoDate: new Date(),
     },
   });
-  
-  const watchedClientName = form.watch('clientName');
 
   useEffect(() => {
-    if (watchedClientName) {
-      form.setValue('contactPerson', watchedClientName);
+    async function fetchStatusesAndSources() {
+      const [statuses, fetchedSources] = await Promise.all([
+        getClientStatuses(),
+        getLeadSources()
+      ]);
+      setClientStatuses(statuses);
+      setSources(fetchedSources);
     }
-  }, [watchedClientName, form]);
+    fetchStatusesAndSources();
+  }, []);
 
-  // Set initial values when the dialog opens
+  const handleClientSelect = (client: Client) => {
+    setSelectedClient(client);
+    form.setValue('clientId', client.id);
+    form.setValue('clientName', client.name);
+    form.setValue('contactPerson', client.name);
+    form.setValue('email', client.email || '');
+    form.setValue('phone', client.phone || '');
+  };
+  
+  const handleClientFormSubmit = async (data: CreateClientData | Client) => {
+    startClientCreation(async () => {
+      const newClient = await createClient(data as CreateClientData);
+      if (newClient) {
+        toast({ title: "Client Created", description: `${newClient.name} has been added.` });
+        clients.push(newClient); 
+        handleClientSelect(newClient);
+        setClientFormOpen(false);
+      } else {
+        toast({ title: "Error", description: "Failed to create client.", variant: "destructive" });
+      }
+    });
+  };
+
   useEffect(() => {
     if (isOpen) {
+      if (deal?.clientId && clients.length) {
+        const client = clients.find(c => c.id === deal.clientId);
+        if (client) handleClientSelect(client);
+      }
       form.reset({
-        clientName: '',
-        contactPerson: '',
-        email: '',
-        phone: '',
-        pipeline: pipeline,
-        stage: initialStage || DEAL_PIPELINES[pipeline][0],
-        dealValue: 0,
-        assignedTo: undefined,
-        poWoDate: new Date(),
+        clientName: deal?.clientName || '',
+        clientId: deal?.clientId || undefined,
+        contactPerson: deal?.contactPerson || '',
+        email: deal?.email || '',
+        phone: deal?.phone || '',
+        pipeline: pipeline || 'Solar PV Plant',
+        dealFor: deal?.dealFor || '',
+        source: deal?.source || undefined,
+        stage: initialStage || deal?.stage || (pipeline ? DEAL_PIPELINES[pipeline][0] : DEAL_PIPELINES['Solar PV Plant'][0]),
+        dealValue: deal?.dealValue || 0,
+        assignedTo: deal?.assignedTo || undefined,
+        poWoDate: deal?.poWoDate ? (deal.poWoDate instanceof Date ? deal.poWoDate : new Date(deal.poWoDate)) : new Date(),
       });
     }
-  }, [isOpen, pipeline, initialStage, form]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, deal, clients, form, pipeline, initialStage]);
 
+  const watchedPipeline = form.watch('pipeline');
   const stagesForSelectedPipeline = useMemo(() => {
-    return DEAL_PIPELINES[pipeline] || [];
-  }, [pipeline]);
+    return DEAL_PIPELINES[watchedPipeline] || [];
+  }, [watchedPipeline]);
 
   const handleSubmit = (values: DealFormValues) => {
     onSubmit(values);
   };
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[620px]">
         <DialogHeader>
-          <DialogTitle>Add New Deal</DialogTitle>
-          <DialogDescription>Enter the details for the new deal.</DialogDescription>
+          <DialogTitle>{deal?.clientName ? 'Edit Deal' : 'Add New Deal'}</DialogTitle>
+          <DialogDescription>Enter the details for the deal.</DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 py-2 pb-4 max-h-[70vh] overflow-y-auto pr-2">
+            <div className="space-y-2">
+                <FormLabel>Client *</FormLabel>
+                <div className="flex gap-2">
+                  <Popover>
+                      <PopoverTrigger asChild>
+                          <Button variant="outline" role="combobox" className="w-full justify-between">
+                              {selectedClient ? selectedClient.name : "Select client"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                          <Command>
+                              <CommandInput placeholder="Search clients..." />
+                              <CommandEmpty>No client found.</CommandEmpty>
+                              <CommandGroup>
+                                  {clients.map((c) => (
+                                      <CommandItem key={c.id} value={c.name} onSelect={() => handleClientSelect(c)}>
+                                          <Check className={cn("mr-2 h-4 w-4", selectedClient?.id === c.id ? "opacity-100" : "opacity-0")} />
+                                          {c.name}
+                                      </CommandItem>
+                                  ))}
+                              </CommandGroup>
+                          </Command>
+                      </PopoverContent>
+                  </Popover>
+                  <Button type="button" variant="outline" size="icon" onClick={() => setClientFormOpen(true)}><PlusCircle /></Button>
+                </div>
+            </div>
+
             <FormField control={form.control} name="clientName" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Client Name *</FormLabel>
+                  <FormLabel>Deal Name / Client Name *</FormLabel>
                   <FormControl><Input placeholder="ABC Corporation" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -153,9 +242,28 @@ export function DealForm({ isOpen, onClose, onSubmit, users, pipeline, initialSt
                 <FormField control={form.control} name="pipeline" render={({ field }) => (
                     <FormItem>
                         <FormLabel>Pipeline *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} disabled>
+                        <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                             <SelectContent>{Object.keys(DEAL_PIPELINES).map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                        </Select>
+                        <FormMessage />
+                    </FormItem>
+                )} />
+                <FormField control={form.control} name="dealFor" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Deal For</FormLabel>
+                    <FormControl><Input placeholder="e.g., Rooftop Solar" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+            </div>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               <FormField control={form.control} name="source" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Source</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl><SelectTrigger><SelectValue placeholder="Select source" /></SelectTrigger></FormControl>
+                            <SelectContent>{sources.map(s => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}</SelectContent>
                         </Select>
                         <FormMessage />
                     </FormItem>
@@ -222,5 +330,13 @@ export function DealForm({ isOpen, onClose, onSubmit, users, pipeline, initialSt
         </Form>
       </DialogContent>
     </Dialog>
+    <ClientForm 
+        isOpen={isClientFormOpen}
+        onClose={() => setClientFormOpen(false)}
+        onSubmit={handleClientFormSubmit}
+        users={users}
+        statuses={clientStatuses}
+    />
+    </>
   );
 }

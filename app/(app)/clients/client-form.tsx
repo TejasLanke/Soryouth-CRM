@@ -113,6 +113,7 @@ export function ClientForm({ isOpen, onClose, onSubmit, client, users, statuses 
       onSubmit({ ...client, ...submissionData });
     } else {
       submissionData.electricityBillUrls = [];
+      submissionData.totalDealValue = 0;
       onSubmit(submissionData as CreateClientData);
     }
   };

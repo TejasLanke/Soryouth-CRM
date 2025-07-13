@@ -777,6 +777,15 @@ export default function LeadDetailsPage() {
                 <p className="text-xs text-muted-foreground ml-10">Created by</p>
               </CardContent>
             </Card>
+            <Card className="bg-primary/10 border-primary/20">
+                <CardContent className="pt-6 text-center">
+                    <p className="text-sm text-primary font-semibold">Total Deal Value</p>
+                    <p className="text-3xl font-bold text-primary flex items-center justify-center">
+                        <IndianRupee className="h-7 w-7 mr-1" />
+                        {lead.totalDealValue?.toLocaleString('en-IN') || 0}
+                    </p>
+                </CardContent>
+            </Card>
             <Card>
                 <CardHeader className="pb-2 pt-4"><CardTitle className="text-md">E-Bills ({lead.electricityBillUrls?.length || 0})</CardTitle></CardHeader>
                 <CardContent className="space-y-2">

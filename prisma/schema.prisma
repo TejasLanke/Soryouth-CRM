@@ -42,6 +42,8 @@ model User {
   assignedTasks        FollowUp[]    @relation("AssignedTasks")
   expenses             Expense[]
   reviewedExpenses     Expense[]     @relation("ReviewedExpenses")
+  dealsCreated  Deal[]  @relation("DealCreatedBy")
+  dealsAssigned Deal[]  @relation("DealAssignedTo")
 }
 
 model Lead {
@@ -64,6 +66,7 @@ model Lead {
   priority          String? // Corresponds to LeadPriorityType
   dropReason        String? // Corresponds to DropReasonType
   clientType        String? // Corresponds to ClientType
+  totalDealValue    Float?
   electricityBillUrls String[] @default([]) 
   followUpCount     Int @default(0)
 
@@ -127,7 +130,7 @@ model Client {
   status             String
   source             String? // Corresponds to ClientSourceOptionType
   priority           String?
-  
+  totalDealValue     Float?  @default(0)
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
@@ -143,6 +146,7 @@ model Client {
   followUps          FollowUp[]
   proposals      Proposal[]
   siteSurveys        SiteSurvey[]
+  deals     Deal[]
 
   // --- Relations to User ---
   createdById String?
@@ -180,6 +184,9 @@ model FollowUp {
 
   droppedLead              DroppedLead? @relation(fields: [droppedLeadId], references: [id], onDelete: Cascade)
   droppedLeadId            String?
+  
+  dealId        String?
+  deal          Deal?     @relation(fields: [dealId], references: [id], onDelete: Cascade)
 
   // --- Relations to User ---
   createdById   String?
@@ -382,4 +389,31 @@ model Attendance {
   userId String
 
   @@index([userId, punchInTime])
+}
+
+model Deal {
+    id            String   @id @default(cuid())
+    clientName    String
+    contactPerson String
+    email         String?
+    phone         String?
+    pipeline      String
+    stage         String
+    dealFor       String?
+    source        String?
+    dealValue     Float  @default(0)
+    poWoDate      DateTime
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+
+    clientId    String?
+    client      Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+    
+    createdById String?
+    createdBy   User?    @relation("DealCreatedBy", fields: [createdById], references: [id])
+    
+    assignedToId String?
+    assignedTo   User?    @relation("DealAssignedTo", fields: [assignedToId], references: [id])
+
+    followUps     FollowUp[]
 }

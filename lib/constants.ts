@@ -69,13 +69,16 @@ export const TOOLS_NAV_ITEMS: NavItem[] = [
 export const DEAL_STAGES_SOLAR = ['Deal Done', 'Procurement', 'Installation', 'Commissioning', 'Handover'] as const;
 export const DEAL_STAGES_AMC = ['New AMC', 'Quoted', 'Agreement', 'Active', 'Expired'] as const;
 
+export const ALL_DEAL_STAGES = [...DEAL_STAGES_SOLAR, ...DEAL_STAGES_AMC] as const;
+
 export const DEAL_PIPELINES = {
     'Solar PV Plant': DEAL_STAGES_SOLAR,
     'AMC': DEAL_STAGES_AMC,
 } as const;
 
 export type DealPipelineType = keyof typeof DEAL_PIPELINES;
-export type DealStage = typeof DEAL_STAGES_SOLAR[number] | typeof DEAL_STAGES_AMC[number];
+export type DealStage = typeof ALL_DEAL_STAGES[number];
+
 
 export const USER_ROLES = ['Admin', 'TechnoSales', 'Designing', 'Procurement', 'ProjectManager', 'LiasoningExecutive', 'OperationAndMaintainance'] as const;
 export const CLIENT_TYPES = ['Individual/Bungalow', 'Housing Society', 'Commercial', 'Industrial', 'Other'] as const;
