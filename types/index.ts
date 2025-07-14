@@ -29,6 +29,16 @@ export interface User {
   createdAt: string;
 }
 
+export interface ElectricityBill {
+  id: string;
+  url: string;
+  createdAt: string;
+  leadId?: string | null;
+  clientId?: string | null;
+  droppedLeadId?: string | null;
+  siteSurveyId?: string | null;
+}
+
 export interface Lead {
   id: string;
   name: string;
@@ -222,6 +232,7 @@ export interface FollowUp {
   taskForUser?: string;
   taskDate?: string;
   taskTime?: string;
+  taskStatus?: 'Open' | 'Closed'; // Added for task tracking
 }
 
 export type AddActivityData = Omit<FollowUp, 'id' | 'createdAt' | 'droppedLeadId' | 'createdBy'> & {
@@ -384,3 +395,13 @@ export interface Deal {
   createdAt: string;
   updatedAt: string;
 }
+
+export type TaskNotification = {
+    id: string;
+    comment: string;
+    time: string;
+    customerName: string;
+    customerPhone: string | null;
+    status: 'Open' | 'Closed';
+    link: string;
+};

@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState, useTransition, useMemo, ChangeEvent } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, CLIENT_PRIORITY_OPTIONS, CLIENT_TYPES, DEAL_PIPELINES } from '@/lib/constants';
 import type { Client, User, UserOptionType, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, CreateClientData, ClientStatusType, ClientPriorityType, Proposal, CustomSetting, SiteSurvey, DocumentType, Deal, DealPipelineType, DealStage, ClientType } from '@/types';
 import { format, parseISO, isValid } from 'date-fns';
-import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, UserCircle2, FileText, ShoppingCart, Loader2, Save, Send, Video, Building, Repeat, UserX, IndianRupee, ClipboardEdit, Eye, UploadCloud, PlusCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Edit, Phone, MessageSquare, Mail, MessageCircle, UserCircle2, FileText, ShoppingCart, Loader2, Save, Send, Video, Building, Repeat, UserX, IndianRupee, ClipboardEdit, Eye, UploadCloud, PlusCircle, CheckCircle } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { getClientById, updateClient, addClientActivity, getActivitiesForClient, convertClientToLead } from '@/app/(app)/clients-list/actions';
 import { getProposalsForClient, createOrUpdateProposal } from '@/app/(app)/proposals/actions';
@@ -33,6 +33,7 @@ import { ProposalForm } from '@/app/(app)/proposals/proposal-form';
 import { TemplateSelectionDialog } from '@/app/(app)/proposals/template-selection-dialog';
 import { DocumentCreationDialog } from '@/app/(app)/documents/document-creation-dialog';
 import { DocumentTemplateSelectionDialog } from '@/app/(app)/documents/document-template-selection-dialog';
+import { TaskCompletionToast } from '@/components/task-completion-toast';
 
 
 const ActivityIcon = ({ type, className }: { type: string, className?: string }) => {
@@ -89,6 +90,7 @@ const SurveyDetailsCard = ({ survey }: { survey: SiteSurvey }) => {
 export default function ClientDetailsPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const clientId = typeof params.clientId === 'string' ? params.clientId : null;
   const { toast } = useToast();
   const [client, setClient] = useState<Client | null | undefined>(undefined);
@@ -504,6 +506,8 @@ export default function ClientDetailsPage() {
     : 'Not set';
   
   return (
+    <>
+    {searchParams.get('from_task') && <TaskCompletionToast taskId={searchParams.get('from_task')!} />}
     <div className="flex flex-col h-full">
       <div className="flex justify-between items-center p-4 border-b bg-card sticky top-0 z-10">
         <h1 className="text-xl font-semibold font-headline">{client.name}</h1>
@@ -758,9 +762,15 @@ export default function ClientDetailsPage() {
                               <Badge variant="outline" className="capitalize bg-slate-800 text-white border-transparent hover:bg-slate-700">{activity.leadStageAtTimeOfFollowUp}</Badge>
                             )}
                              {activity.followupOrTask === 'Task' ? (
-                               <Badge className="bg-green-600 text-white border-transparent hover:bg-green-700">
-                                Task For: {activity.taskForUser} Due: {activity.taskDate ? format(parseISO(activity.taskDate), 'dd-MM-yyyy') : ''} {activity.taskTime || ''}
-                              </Badge>
+                               activity.taskStatus === 'Closed' ? (
+                                    <Badge className="bg-green-100 text-green-800 border-transparent hover:bg-green-200">
+                                        <CheckCircle className="mr-1.5 h-3.5 w-3.5"/> Completed: {activity.taskDate ? format(parseISO(activity.taskDate), 'dd-MM-yyyy') : ''} : {activity.taskTime || ''}
+                                    </Badge>
+                                ) : (
+                                    <Badge className="bg-orange-100 text-orange-800 border-transparent hover:bg-orange-200">
+                                        Task For: {activity.taskForUser} Due: {activity.taskDate ? format(parseISO(activity.taskDate), 'dd-MM-yyyy') : ''} {activity.taskTime || ''}
+                                    </Badge>
+                                )
                             ) : (
                               <Badge variant="outline" className="bg-slate-800 text-white border-transparent hover:bg-slate-700">Followup</Badge>
                             )}
@@ -958,5 +968,6 @@ export default function ClientDetailsPage() {
         />
       )}
     </div>
+    </>
   );
 }

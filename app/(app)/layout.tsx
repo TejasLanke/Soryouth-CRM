@@ -14,13 +14,19 @@ import { Logo } from '@/components/logo';
 import { Toaster } from '@/components/ui/toaster';
 import { UserNav } from '@/components/user-nav';
 import { ClientSidebarMenu } from './client-sidebar-menu';
+import { TaskNotifications } from '@/components/task-notifications';
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <SidebarProvider>
       <Sidebar collapsible="icon">
         <SidebarHeader>
-          <Logo />
+            <div className="flex w-full items-center justify-between">
+                <Logo />
+                <div className="group-data-[collapsible=icon]:hidden">
+                    <TaskNotifications />
+                </div>
+            </div>
         </SidebarHeader>
         <SidebarContent>
           <ClientSidebarMenu />
@@ -31,7 +37,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       </Sidebar>
       <SidebarInset className="flex flex-col">
         <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-4">
-          {/* The trigger for the mobile sidebar */}
           <SidebarTrigger className="sm:hidden" />
           <div className="flex-1">
           </div>

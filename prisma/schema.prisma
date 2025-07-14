@@ -175,6 +175,7 @@ model FollowUp {
 
   taskDate                 DateTime?
   taskTime                 String?
+  taskStatus               String?   @default("Open")
   
   lead                     Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
   leadId                   String?

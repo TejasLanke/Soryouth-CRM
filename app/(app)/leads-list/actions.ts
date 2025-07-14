@@ -2,9 +2,9 @@
 'use server';
 
 import prisma from '@/lib/prisma';
-import type { Lead, FollowUp, AddActivityData, CreateLeadData, Client, DropReasonType, LeadSourceOptionType, UserOptionType, LeadStatusType } from '@/types';
+import type { Lead, FollowUp, AddActivityData, CreateLeadData, Client, DropReasonType, LeadSourceOptionType, UserOptionType, LeadStatusType, TaskNotification } from '@/types';
 import { revalidatePath } from 'next/cache';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { verifySession } from '@/lib/auth';
 import * as ExcelJS from 'exceljs';
 import { z } from 'zod';
@@ -54,6 +54,7 @@ function mapPrismaFollowUpToFollowUpType(prismaFollowUp: any): FollowUp {
     taskForUser: prismaFollowUp.taskForUser?.name ?? undefined,
     taskDate: prismaFollowUp.taskDate?.toISOString() ?? undefined,
     taskTime: prismaFollowUp.taskTime ?? undefined,
+    taskStatus: prismaFollowUp.taskStatus ?? 'Open',
   } as FollowUp;
 }
 
@@ -258,6 +259,7 @@ export async function addActivity(
           followupOrTask: data.followupOrTask,
           taskDate: data.taskDate ? parseISO(data.taskDate) : null,
           taskTime: data.taskTime || null,
+          taskStatus: data.followupOrTask === 'Task' ? 'Open' : null,
           createdById: session.userId,
           taskForUserId: taskForUserId,
         },
@@ -635,5 +637,78 @@ export async function importLeads(formData: FormData): Promise<{ success: boolea
     } catch (error) {
         console.error("Failed to import leads:", error);
         return { success: false, message: 'An unexpected error occurred during import.', createdCount: 0, errorCount: 0 };
+    }
+}
+
+export async function getTasksForCurrentUser(): Promise<TaskNotification[]> {
+  const session = await verifySession();
+  if (!session?.userId) return [];
+
+  try {
+    const todayStart = startOfDay(new Date());
+    const todayEnd = endOfDay(new Date());
+    const tasks = await prisma.followUp.findMany({
+      where: {
+        followupOrTask: 'Task',
+        taskForUserId: session.userId,
+        taskDate: {
+            gte: todayStart,
+            lte: todayEnd,
+        }
+      },
+      include: {
+        lead: { select: { name: true, phone: true } },
+        client: { select: { name: true, phone: true } },
+        droppedLead: { select: { name: true, phone: true } },
+      },
+      orderBy: {
+        taskTime: 'asc',
+      },
+    });
+
+    return tasks.map(task => {
+        const customer = task.lead || task.client || task.droppedLead;
+        let link = '#';
+        if(task.leadId) link = `/leads/${task.leadId}`;
+        else if(task.clientId) link = `/clients/${task.clientId}`;
+        else if(task.droppedLeadId) link = `/dropped-leads/${task.droppedLeadId}`;
+
+        return {
+            id: task.id,
+            comment: task.comment || 'No comment',
+            time: task.taskTime || 'No time set',
+            customerName: customer?.name || 'Unknown Customer',
+            customerPhone: customer?.phone || null,
+            status: task.taskStatus === 'Closed' ? 'Closed' : 'Open',
+            link: link,
+        };
+    });
+  } catch (error) {
+    console.error("Failed to fetch tasks for user:", error);
+    return [];
+  }
+}
+
+export async function updateTaskStatus(taskId: string, status: 'Open' | 'Closed'): Promise<{success: boolean, message?: string}> {
+    const session = await verifySession();
+    if(!session?.userId) return { success: false, message: 'Unauthorized' };
+
+    try {
+        const task = await prisma.followUp.findFirst({
+            where: {
+                id: taskId,
+                taskForUserId: session.userId,
+            }
+        });
+        if (!task) return { success: false, message: 'Task not found or you do not have permission to update it.' };
+
+        await prisma.followUp.update({
+            where: { id: taskId },
+            data: { taskStatus: status }
+        });
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to update task status:", error);
+        return { success: false, message: 'An unexpected error occurred.' };
     }
 }
