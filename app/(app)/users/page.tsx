@@ -8,28 +8,23 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Users, PlusCircle, Loader2, MoreVertical, Trash2, Edit } from 'lucide-react';
-import type { User, UserRole } from '@/types';
-import { getUsers, deleteUser, updateUserRole } from './actions';
+import { Users, PlusCircle, Loader2, MoreVertical, Trash2, Edit, UserX, UserCheck } from 'lucide-react';
+import type { User } from '@/types';
+import { getUsers, deleteUser, updateUser, toggleUserStatus } from './actions';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { USER_ROLES } from '@/lib/constants';
-import { Label } from '@/components/ui/label';
+import { UserForm } from './user-form';
 
 export default function ManageUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDeleting, startDeleteTransition] = useTransition();
-  const [isUpdating, startUpdateTransition] = useTransition();
+  const [isProcessing, startTransition] = useTransition();
   const { toast } = useToast();
 
-  const [isEditRoleDialogOpen, setIsEditRoleDialogOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [selectedRole, setSelectedRole] = useState<UserRole | ''>('');
 
   const fetchUsers = async () => {
       setIsLoading(true);
@@ -44,33 +39,37 @@ export default function ManageUsersPage() {
 
   const handleOpenEditDialog = (user: User) => {
     setSelectedUser(user);
-    setSelectedRole(user.role);
-    setIsEditRoleDialogOpen(true);
+    setIsFormOpen(true);
   };
+  
+  const closeForm = () => {
+    setSelectedUser(null);
+    setIsFormOpen(false);
+  }
 
-  const handleUpdateRole = () => {
-    if (!selectedUser || !selectedRole) return;
-    startUpdateTransition(async () => {
-        const result = await updateUserRole(selectedUser.id, selectedRole);
+  const handleFormSubmit = (formData: FormData) => {
+    if (!selectedUser) return;
+    startTransition(async () => {
+        const result = await updateUser(selectedUser.id, formData);
         if (result.success) {
-            toast({ title: "Role Updated", description: `Role for ${selectedUser.name} has been updated.` });
-            setIsEditRoleDialogOpen(false);
+            toast({ title: "User Updated", description: `${selectedUser.name}'s details have been updated.` });
+            closeForm();
             fetchUsers();
         } else {
-            toast({ title: "Error", description: result.error || "Failed to update user role.", variant: "destructive" });
+            toast({ title: "Error", description: result.error || "Failed to update user.", variant: "destructive" });
         }
     });
   };
 
   const handleDeleteUser = (userId: string) => {
-    startDeleteTransition(async () => {
+    startTransition(async () => {
         const result = await deleteUser(userId);
         if (result.success) {
             toast({
                 title: "User Deleted",
                 description: "The user has been successfully deleted.",
             });
-            fetchUsers(); // Refresh the list
+            fetchUsers();
         } else {
             toast({
                 title: "Error",
@@ -78,6 +77,18 @@ export default function ManageUsersPage() {
                 variant: "destructive",
             });
         }
+    });
+  };
+  
+  const handleToggleStatus = (user: User) => {
+    startTransition(async () => {
+      const result = await toggleUserStatus(user.id, user.isActive);
+      if (result.success) {
+        toast({ title: "Status Updated", description: `${user.name}'s status has been changed.` });
+        fetchUsers();
+      } else {
+        toast({ title: "Error", description: result.error || "Failed to update status.", variant: "destructive" });
+      }
     });
   };
 
@@ -107,7 +118,9 @@ export default function ManageUsersPage() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
+                <TableHead>Phone</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Date Joined</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -117,9 +130,15 @@ export default function ManageUsersPage() {
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">{user.name}</TableCell>
                   <TableCell>{user.email}</TableCell>
+                  <TableCell>{user.phone}</TableCell>
                   <TableCell>
                     <Badge variant={user.role === 'Admin' ? 'destructive' : 'secondary'}>
                       {user.role}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={user.isActive ? 'default' : 'outline'}>
+                      {user.isActive ? 'Active' : 'Inactive'}
                     </Badge>
                   </TableCell>
                   <TableCell>{format(new Date(user.createdAt), 'dd MMM, yyyy')}</TableCell>
@@ -134,7 +153,11 @@ export default function ManageUsersPage() {
                         <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => handleOpenEditDialog(user)}>
                                 <Edit className="mr-2 h-4 w-4" />
-                                Edit Role
+                                Edit User
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleToggleStatus(user)}>
+                                {user.isActive ? <UserX className="mr-2 h-4 w-4" /> : <UserCheck className="mr-2 h-4 w-4" />}
+                                <span>{user.isActive ? 'Make Inactive' : 'Make Active'}</span>
                             </DropdownMenuItem>
                            <AlertDialog>
                                 <AlertDialogTrigger asChild>
@@ -155,9 +178,9 @@ export default function ManageUsersPage() {
                                         <AlertDialogAction
                                             className={buttonVariants({ variant: 'destructive' })}
                                             onClick={() => handleDeleteUser(user.id)}
-                                            disabled={isDeleting}
+                                            disabled={isProcessing}
                                         >
-                                            {isDeleting ? 'Deleting...' : 'Delete'}
+                                            {isProcessing ? 'Deleting...' : 'Delete'}
                                         </AlertDialogAction>
                                     </AlertDialogFooter>
                                 </AlertDialogContent>
@@ -172,39 +195,16 @@ export default function ManageUsersPage() {
           )}
         </CardContent>
       </Card>
-
-      <Dialog open={isEditRoleDialogOpen} onOpenChange={setIsEditRoleDialogOpen}>
-        <DialogContent>
-            <DialogHeader>
-                <DialogTitle>Edit Role for {selectedUser?.name}</DialogTitle>
-                <DialogDescription>
-                    Select a new role for this user.
-                </DialogDescription>
-            </DialogHeader>
-            <div className="py-4">
-                <Label htmlFor="role-select">Role</Label>
-                <Select value={selectedRole} onValueChange={(value) => setSelectedRole(value as UserRole)}>
-                    <SelectTrigger id="role-select">
-                        <SelectValue placeholder="Select a role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {USER_ROLES.map(role => (
-                            <SelectItem key={role} value={role}>{role}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
-            <DialogFooter>
-                <DialogClose asChild>
-                  <Button variant="outline">Cancel</Button>
-                </DialogClose>
-                <Button onClick={handleUpdateRole} disabled={isUpdating}>
-                    {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Update Role
-                </Button>
-            </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      
+      {isFormOpen && (
+        <UserForm
+            isEditMode
+            user={selectedUser}
+            isOpen={isFormOpen}
+            onClose={closeForm}
+            formAction={handleFormSubmit}
+        />
+      )}
     </>
   );
 }

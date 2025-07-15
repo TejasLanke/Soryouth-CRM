@@ -26,6 +26,7 @@ export interface User {
   email: string;
   phone: string;
   role: UserRole;
+  isActive: boolean;
   createdAt: string;
 }
 
@@ -227,15 +228,18 @@ export interface FollowUp {
   leadStageAtTimeOfFollowUp?: AnyStatusType;
   comment?: string;
   createdBy?: string;
+  createdById: string;
   createdAt: string;
   followupOrTask: 'Followup' | 'Task';
   taskForUser?: string;
   taskDate?: string;
   taskTime?: string;
   taskStatus?: 'Open' | 'Closed'; // Added for task tracking
+  lead?: { name: string, phone: string | null } | null;
+  client?: { name: string, phone: string | null } | null;
 }
 
-export type AddActivityData = Omit<FollowUp, 'id' | 'createdAt' | 'droppedLeadId' | 'createdBy'> & {
+export type AddActivityData = Omit<FollowUp, 'id' | 'createdAt' | 'droppedLeadId' | 'createdBy' | 'createdById' | 'lead' | 'client'> & {
   priority?: LeadPriorityType | ClientPriorityType;
 };
 

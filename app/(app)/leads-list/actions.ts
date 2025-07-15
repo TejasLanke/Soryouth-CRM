@@ -36,6 +36,32 @@ function mapPrismaLeadToLeadType(prismaLead: any): Lead {
   } as Lead;
 }
 
+// Helper to map Prisma client to frontend Client type
+function mapPrismaClientToClientType(prismaClient: any): Client {
+  return {
+    id: prismaClient.id,
+    name: prismaClient.name,
+    email: prismaClient.email ?? undefined,
+    phone: prismaClient.phone ?? undefined,
+    status: prismaClient.status,
+    priority: prismaClient.priority ?? undefined,
+    assignedTo: prismaClient.assignedTo?.name ?? undefined,
+    createdBy: prismaClient.createdBy?.name ?? undefined,
+    createdAt: prismaClient.createdAt.toISOString(),
+    updatedAt: prismaClient.updatedAt.toISOString(),
+    kilowatt: prismaClient.kilowatt ?? undefined,
+    address: prismaClient.address ?? undefined,
+    clientType: prismaClient.clientType ?? undefined,
+    electricityBillUrls: prismaClient.electricityBillUrls ?? [],
+    followupCount: prismaClient.followUps?.length ?? 0,
+    lastCommentText: prismaClient.followUps?.[0]?.comment ?? undefined,
+    lastCommentDate: prismaClient.followUps?.[0]?.createdAt ? format(prismaClient.followUps[0].createdAt, 'dd-MM-yyyy') : undefined,
+    nextFollowUpDate: prismaClient.nextFollowUpDate ? format(prismaClient.nextFollowUpDate, 'yyyy-MM-dd') : undefined,
+    nextFollowUpTime: prismaClient.nextFollowUpTime ?? undefined,
+    totalDealValue: Number(prismaClient.totalDealValue) || 0,
+  };
+}
+
 // Helper function to map Prisma FollowUp to frontend FollowUp type
 function mapPrismaFollowUpToFollowUpType(prismaFollowUp: any): FollowUp {
   return {
@@ -49,12 +75,15 @@ function mapPrismaFollowUpToFollowUpType(prismaFollowUp: any): FollowUp {
     leadStageAtTimeOfFollowUp: prismaFollowUp.leadStageAtTimeOfFollowUp ?? undefined,
     comment: prismaFollowUp.comment ?? undefined,
     createdBy: prismaFollowUp.createdBy?.name ?? undefined,
+    createdById: prismaFollowUp.createdById,
     createdAt: prismaFollowUp.createdAt.toISOString(),
     followupOrTask: prismaFollowUp.followupOrTask,
     taskForUser: prismaFollowUp.taskForUser?.name ?? undefined,
     taskDate: prismaFollowUp.taskDate?.toISOString() ?? undefined,
     taskTime: prismaFollowUp.taskTime ?? undefined,
     taskStatus: prismaFollowUp.taskStatus ?? 'Open',
+    lead: prismaFollowUp.lead ? mapPrismaLeadToLeadType(prismaFollowUp.lead) : undefined,
+    client: prismaFollowUp.client ? mapPrismaClientToClientType(prismaFollowUp.client) : undefined,
   } as FollowUp;
 }
 
@@ -78,6 +107,24 @@ export async function getLeads(): Promise<Lead[]> {
     console.error("Failed to fetch leads:", error);
     return [];
   }
+}
+
+export async function getAllFollowUps(): Promise<FollowUp[]> {
+    try {
+        const followUps = await prisma.followUp.findMany({
+            orderBy: { createdAt: 'desc' },
+            include: { 
+                createdBy: true, 
+                taskForUser: true,
+                lead: true,
+                client: true,
+            }
+        });
+        return followUps.map(mapPrismaFollowUpToFollowUpType);
+    } catch (error) {
+        console.error("Failed to fetch all follow-ups:", error);
+        return [];
+    }
 }
 
 export async function getLeadById(id: string): Promise<Lead | null> {

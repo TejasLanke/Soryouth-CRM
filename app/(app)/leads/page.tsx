@@ -4,13 +4,13 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-// This page serves as the entry point for the /leads route (now "Summary").
-// It redirects to the default "Leads" tab.
+// This page serves as a fallback redirect for the old /leads route.
+// It redirects to the primary leads list page.
 export default function LeadsSummaryPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/leads/current');
+    router.replace('/leads-list');
   }, [router]);
 
   return null; // Or a loading spinner

@@ -33,6 +33,10 @@ export async function login(prevState: any, formData: FormData) {
     if (!user) {
       return { error: 'Invalid email or password.' };
     }
+    
+    if (!user.isActive) {
+      return { error: 'Your account is inactive. Please contact an administrator.' };
+    }
 
     const passwordsMatch = await comparePassword(password, user.password);
     if (!passwordsMatch) {
@@ -79,6 +83,7 @@ export async function signup(prevState: any, formData: FormData) {
               phone,
               password: hashedPassword,
               role: 'Admin', // The first user is always an Admin
+              isActive: true, // First user is active
           },
       });
   } catch (error) {
