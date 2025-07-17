@@ -79,7 +79,7 @@ export function SettingsDialog({ isOpen, onClose, settingTypes }: SettingsDialog
     }
 
     if (result.success) {
-      toast({ title: 'Success', description: `${deleteCandidate.name} and all its contents removed.` });
+      toast({ title: 'Success', description: `"${deleteCandidate.name}" removed.` });
       fetchAllSettings();
     } else {
       toast({ title: `Error removing item`, description: result.error, variant: "destructive" });
@@ -135,7 +135,7 @@ export function SettingsDialog({ isOpen, onClose, settingTypes }: SettingsDialog
             <AlertDialogHeader>
                 <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This action cannot be undone. You are about to delete the type "{deleteCandidate?.name}".
+                  This action cannot be undone. You are about to delete "{deleteCandidate?.name}".
                 </AlertDialogDescription>
                 {deleteImpact && (deleteImpact.templateCount > 0 || deleteImpact.documentCount > 0) && (
                     <div className="text-sm font-semibold text-destructive pt-2">

@@ -16,8 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { useState } from 'react';
-import { USER_ROLES } from '@/lib/constants';
-import type { User } from '@/types';
+import type { User, CustomSetting } from '@/types';
 
 function SubmitButton({ isEditMode }: { isEditMode?: boolean }) {
   const { pending } = useFormStatus();
@@ -35,12 +34,13 @@ function SubmitButton({ isEditMode }: { isEditMode?: boolean }) {
 interface UserFormProps {
   user?: User | null;
   formAction: (formData: FormData) => void;
+  roles: CustomSetting[];
   isEditMode?: boolean;
   isOpen?: boolean;
   onClose?: () => void;
 }
 
-export function UserForm({ user, formAction, isEditMode = false, isOpen = true, onClose }: UserFormProps) {
+export function UserForm({ user, formAction, roles, isEditMode = false, isOpen = true, onClose }: UserFormProps) {
   const [showPassword, setShowPassword] = useState(false);
 
   const FormContent = (
@@ -77,13 +77,13 @@ export function UserForm({ user, formAction, isEditMode = false, isOpen = true, 
       </div>
       <div className="space-y-2">
         <Label htmlFor="role">Role</Label>
-        <Select name="role" required defaultValue={user?.role || USER_ROLES[1]}>
+        <Select name="role" required defaultValue={user?.role || roles[0]?.name}>
           <SelectTrigger id="role">
             <SelectValue placeholder="Select a role" />
           </SelectTrigger>
           <SelectContent>
-            {USER_ROLES.map(role => (
-              <SelectItem key={role} value={role}>{role}</SelectItem>
+            {roles.map(role => (
+              <SelectItem key={role.id} value={role.name}>{role.name}</SelectItem>
             ))}
           </SelectContent>
         </Select>

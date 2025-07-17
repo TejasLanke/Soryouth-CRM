@@ -8,14 +8,13 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  Admin
-  TechnoSales
-  Designing
-  Procurement
-  ProjectManager
-  LiasoningExecutive
-  OperationAndMaintainance
+model RolePermission {
+  id       String @id @default(cuid())
+  roleName String
+  navPath  String
+
+  @@unique([roleName, navPath])
+  @@index([roleName])
 }
 
 model User {
@@ -25,7 +24,7 @@ model User {
   phone     String
   password  String
   role      String   @default("TechnoSales")
-  isActive     Boolean       @default(true)
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   surveys   SiteSurvey[]
@@ -284,17 +283,7 @@ enum SettingType {
   LEAD_SOURCE
   CLIENT_STATUS
   DOCUMENT_TYPE
-}
-
-enum UserRole {
-  Admin
-  TechnoSales
-  OfficeAdmin
-  Designing
-  Procurement
-  ProjectManager
-  LiasoningExecutive
-  OperationAndMaintainance
+  USER_ROLE
 }
 
 model SiteSurvey {

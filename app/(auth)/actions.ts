@@ -43,7 +43,7 @@ export async function login(prevState: any, formData: FormData) {
       return { error: 'Invalid email or password.' };
     }
     
-    await createSession(user.id, user.name, user.email);
+    await createSession(user.id, user.name, user.email, user.role);
     
   } catch (error) {
     console.error(error);
@@ -76,13 +76,22 @@ export async function signup(prevState: any, formData: FormData) {
 
       const hashedPassword = await hashPassword(password);
       
+      const adminRoleName = 'Admin';
+      
+      // Ensure 'Admin' role exists in CustomSettings
+      await prisma.customSetting.upsert({
+          where: { type_name: { type: 'USER_ROLE', name: adminRoleName } },
+          update: {},
+          create: { type: 'USER_ROLE', name: adminRoleName },
+      });
+
       await prisma.user.create({
           data: {
               name,
               email,
               phone,
               password: hashedPassword,
-              role: 'Admin', // The first user is always an Admin
+              role: adminRoleName, // The first user is always an Admin
               isActive: true, // First user is active
           },
       });

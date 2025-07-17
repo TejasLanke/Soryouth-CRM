@@ -46,6 +46,22 @@ export async function getDocumentTypes(): Promise<CustomSetting[]> {
     return getSettingsByType('DOCUMENT_TYPE');
 }
 
+export async function getUserRoles(): Promise<CustomSetting[]> {
+    const roles = await getSettingsByType('USER_ROLE');
+    if (roles.length === 0) {
+        // Seed default roles if none exist
+        const defaultRoles = ['Admin', 'TechnoSales', 'Designing', 'Procurement', 'ProjectManager', 'LiasoningExecutive', 'OperationAndMaintainance'];
+        const createdRoles: CustomSetting[] = [];
+        for (const roleName of defaultRoles) {
+            const result = await addSetting('USER_ROLE', roleName);
+            if (!('error' in result)) {
+                createdRoles.push(result);
+            }
+        }
+        return createdRoles;
+    }
+    return roles;
+}
 
 export async function addSetting(type: SettingType, name: string): Promise<CustomSetting | { error: string }> {
     if (!name || name.trim().length === 0) {
@@ -62,6 +78,7 @@ export async function addSetting(type: SettingType, name: string): Promise<Custo
         // Revalidate relevant paths
         if (type === 'LEAD_STATUS' || type === 'LEAD_SOURCE') revalidatePath('/leads-list');
         if (type === 'CLIENT_STATUS') revalidatePath('/clients-list');
+        if (type === 'USER_ROLE') revalidatePath('/users');
         if (type === 'DOCUMENT_TYPE') {
             revalidatePath('/documents');
             revalidatePath('/manage-templates');
@@ -90,6 +107,7 @@ export async function deleteSetting(id: string): Promise<{ success: boolean; err
         
         if (settingToDelete.type === 'LEAD_STATUS' || settingToDelete.type === 'LEAD_SOURCE') revalidatePath('/leads-list');
         if (settingToDelete.type === 'CLIENT_STATUS') revalidatePath('/clients-list');
+        if (settingToDelete.type === 'USER_ROLE') revalidatePath('/users');
         if (settingToDelete.type === 'DOCUMENT_TYPE') {
             revalidatePath('/documents');
             revalidatePath('/manage-templates');

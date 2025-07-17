@@ -1,11 +1,12 @@
 
-import type { LEAD_PRIORITY_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES, EXPENSE_CATEGORIES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS, SURVEY_STATUS_OPTIONS, SURVEY_TYPE_OPTIONS, METER_PHASES, CONSUMER_LOAD_TYPES, ROOF_TYPES, DISCOM_OPTIONS, CLIENT_PRIORITY_OPTIONS, USER_ROLES, EXPENSE_STATUSES, DEAL_PIPELINES, ALL_DEAL_STAGES, DealStage } from '@/lib/constants';
+import type { LEAD_PRIORITY_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES, EXPENSE_CATEGORIES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS, SURVEY_STATUS_OPTIONS, SURVEY_TYPE_OPTIONS, METER_PHASES, CONSUMER_LOAD_TYPES, ROOF_TYPES, DISCOM_OPTIONS, CLIENT_PRIORITY_OPTIONS, EXPENSE_STATUSES, DEAL_PIPELINES, ALL_DEAL_STAGES } from '@/lib/constants';
 
 // Deriving types from the const arrays ensures type safety and single source of truth
 export type LeadStatusType = string;
 export type LeadSourceOptionType = string;
 export type ClientStatusType = string;
 export type DocumentType = string;
+export type UserRole = string;
 
 export type LeadPriorityType = typeof LEAD_PRIORITY_OPTIONS[number];
 export type UserOptionType = typeof USER_OPTIONS[number];
@@ -15,7 +16,6 @@ export type ModuleType = typeof MODULE_TYPES[number];
 export type DCRStatus = typeof DCR_STATUSES[number];
 export type ModuleWattage = typeof MODULE_WATTAGE_OPTIONS[number];
 export type ClientPriorityType = typeof CLIENT_PRIORITY_OPTIONS[number];
-export type UserRole = typeof USER_ROLES[number];
 
 
 export type AnyStatusType = LeadStatusType | ClientStatusType;
@@ -28,6 +28,12 @@ export interface User {
   role: UserRole;
   isActive: boolean;
   createdAt: string;
+}
+
+export interface RolePermission {
+  id: string;
+  roleName: string;
+  navPath: string;
 }
 
 export interface ElectricityBill {
@@ -64,14 +70,15 @@ export interface Lead {
   followupCount?: number;
   totalDealValue?: number | null;
 }
-export type CreateLeadData = Omit<Lead, 'id' | 'createdAt' | 'updatedAt' | 'followupCount'>;
+export type CreateLeadData = Omit<Lead, 'id' | 'createdAt' | 'updatedAt' | 'followupCount' | 'electricityBillUrls'> & {
+  electricityBillUrls?: string[];
+};
 
-export interface DroppedLead extends Omit<Lead, 'status' | 'updatedAt' | 'electricityBillUrl'> {
+export interface DroppedLead extends Omit<Lead, 'status' | 'updatedAt'> {
   status: 'Lost';
   dropReason: DropReasonType;
   dropComment?: string | null;
   droppedAt: string;
-  electricityBillUrls: string[];
 }
 
 export interface Client {
@@ -217,9 +224,9 @@ export type FollowUpStatus = typeof FOLLOW_UP_STATUSES[number];
 
 export interface FollowUp {
   id: string;
-  leadId?: string;
-  clientId?: string;
-  dealId?: string;
+  leadId?: string | null;
+  clientId?: string | null;
+  dealId?: string | null;
   droppedLeadId?: string;
   type: FollowUpType;
   date: string;
@@ -316,7 +323,7 @@ export interface SiteSurvey {
   surveyorId: string;
 }
 
-export type CreateSiteSurveyData = Omit<SiteSurvey, 'id' | 'surveyNumber' | 'createdAt' | 'updatedAt' | 'surveyorName' | 'status' | 'consumerName' | 'location'> & {
+export type CreateSiteSurveyData = Omit<SiteSurvey, 'id' | 'surveyNumber' | 'createdAt' | 'updatedAt' | 'surveyorName' | 'status' | 'consumerName' | 'location' | 'electricityBills'> & {
   leadId?: string | null;
   clientId?: string | null;
   surveyorId: string;
@@ -326,7 +333,7 @@ export type CreateSiteSurveyData = Omit<SiteSurvey, 'id' | 'surveyNumber' | 'cre
 };
 
 
-export type SiteSurveyFormValues = Omit<SiteSurvey, 'id' | 'surveyNumber' | 'createdAt' | 'updatedAt' | 'surveyorName' | 'status' | 'electricityBillFiles' | 'surveyorId' > & {
+export interface SiteSurveyFormValues extends Omit<SiteSurvey, 'id' | 'surveyNumber' | 'createdAt' | 'updatedAt' | 'surveyorName' | 'status' | 'electricityBillFiles' | 'surveyorId'> {
   electricityBillFiles?: FileList | null;
   surveyorName: UserOptionType;
   leadId?: string;
@@ -340,7 +347,7 @@ export interface SurveySortConfig {
 }
 
 export interface SurveyStatusFilterItem {
-  label: SurveyStatusType | 'Show all';
+  label: SurveyStatusType | 'all';
   count: number;
   value: SurveyStatusType | 'all';
 }
@@ -360,7 +367,7 @@ export interface Template {
 
 export type CreateTemplateData = Omit<Template, 'id' | 'createdAt' | 'updatedAt'>;
 
-export type SettingType = 'LEAD_STATUS' | 'LEAD_SOURCE' | 'CLIENT_STATUS' | 'DOCUMENT_TYPE';
+export type SettingType = 'LEAD_STATUS' | 'LEAD_SOURCE' | 'CLIENT_STATUS' | 'DOCUMENT_TYPE' | 'USER_ROLE';
 
 export interface CustomSetting {
     id: string;

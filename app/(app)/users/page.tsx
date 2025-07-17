@@ -8,33 +8,43 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Users, PlusCircle, Loader2, MoreVertical, Trash2, Edit, UserX, UserCheck } from 'lucide-react';
-import type { User } from '@/types';
+import { Users, PlusCircle, Loader2, MoreVertical, Trash2, Edit, UserX, UserCheck, Settings, ShieldCheck } from 'lucide-react';
+import type { User, CustomSetting } from '@/types';
 import { getUsers, deleteUser, updateUser, toggleUserStatus } from './actions';
+import { getUserRoles } from '@/app/(app)/settings/actions';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { UserForm } from './user-form';
+import { SettingsDialog } from '@/app/(app)/settings/settings-dialog';
+import { useRouter } from 'next/navigation';
 
 export default function ManageUsersPage() {
+  const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
+  const [roles, setRoles] = useState<CustomSetting[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, startTransition] = useTransition();
   const { toast } = useToast();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
-  const fetchUsers = async () => {
+  const fetchData = async () => {
       setIsLoading(true);
-      const fetchedUsers = await getUsers();
+      const [fetchedUsers, fetchedRoles] = await Promise.all([
+        getUsers(),
+        getUserRoles(),
+      ]);
       setUsers(fetchedUsers);
+      setRoles(fetchedRoles);
       setIsLoading(false);
   };
   
   useEffect(() => {
-    fetchUsers();
+    fetchData();
   }, []);
 
   const handleOpenEditDialog = (user: User) => {
@@ -54,7 +64,7 @@ export default function ManageUsersPage() {
         if (result.success) {
             toast({ title: "User Updated", description: `${selectedUser.name}'s details have been updated.` });
             closeForm();
-            fetchUsers();
+            fetchData();
         } else {
             toast({ title: "Error", description: result.error || "Failed to update user.", variant: "destructive" });
         }
@@ -69,7 +79,7 @@ export default function ManageUsersPage() {
                 title: "User Deleted",
                 description: "The user has been successfully deleted.",
             });
-            fetchUsers();
+            fetchData();
         } else {
             toast({
                 title: "Error",
@@ -85,7 +95,7 @@ export default function ManageUsersPage() {
       const result = await toggleUserStatus(user.id, user.isActive);
       if (result.success) {
         toast({ title: "Status Updated", description: `${user.name}'s status has been changed.` });
-        fetchUsers();
+        fetchData();
       } else {
         toast({ title: "Error", description: result.error || "Failed to update status.", variant: "destructive" });
       }
@@ -99,11 +109,19 @@ export default function ManageUsersPage() {
         description="Add, view, and manage user accounts and their roles."
         icon={Users}
         actions={
-          <Button asChild>
-            <Link href="/users/add">
-              <PlusCircle className="mr-2 h-4 w-4" /> Add New User
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setIsSettingsOpen(true)}>
+              <Settings className="mr-2 h-4 w-4" /> Manage Roles
+            </Button>
+            <Button variant="outline" onClick={() => router.push('/users/roles')}>
+              <ShieldCheck className="mr-2 h-4 w-4" /> Manage Role Permissions
+            </Button>
+            <Button asChild>
+              <Link href="/users/add">
+                <PlusCircle className="mr-2 h-4 w-4" /> Add New User
+              </Link>
+            </Button>
+          </div>
         }
       />
       <Card>
@@ -200,11 +218,20 @@ export default function ManageUsersPage() {
         <UserForm
             isEditMode
             user={selectedUser}
+            roles={roles}
             isOpen={isFormOpen}
             onClose={closeForm}
             formAction={handleFormSubmit}
         />
       )}
+      <SettingsDialog
+        isOpen={isSettingsOpen}
+        onClose={() => {
+            setIsSettingsOpen(false);
+            fetchData();
+        }}
+        settingTypes={[{ title: 'User Roles', type: 'USER_ROLE' }]}
+      />
     </>
   );
 }

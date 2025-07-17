@@ -77,8 +77,6 @@ export const DEAL_PIPELINES = {
 export type DealPipelineType = keyof typeof DEAL_PIPELINES;
 export type DealStage = typeof ALL_DEAL_STAGES[number];
 
-
-export const USER_ROLES = ['Admin', 'TechnoSales', 'Designing', 'Procurement', 'ProjectManager', 'LiasoningExecutive', 'OperationAndMaintainance'] as const;
 export const CLIENT_TYPES = ['Individual/Bungalow', 'Housing Society', 'Commercial', 'Industrial', 'Other'] as const;
 export const LEAD_PRIORITY_OPTIONS = ['Hot', 'High', 'Medium', 'Average', 'Low'] as const;
 export const CLIENT_PRIORITY_OPTIONS = ['Hot', 'Average'] as const;
@@ -95,6 +93,38 @@ export const MODULE_TYPES = ['Mono PERC', 'TOPCon'] as const;
 export const DCR_STATUSES = ['DCR', 'Non-DCR'] as const;
 export const MODULE_WATTAGE_OPTIONS = ["540", "545", "550", "585", "590"] as const;
 
+export const MOCK_LEADS: Lead[] = [
+  {
+    id: 'lead1', name: 'Pramod Agrawal', email: 'pramod.agrawal@example.com', phone: '6263537508',
+    status: 'Fresher', source: 'Facebook', createdAt: subDays(new Date(),5).toISOString(), updatedAt: new Date().toISOString(),
+    lastCommentText: 'lb 8000/-', lastCommentDate: format(subDays(new Date(), 2), 'dd-MM-yyyy'),
+    kilowatt: 10, clientType: 'Commercial', nextFollowUpDate: format(addDays(new Date(), 5), 'yyyy-MM-dd'), nextFollowUpTime: '10:00',
+    address: '123 Main St, Nagpur', priority: 'High', assignedTo: 'Mayur', createdBy: 'Admin', electricityBillUrls: [], followupCount: 3,
+  },
+  {
+    id: 'lead2', name: 'sir (Jane Smith)', email: 'jane.smith.lead@example.com', phone: '7001173134',
+    status: 'Requirement', source: 'Facebook', assignedTo: 'Sales Rep A', createdBy: 'Mayur',
+    createdAt: new Date(Date.now() - 86400000).toISOString(), updatedAt: new Date().toISOString(),
+    lastCommentText: 'Not answering', lastCommentDate: format(subDays(new Date(), 1), 'dd-MM-yyyy'),
+    kilowatt: 5, clientType: 'Individual/Bungalow', nextFollowUpDate: format(addDays(new Date(), 7), 'yyyy-MM-dd'), nextFollowUpTime: '14:30',
+    address: '456 Oak Ave, Mumbai', priority: 'Medium', electricityBillUrls: [], followupCount: 5,
+  },
+];
+
+export const MOCK_CLIENTS: Client[] = [
+   {
+    id: 'client1', name: 'Green Valley Society', status: 'Deal Done', clientType: 'Housing Society', phone: '9876543210', assignedTo: 'Mayur',
+    createdAt: subDays(new Date(), 100).toISOString(), updatedAt: subDays(new Date(), 10).toISOString(), electricityBillUrls: [], followupCount: 12
+  },
+  {
+    id: 'client2', name: 'Mr. Anil Patel (Bungalow)', status: 'Deal Done', clientType: 'Individual/Bungalow', phone: '9876543211', assignedTo: 'Sales Rep A',
+    createdAt: subDays(new Date(), 120).toISOString(), updatedAt: subDays(new Date(), 5).toISOString(), followupCount: 8, electricityBillUrls: [],
+  },
+  {
+    id: 'client3', name: 'FutureTech Industries', status: 'Installer', clientType: 'Commercial', phone: '9876543212', assignedTo: 'Sales Rep B',
+    createdAt: subDays(new Date(), 80).toISOString(), updatedAt: subDays(new Date(), 1).toISOString(), followupCount: 15, electricityBillUrls: [],
+  },
+];
 
 export const DOCUMENT_TYPES_CONFIG: Array<{ type: DocumentType; icon: React.ComponentType<{ className?: string }>; description: string }> = [];
 

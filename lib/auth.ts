@@ -3,6 +3,7 @@ import 'server-only';
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import bcrypt from 'bcryptjs';
+import prisma from './prisma';
 
 const secretKey = process.env.JWT_SECRET;
 
@@ -33,9 +34,9 @@ export async function decrypt(input: string): Promise<any> {
   }
 }
 
-export async function createSession(userId: string, name: string, email: string) {
+export async function createSession(userId: string, name: string, email: string, role: string) {
   const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 1 day
-  const session = await encrypt({ userId, name, email, expires });
+  const session = await encrypt({ userId, name, email, role, expires });
 
   (await cookies()).set('session', session, { expires, httpOnly: true });
 }
@@ -49,7 +50,7 @@ export async function verifySession() {
   if (!session?.userId) {
     return null;
   }
-  return { isAuth: true, userId: session.userId, name: session.name, email: session.email };
+  return { isAuth: true, userId: session.userId, name: session.name, email: session.email, role: session.role };
 }
 
 export async function deleteSession() {

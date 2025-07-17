@@ -5,8 +5,9 @@ import { z } from 'zod';
 import prisma from '@/lib/prisma';
 import { hashPassword, verifySession } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
-import type { User, UserRole } from '@/types';
-import { USER_ROLES } from '@/lib/constants';
+import type { User, UserRole, RolePermission } from '@/types';
+import { getUserRoles } from '@/app/(app)/settings/actions';
+import { NAV_ITEMS, TOOLS_NAV_ITEMS } from '@/lib/constants';
 
 function mapPrismaUserToUserType(prismaUser: any): User {
     return {
@@ -20,18 +21,18 @@ function mapPrismaUserToUserType(prismaUser: any): User {
     };
   }
 
-const userSchema = z.object({
+const getUserSchema = (roles: string[]) => z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Invalid email address." }),
   phone: z.string().min(10, { message: "Phone number must be at least 10 digits." }),
-  role: z.enum(USER_ROLES),
+  role: z.string().refine(val => roles.includes(val), { message: "Please select a valid role." }),
 });
 
-const addUserSchema = userSchema.extend({
+const getAddUserSchema = (roles: string[]) => getUserSchema(roles).extend({
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
 });
 
-const editUserSchema = userSchema.extend({
+const getEditUserSchema = (roles: string[]) => getUserSchema(roles).extend({
   password: z.string().min(6, "Password must be at least 6 characters.").optional().or(z.literal('')),
 });
 
@@ -51,6 +52,8 @@ export async function getUsers(): Promise<User[]> {
 }
 
 export async function addUser(prevState: any, formData: FormData) {
+  const roles = (await getUserRoles()).map(r => r.name);
+  const addUserSchema = getAddUserSchema(roles);
   const validatedFields = addUserSchema.safeParse(Object.fromEntries(formData.entries()));
 
   if (!validatedFields.success) {
@@ -89,6 +92,8 @@ export async function addUser(prevState: any, formData: FormData) {
 }
 
 export async function updateUser(userId: string, formData: FormData) {
+    const roles = (await getUserRoles()).map(r => r.name);
+    const editUserSchema = getEditUserSchema(roles);
     const data = Object.fromEntries(formData.entries());
     const validatedFields = editUserSchema.safeParse(data);
     
@@ -162,4 +167,56 @@ export async function deleteUser(userId: string): Promise<{ success: boolean; er
         }
         return { success: false, error: 'An unexpected error occurred while deleting the user.' };
     }
+}
+
+
+export async function getUserPermissions(roleName: string): Promise<RolePermission[]> {
+  if (roleName === 'Admin') {
+    // Admins have access to everything
+    return [...NAV_ITEMS, ...TOOLS_NAV_ITEMS].map(item => ({
+      id: item.href,
+      roleName: 'Admin',
+      navPath: item.href,
+    }));
+  }
+  
+  try {
+    const permissions = await prisma.rolePermission.findMany({
+      where: { roleName: roleName },
+    });
+    return permissions;
+  } catch (error) {
+    console.error(`Failed to fetch permissions for role ${roleName}:`, error);
+    return [];
+  }
+}
+
+
+export async function updateRolePermissions(roleName: string, permissions: { navPath: string, allowed: boolean }[]) {
+  try {
+    await prisma.$transaction(async (tx) => {
+      // First, delete all existing permissions for this role
+      await tx.rolePermission.deleteMany({
+        where: { roleName: roleName },
+      });
+
+      // Then, create new permissions for the allowed paths
+      const allowedPermissions = permissions.filter(p => p.allowed);
+      if (allowedPermissions.length > 0) {
+        await tx.rolePermission.createMany({
+          data: allowedPermissions.map(p => ({
+            roleName: roleName,
+            navPath: p.navPath,
+          })),
+        });
+      }
+    });
+    
+    revalidatePath('/users', 'layout'); // Revalidate the entire user section
+    return { success: true };
+
+  } catch (error) {
+    console.error(`Failed to update permissions for role ${roleName}:`, error);
+    return { success: false, error: 'An unexpected error occurred.' };
+  }
 }
