@@ -716,9 +716,9 @@ export async function getTasksForCurrentUser(): Promise<TaskNotification[]> {
     return tasks.map(task => {
         const customer = task.lead || task.client || task.droppedLead;
         let link = '#';
-        if(task.leadId) link = `/leads/${task.leadId}`;
-        else if(task.clientId) link = `/clients/${task.clientId}`;
-        else if(task.droppedLeadId) link = `/dropped-leads/${task.droppedLeadId}`;
+        if(task.leadId) link = `/leads/${task.leadId}?from_task=${task.id}`;
+        else if(task.clientId) link = `/clients/${task.clientId}?from_task=${task.id}`;
+        else if(task.droppedLeadId) link = `/dropped-leads/${task.droppedLeadId}?from_task=${task.id}`;
 
         return {
             id: task.id,

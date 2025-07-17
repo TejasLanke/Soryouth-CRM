@@ -42,8 +42,10 @@ model User {
   assignedTasks        FollowUp[]    @relation("AssignedTasks")
   expenses             Expense[]
   reviewedExpenses     Expense[]     @relation("ReviewedExpenses")
-  dealsCreated  Deal[]  @relation("DealCreatedBy")
-  dealsAssigned Deal[]  @relation("DealAssignedTo")
+  dealsCreated         Deal[]  @relation("DealCreatedBy")
+  dealsAssigned        Deal[]  @relation("DealAssignedTo")
+  generalTasksAssigned GeneralTask[]           @relation("TasksAssignedTo")
+  generalTasksCreated  GeneralTask[]           @relation("TasksCreatedBy")
 }
 
 model Lead {
@@ -407,4 +409,20 @@ model Deal {
     assignedTo   User?    @relation("DealAssignedTo", fields: [assignedToId], references: [id])
 
     followUps     FollowUp[]
+}
+
+model GeneralTask {
+  id         String   @id @default(cuid())
+  comment    String
+  taskDate   DateTime
+  priority   String   // Low, Medium, High
+  status     String   // Pending, In Progress, Completed, Failed
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  assignedToId String
+  assignedTo User     @relation("TasksAssignedTo", fields: [assignedToId], references: [id], onDelete: Cascade)
+
+  createdById String?
+  createdBy   User?    @relation("TasksCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 }

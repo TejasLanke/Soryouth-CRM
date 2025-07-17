@@ -1,5 +1,5 @@
 
-import type { LEAD_PRIORITY_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES, EXPENSE_CATEGORIES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS, SURVEY_STATUS_OPTIONS, SURVEY_TYPE_OPTIONS, METER_PHASES, CONSUMER_LOAD_TYPES, ROOF_TYPES, DISCOM_OPTIONS, CLIENT_PRIORITY_OPTIONS, EXPENSE_STATUSES, DEAL_PIPELINES, ALL_DEAL_STAGES } from '@/lib/constants';
+import type { LEAD_PRIORITY_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES, EXPENSE_CATEGORIES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS, SURVEY_STATUS_OPTIONS, SURVEY_TYPE_OPTIONS, METER_PHASES, CONSUMER_LOAD_TYPES, ROOF_TYPES, DISCOM_OPTIONS, CLIENT_PRIORITY_OPTIONS, EXPENSE_STATUSES, DEAL_PIPELINES, ALL_DEAL_STAGES, TASK_PRIORITIES } from '@/lib/constants';
 
 // Deriving types from the const arrays ensures type safety and single source of truth
 export type LeadStatusType = string;
@@ -416,3 +416,27 @@ export type TaskNotification = {
     status: 'Open' | 'Closed';
     link: string;
 };
+
+export type GeneralTaskPriority = typeof TASK_PRIORITIES[number];
+export type GeneralTaskStatus = 'Pending' | 'In Progress' | 'Completed' | 'Failed';
+
+export interface GeneralTask {
+    id: string;
+    comment: string;
+    taskDate: Date;
+    priority: GeneralTaskPriority;
+    status: GeneralTaskStatus;
+    createdAt: Date;
+    updatedAt: Date;
+    assignedToId: string;
+    assignedTo: { id: string; name: string; };
+    createdById: string | null;
+    createdBy: { id: string; name: string; } | null;
+}
+
+export type CreateGeneralTaskData = {
+    assignedToId: string;
+    taskDate: Date;
+    priority: GeneralTaskPriority;
+    comment: string;
+}

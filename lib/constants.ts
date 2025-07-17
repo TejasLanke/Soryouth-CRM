@@ -30,6 +30,7 @@ import {
   ClipboardPaste,
   ClipboardCheck,
   Handshake,
+  Ticket,
 } from 'lucide-react';
 import { format, parseISO, addDays, subDays } from 'date-fns';
 
@@ -44,6 +45,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/proposals', label: 'Proposals', icon: FileText },
   { href: '/dropped-leads-list', label: 'Dropped Leads', icon: UserX },
   { href: '/inactive-clients', label: 'Inactive Clients', icon: Archive },
+  { href: '/tasks', label: 'Tasks', icon: Ticket },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
   { href: '/users', label: 'Manage Users', icon: Users },
   { href: '/manage-templates', label: 'Manage Templates', icon: ClipboardPaste },
@@ -77,6 +79,7 @@ export const DEAL_PIPELINES = {
 export type DealPipelineType = keyof typeof DEAL_PIPELINES;
 export type DealStage = typeof ALL_DEAL_STAGES[number];
 
+export const USER_ROLES = ['Admin', 'TechnoSales', 'Designing', 'Procurement', 'ProjectManager', 'LiasoningExecutive', 'OperationAndMaintainance'] as const;
 export const CLIENT_TYPES = ['Individual/Bungalow', 'Housing Society', 'Commercial', 'Industrial', 'Other'] as const;
 export const LEAD_PRIORITY_OPTIONS = ['Hot', 'High', 'Medium', 'Average', 'Low'] as const;
 export const CLIENT_PRIORITY_OPTIONS = ['Hot', 'Average'] as const;
@@ -140,6 +143,7 @@ export const METER_PHASES = ['Single Phase', 'Three Phase', 'Not Applicable'] as
 export const CONSUMER_LOAD_TYPES = ['LT', 'HT'] as const;
 export const ROOF_TYPES = ['Metal', 'RCC', 'Asbestos', 'Other'] as const;
 export const DISCOM_OPTIONS = ['MSEDCL', 'Adani Electricity', 'Tata Power', 'Torrent Power', 'Other'] as const;
+export const TASK_PRIORITIES = ['High', 'Medium', 'Low'] as const;
 
 type PlaceholderDef = { placeholder: string; description: string; };
 type PlaceholderGroup = { [groupName: string]: PlaceholderDef[] };
