@@ -1,213 +1,214 @@
+
 'use client';
 
+import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { PageHeader } from '@/components/page-header';
-import { useState } from 'react';
-import { Link } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { useState, useEffect, useMemo } from 'react';
+import { Ticket, PlusCircle, CalendarIcon, UserCircle, Users, ChevronDown, Loader2 } from 'lucide-react';
+import { format, isBefore, startOfDay } from 'date-fns';
+import { cn } from '@/lib/utils';
+import { getTickets } from './actions';
+import { getUsers } from '../users/actions';
+import type { Tickets as TicketsType, User } from '@/types';
+import { useToast } from '@/hooks/use-toast';
+import { CreateTicketForm } from '@/components/create-ticket-form';
+import { Badge } from '@/components/ui/badge';
+import Link from 'next/link';
 
-const tickets = [
-  {
-    id: 'TICKET001',
-    subject: 'Issue with solar panel installation',
-    client: 'Jitendra Kadam',
-    priority: 'High',
-    status: 'Open',
-    dueDate: '2023-12-31',
-    assignedTo: 'tejas ( 0 )',
-  },
-  {
-    id: 'TICKET002',
-    subject: 'Question about billing',
-    client: 'Jane Doe',
-    priority: 'Medium',
-    status: 'Closed',
-    dueDate: '2023-11-15',
-    assignedTo: 'Unassigned',
-  },
-  {
-    id: 'TICKET003',
-    subject: 'Maintenance request',
-    client: 'John Smith',
-    priority: 'Low',
-    status: 'Hold',
-    dueDate: '2024-01-20',
-    assignedTo: 'tejas ( 0 )',
-  },
-];
-
-const TicketsPage = () => {
-  const [filters, setFilters] = useState({
-    dueDate: '',
-    status: '',
-    overdue: false,
-    priority: '',
-    assignedTo: '',
-  });
-
-  const handleFilterChange = (name: string, value: any) => {
-    setFilters((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const filteredTickets = tickets.filter((ticket) => {
-    let isMatch = true;
-    if (filters.dueDate && ticket.dueDate !== filters.dueDate) {
-      isMatch = false;
-    }
-    if (filters.status && filters.status !== 'Show all' && ticket.status !== filters.status) {
-      isMatch = false;
-    }
-    if (filters.overdue && new Date(ticket.dueDate) > new Date()) {
-      isMatch = false;
-    }
-    if (filters.priority && ticket.priority !== filters.priority) {
-      isMatch = false;
-    }
-    if (filters.assignedTo && ticket.assignedTo !== filters.assignedTo) {
-      isMatch = false;
-    }
-    return isMatch;
-  });
-
-  return (
-    <div className="flex-1 space-y-4 p-8 pt-6">
-      <PageHeader title="Tickets" description="View and manage your support tickets." />
-      <Card>
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <Label htmlFor="dueDate">Due Date</Label>
-              <Input
-                id="dueDate"
-                type="date"
-                value={filters.dueDate}
-                onChange={(e) => handleFilterChange('dueDate', e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="status">Status</Label>
-              <Select
-                value={filters.status}
-                onValueChange={(value) => handleFilterChange('status', value)}
-              >
-                <SelectTrigger id="status">
-                  <SelectValue placeholder="Select Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Show all">Show all</SelectItem>
-                  <SelectItem value="Open">Open</SelectItem>
-                  <SelectItem value="Hold">Hold</SelectItem>
-                  <SelectItem value="Closed">Closed</SelectItem>
-                  <SelectItem value="Unassigned">Unassigned</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="overdue"
-                checked={filters.overdue}
-                onCheckedChange={(checked) => handleFilterChange('overdue', checked)}
-              />
-              <Label htmlFor="overdue">Show Overdue</Label>
-            </div>
-            <div>
-              <Label htmlFor="priority">Priority</Label>
-              <Select
-                value={filters.priority}
-                onValueChange={(value) => handleFilterChange('priority', value)}
-              >
-                <SelectTrigger id="priority">
-                  <SelectValue placeholder="Select Priority" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="High">High</SelectItem>
-                  <SelectItem value="Medium">Medium</SelectItem>
-                  <SelectItem value="Low">Low</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="assignedTo">Assigned To</Label>
-              <Select
-                value={filters.assignedTo}
-                onValueChange={(value) => handleFilterChange('assignedTo', value)}
-              >
-                <SelectTrigger id="assignedTo">
-                  <SelectValue placeholder="Select User" />
-                </SelectTrigger>
-                <SelectContent>
-                  {/* Replace with actual user data */}
-                  <SelectItem value="tejas ( 0 )">tejas ( 0 )</SelectItem>
-                  <SelectItem value="Unassigned">Unassigned</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Tickets</CardTitle>
-          <Button>Create Ticket</Button>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Ticket ID</TableHead>
-                <TableHead>Subject</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead>Priority</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Due Date</TableHead>
-                <TableHead>Assigned To</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredTickets.map((ticket) => (
-                <TableRow key={ticket.id}>
-                  <TableCell>{ticket.id}</TableCell>
-                  <TableCell>{ticket.subject}</TableCell>
-                  <TableCell>{ticket.client}</TableCell>
-                  <TableCell>{ticket.priority}</TableCell>
-                  <TableCell>{ticket.status}</TableCell>
-                  <TableCell>{ticket.dueDate}</TableCell>
-                  <TableCell>{ticket.assignedTo}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </div>
-  );
+type TicketFilters = {
+  dueDate: Date | undefined;
+  status: string;
+  priority: string;
+  assignedToId: string;
+  isOverdue: boolean;
 };
 
-export default TicketsPage;
+const TICKET_STATUSES = ['Open', 'On Hold', 'Closed'];
+const TICKET_PRIORITIES = ['High', 'Medium', 'Low'];
+
+export default function TicketsPage() {
+  const [tickets, setTickets] = useState<TicketsType[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const { toast } = useToast();
+
+  const [filters, setFilters] = useState<TicketFilters>({
+    dueDate: undefined,
+    status: 'all',
+    priority: 'all',
+    assignedToId: 'all',
+    isOverdue: false,
+  });
+  
+  const refreshTickets = async () => {
+    setIsLoading(true);
+    const [fetchedTickets, fetchedUsers] = await Promise.all([getTickets(), getUsers()]);
+    setTickets(fetchedTickets);
+    setUsers(fetchedUsers);
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    refreshTickets();
+  }, []);
+
+  const handleFilterChange = <K extends keyof TicketFilters>(key: K, value: TicketFilters[K]) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const statusCounts = useMemo(() => {
+    const counts = { Open: 0, 'On Hold': 0, Closed: 0 };
+    tickets.forEach(ticket => {
+      if (ticket.status in counts) {
+        counts[ticket.status as keyof typeof counts]++;
+      }
+    });
+    return counts;
+  }, [tickets]);
+
+  const filteredTickets = useMemo(() => {
+    return tickets.filter(ticket => {
+      if (filters.status !== 'all' && ticket.status !== filters.status) return false;
+      if (filters.priority !== 'all' && ticket.priority !== filters.priority) return false;
+      if (filters.assignedToId !== 'all' && ticket.assignedToId !== filters.assignedToId) return false;
+      if (filters.isOverdue && (new Date(ticket.dueDate) >= startOfDay(new Date()) || ticket.status === 'Closed')) return false;
+      if (filters.dueDate && format(new Date(ticket.dueDate), 'yyyy-MM-dd') !== format(filters.dueDate, 'yyyy-MM-dd')) return false;
+      return true;
+    });
+  }, [tickets, filters]);
+  
+  const getPriorityBadgeVariant = (priority: string) => {
+    switch(priority) {
+      case 'High': return 'destructive';
+      case 'Medium': return 'secondary';
+      case 'Low': return 'outline';
+      default: return 'outline';
+    }
+  };
+
+  return (
+    <>
+      <PageHeader title="Tickets" description="View and manage your support tickets." icon={Ticket} />
+      <div className="flex gap-6 h-full">
+        <main className="flex-1 space-y-4">
+          <Card>
+            <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">All Tickets</CardTitle>
+              <Button size="sm" onClick={() => setIsFormOpen(true)}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Create Ticket
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Ticket ID</TableHead>
+                      <TableHead>Subject</TableHead>
+                      <TableHead>Client</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Due Date</TableHead>
+                      <TableHead>Assigned To</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredTickets.length === 0 ? (
+                        <TableRow><TableCell colSpan={7} className="text-center h-24">No tickets found.</TableCell></TableRow>
+                    ) : (
+                        filteredTickets.map((ticket) => (
+                        <TableRow key={ticket.id}>
+                            <TableCell className="font-medium">#{ticket.id.slice(-6)}</TableCell>
+                            <TableCell>{ticket.subject}</TableCell>
+                            <TableCell>
+                                <Link href={`/clients/${ticket.clientId}`} className="hover:underline text-primary">{ticket.client.name}</Link>
+                            </TableCell>
+                            <TableCell>
+                                <Badge variant={getPriorityBadgeVariant(ticket.priority)}>{ticket.priority}</Badge>
+                            </TableCell>
+                            <TableCell>{ticket.status}</TableCell>
+                            <TableCell>{format(new Date(ticket.dueDate), 'dd MMM, yyyy')}</TableCell>
+                            <TableCell>{ticket.assignedTo?.name || 'Unassigned'}</TableCell>
+                        </TableRow>
+                        ))
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </main>
+
+        <aside className="w-64 flex-shrink-0">
+          <Card>
+            <CardHeader><CardTitle className="text-base">Filter tickets by</CardTitle></CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label>Due date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !filters.dueDate && "text-muted-foreground")}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {filters.dueDate ? format(filters.dueDate, 'PPP') : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={filters.dueDate} onSelect={(d) => handleFilterChange('dueDate', d || undefined)} initialFocus/></PopoverContent>
+                </Popover>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <div className="space-y-1 text-sm">
+                    <div className="flex justify-between items-center cursor-pointer" onClick={() => handleFilterChange('status', 'Open')}><p>Open</p><Badge variant="outline">{statusCounts.Open}</Badge></div>
+                    <div className="flex justify-between items-center cursor-pointer" onClick={() => handleFilterChange('status', 'On Hold')}><p>Hold</p><Badge variant="outline">{statusCounts['On Hold']}</Badge></div>
+                    <div className="flex justify-between items-center cursor-pointer" onClick={() => handleFilterChange('status', 'Closed')}><p>Closed</p><Badge variant="outline">{statusCounts.Closed}</Badge></div>
+                    <div className="cursor-pointer" onClick={() => handleFilterChange('status', 'all')}>Show all</div>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox id="overdue" checked={filters.isOverdue} onCheckedChange={(checked) => handleFilterChange('isOverdue', !!checked)} />
+                <Label htmlFor="overdue">Show Overdue</Label>
+              </div>
+
+              <div className="space-y-2">
+                 <Label>Priority</Label>
+                 <Select value={filters.priority} onValueChange={(v) => handleFilterChange('priority', v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>
+                    <SelectItem value="all">Show all</SelectItem>
+                    {TICKET_PRIORITIES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                 </SelectContent></Select>
+              </div>
+
+               <div className="space-y-2">
+                 <Label>Users</Label>
+                 <Select value={filters.assignedToId} onValueChange={(v) => handleFilterChange('assignedToId', v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>
+                    <SelectItem value="all">
+                        <div className="flex items-center gap-2">
+                            <UserCircle className="h-5 w-5"/>
+                            <div><p>All users</p><p className="text-xs text-muted-foreground">Tickets for all users</p></div>
+                        </div>
+                    </SelectItem>
+                    {users.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                 </SelectContent></Select>
+              </div>
+
+            </CardContent>
+          </Card>
+        </aside>
+      </div>
+      <CreateTicketForm isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} onTicketCreated={refreshTickets} />
+    </>
+  );
+}

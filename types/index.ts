@@ -426,6 +426,7 @@ export interface GeneralTask {
     taskDate: Date;
     priority: GeneralTaskPriority;
     status: GeneralTaskStatus;
+    reason?: string | null;
     createdAt: Date;
     updatedAt: Date;
     assignedToId: string;
@@ -440,3 +441,50 @@ export type CreateGeneralTaskData = {
     priority: GeneralTaskPriority;
     comment: string;
 }
+
+export type TicketStatus = 'Open' | 'On Hold' | 'Closed';
+export type TicketPriority = 'High' | 'Medium' | 'Low';
+
+export interface Tickets {
+  id: string;
+  subject: string;
+  description: string;
+  status: TicketStatus;
+  priority: TicketPriority;
+  dueDate: string;
+  ticketFor?: string | null;
+  createdAt: string;
+  updatedAt: string;
+
+  // Client Snapshot Data
+  clientName: string;
+  mobileNo: string;
+  email?: string | null;
+  address: string;
+
+  // Relations
+  clientId: string;
+  client: Client;
+  dealId?: string | null;
+  deal?: Deal | null;
+  createdById: string;
+  createdBy: User;
+  assignedToId?: string | null;
+  assignedTo?: User | null;
+}
+
+export type CreateTicketData = {
+  clientId: string;
+  clientName: string;
+  mobileNo: string;
+  email?: string;
+  address: string;
+  dealId?: string;
+  subject: string;
+  description: string;
+  status: TicketStatus;
+  priority: TicketPriority;
+  dueDate: string;
+  ticketFor?: string;
+  assignedToId?: string;
+};

@@ -1,5 +1,5 @@
 
-import type { NavItem, Lead, Client, Proposal, Document, Communication, DocumentType, ClientType, LeadPriorityType, ClientPriorityType, UserOptionType, DropReasonType, Expense, UserRole, Template, ProposalOrDocumentType, SiteSurvey } from '@/types';
+import type { NavItem, Lead, Client, Proposal, Document, Communication, DocumentType, ClientType, LeadPriorityType, ClientPriorityType, UserOptionType, DropReasonType, Expense, UserRole, Template, ProposalOrDocumentType, SiteSurvey, Tickets } from '@/types';
 import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard,
@@ -45,7 +45,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/proposals', label: 'Proposals', icon: FileText },
   { href: '/dropped-leads-list', label: 'Dropped Leads', icon: UserX },
   { href: '/inactive-clients', label: 'Inactive Clients', icon: Archive },
-  { href: '/tasks', label: 'Tasks', icon: Ticket },
+  { href: '/tasks', label: 'Tasks', icon: ClipboardCheck },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
   { href: '/users', label: 'Manage Users', icon: Users },
   { href: '/manage-templates', label: 'Manage Templates', icon: ClipboardPaste },
@@ -60,7 +60,7 @@ export const TOOLS_NAV_ITEMS: NavItem[] = [
   { href: '/communications', label: 'Communications', icon: MessageSquareText },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays },
   { href: '/survey-reports', label: 'Survey Reports', icon: MapPinnedIcon },
-  { href: '/tickets', label: 'Tickets', icon: Receipt },
+  { href: '/tickets', label: 'Tickets', icon: Ticket },
   { href: '/proposals/batch', label: 'Batch Proposals', icon: Rows },
   { href: '/site-survey', label: 'Site Survey Form', icon: ClipboardEdit },
   { href: '/documents', label: 'Documents', icon: Files },

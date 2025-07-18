@@ -46,6 +46,8 @@ model User {
   dealsAssigned        Deal[]  @relation("DealAssignedTo")
   generalTasksAssigned GeneralTask[]           @relation("TasksAssignedTo")
   generalTasksCreated  GeneralTask[]           @relation("TasksCreatedBy")
+  createdTickets          Ticket[]       @relation("CreatedTickets")
+  assignedTickets         Ticket[]       @relation("AssignedTickets")
 }
 
 model Lead {
@@ -147,8 +149,9 @@ model Client {
   followUpCount Int @default(0)
   followUps          FollowUp[]
   proposals      Proposal[]
-  siteSurveys        SiteSurvey[]
-  deals     Deal[]
+  siteSurveys    SiteSurvey[]
+  deals          Deal[]
+  tickets        Ticket[]
 
   // --- Relations to User ---
   createdById String?
@@ -409,6 +412,35 @@ model Deal {
     assignedTo   User?    @relation("DealAssignedTo", fields: [assignedToId], references: [id])
 
     followUps     FollowUp[]
+    tickets       Ticket[]
+}
+
+model Ticket {
+  id            String      @id @default(cuid())
+  clientName    String
+  mobileNo      String
+  email         String?
+  address       String
+  subject       String
+  description   String
+  status        String      // Open, On Hold, Closed
+  priority      String      // High, Medium, Low
+  dueDate       DateTime
+  ticketFor     String?     // Product/Deal description
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  clientId      String
+  client        Client      @relation(fields: [clientId], references: [id])
+  
+  dealId        String?
+  deal          Deal?       @relation(fields: [dealId], references: [id])
+
+  createdById   String
+  createdBy     User        @relation("CreatedTickets", fields: [createdById], references: [id])
+
+  assignedToId  String?
+  assignedTo    User?       @relation("AssignedTickets", fields: [assignedToId], references: [id])
 }
 
 model GeneralTask {
