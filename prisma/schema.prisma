@@ -417,6 +417,7 @@ model GeneralTask {
   taskDate   DateTime
   priority   String   // Low, Medium, High
   status     String   // Pending, In Progress, Completed, Failed
+  reason     String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   

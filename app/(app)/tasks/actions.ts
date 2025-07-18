@@ -14,6 +14,7 @@ function mapPrismaGeneralTask(task: any): GeneralTask {
         taskDate: task.taskDate,
         priority: task.priority,
         status: task.status,
+        reason: task.reason,
         createdAt: task.createdAt,
         updatedAt: task.updatedAt,
         assignedToId: task.assignedToId,
@@ -84,18 +85,21 @@ export async function getGroupedGeneralTasks(): Promise<Record<string, { user: {
     }
 }
 
-export async function updateGeneralTaskStatus(taskId: string, status: GeneralTaskStatus): Promise<{ success: boolean, error?: string }> {
+export async function updateGeneralTaskStatus(taskId: string, status: GeneralTaskStatus, reason?: string): Promise<{ success: boolean, error?: string }> {
     const session = await verifySession();
     if (!session?.userId) {
         return { success: false, error: 'Authentication required.' };
     }
 
     try {
+        const dataToUpdate: { status: GeneralTaskStatus, reason?: string | null } = { status, reason: null };
+        if (status === 'Failed' && reason) {
+            dataToUpdate.reason = reason;
+        }
+
         await prisma.generalTask.update({
             where: { id: taskId },
-            data: {
-                status: status,
-            },
+            data: dataToUpdate,
         });
         revalidatePath('/tasks');
         return { success: true };
@@ -113,8 +117,10 @@ export async function getOpenGeneralTasksForCurrentUser(): Promise<GeneralTask[]
     const tasks = await prisma.generalTask.findMany({
       where: {
         assignedToId: session.userId,
-        status: {
-          notIn: ['Completed', 'Failed']
+        NOT: {
+          status: {
+            in: ['Completed', 'Failed']
+          }
         }
       },
       include: {
@@ -131,4 +137,29 @@ export async function getOpenGeneralTasksForCurrentUser(): Promise<GeneralTask[]
     console.error("Failed to fetch general tasks for current user:", error);
     return [];
   }
+}
+
+export async function deleteTasksByStatusForUser(userId: string, status: 'Completed' | 'Failed'): Promise<{ success: boolean; count: number; error?: string }> {
+    const session = await verifySession();
+    if (!session?.userId) {
+        return { success: false, count: 0, error: 'Authentication required.' };
+    }
+
+    if (status !== 'Completed' && status !== 'Failed') {
+        return { success: false, count: 0, error: 'Invalid status provided for deletion.' };
+    }
+
+    try {
+        const { count } = await prisma.generalTask.deleteMany({
+            where: {
+                assignedToId: userId,
+                status: status,
+            },
+        });
+        revalidatePath('/tasks');
+        return { success: true, count };
+    } catch (error) {
+        console.error(`Failed to delete tasks with status ${status} for user ${userId}:`, error);
+        return { success: false, count: 0, error: 'An unexpected error occurred.' };
+    }
 }

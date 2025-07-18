@@ -15,6 +15,9 @@ import type { GeneralTask, GeneralTaskStatus, TaskNotification } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from './ui/separator';
 import { cn } from '@/lib/utils';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import { Textarea } from './ui/textarea';
+import { Label } from './ui/label';
 
 type UnifiedTask = {
   id: string;
@@ -28,12 +31,65 @@ type UnifiedTask = {
   status: 'Open' | 'Closed' | GeneralTaskStatus;
 };
 
+function FailureReasonDialog({
+    isOpen,
+    onClose,
+    onSubmit,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    onSubmit: (reason: string) => void;
+}) {
+    const [reason, setReason] = useState('');
+    const [isSubmitting, startSubmitTransition] = useTransition();
+
+    const handleSubmit = () => {
+        startSubmitTransition(() => {
+            onSubmit(reason);
+        });
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Reason for Failure</DialogTitle>
+                    <DialogDescription>
+                        Please provide a brief reason why this task could not be completed.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                    <Label htmlFor="failure-reason" className="sr-only">Failure Reason</Label>
+                    <Textarea
+                        id="failure-reason"
+                        value={reason}
+                        onChange={(e) => setReason(e.target.value)}
+                        placeholder="e.g., Client was not available, required information was missing..."
+                    />
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={onClose} disabled={isSubmitting}>Cancel</Button>
+                    <Button onClick={handleSubmit} disabled={isSubmitting || !reason.trim()}>
+                        {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2"/>}
+                        Submit Reason
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+
 export function TaskNotifications() {
   const [tasks, setTasks] = useState<UnifiedTask[]>([]);
   const [openTasksCount, setOpenTasksCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, startUpdateTransition] = useTransition();
   const { toast } = useToast();
+  
+  const [isFailureDialogOpen, setIsFailureDialogOpen] = useState(false);
+  const [taskToFail, setTaskToFail] = useState<string | null>(null);
+
 
   const fetchTasks = async () => {
     setIsLoading(true);
@@ -59,7 +115,6 @@ export function TaskNotifications() {
         type: 'follow-up',
         comment: task.comment,
         time: task.time,
-        // The date for follow-up tasks is today as per the query
         dueDate: parse(task.time, 'HH:mm', new Date()),
         customerName: task.customerName,
         link: task.link,
@@ -80,10 +135,10 @@ export function TaskNotifications() {
     const interval = setInterval(fetchTasks, 60000); // Refresh every minute
     return () => clearInterval(interval);
   }, []);
-
-  const handleUpdateStatus = (taskId: string, status: GeneralTaskStatus) => {
+  
+  const handleUpdateStatus = (taskId: string, status: GeneralTaskStatus, reason?: string) => {
     startUpdateTransition(async () => {
-      const result = await updateGeneralTaskStatus(taskId, status);
+      const result = await updateGeneralTaskStatus(taskId, status, reason);
       if (result.success) {
         toast({ title: 'Status Updated', description: `Task has been marked as ${status}.` });
         fetchTasks();
@@ -93,7 +148,21 @@ export function TaskNotifications() {
     });
   };
 
+  const openFailureDialog = (taskId: string) => {
+    setTaskToFail(taskId);
+    setIsFailureDialogOpen(true);
+  };
+  
+  const handleFailureSubmit = (reason: string) => {
+      if(taskToFail) {
+          handleUpdateStatus(taskToFail, 'Failed', reason);
+      }
+      setIsFailureDialogOpen(false);
+      setTaskToFail(null);
+  }
+
   return (
+    <>
     <Popover>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
@@ -148,7 +217,7 @@ export function TaskNotifications() {
                                 <div className="flex gap-1">
                                     <Button onClick={() => handleUpdateStatus(task.id, 'Completed')} variant="ghost" size="icon" title="Mark as Completed" disabled={isUpdating}><CheckCircle2 className="h-5 w-5 text-green-600"/></Button>
                                     <Button onClick={() => handleUpdateStatus(task.id, 'In Progress')} variant="ghost" size="icon" title="Mark as In Progress" disabled={isUpdating}><Play className="h-5 w-5 text-blue-600"/></Button>
-                                    <Button onClick={() => handleUpdateStatus(task.id, 'Failed')} variant="ghost" size="icon" title="Mark as Failed" disabled={isUpdating}><ThumbsDown className="h-5 w-5 text-red-600"/></Button>
+                                    <Button onClick={() => openFailureDialog(task.id)} variant="ghost" size="icon" title="Mark as Failed" disabled={isUpdating}><ThumbsDown className="h-5 w-5 text-red-600"/></Button>
                                 </div>
                             ) : (
                                 <Link href={task.link || '#'} className={cn(buttonVariants({variant: 'outline', size: 'sm'}), 'text-xs')}>
@@ -164,5 +233,12 @@ export function TaskNotifications() {
         </ScrollArea>
       </PopoverContent>
     </Popover>
+    
+    <FailureReasonDialog 
+        isOpen={isFailureDialogOpen}
+        onClose={() => setIsFailureDialogOpen(false)}
+        onSubmit={handleFailureSubmit}
+    />
+    </>
   );
 }
