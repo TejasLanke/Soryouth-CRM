@@ -401,6 +401,8 @@ model Deal {
     poWoDate      DateTime
     createdAt     DateTime @default(now())
     updatedAt     DateTime @updatedAt
+    amcDurationInMonths Int?
+    amcEffectiveDate    DateTime?
 
     clientId    String?
     client      Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
@@ -413,6 +415,7 @@ model Deal {
 
     followUps     FollowUp[]
     tickets       Ticket[]
+    generalTasks  GeneralTask[]
 }
 
 model Ticket {
@@ -451,6 +454,7 @@ model GeneralTask {
   priority   String   // Low, Medium, High
   status     String   // Pending, In Progress, Completed, Failed
   reason     String?
+  amcTaskId  String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   
@@ -459,4 +463,7 @@ model GeneralTask {
 
   createdById String?
   createdBy   User?    @relation("TasksCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  dealId        String?
+  deal          Deal?     @relation(fields: [dealId], references: [id], onDelete: Cascade)
 }

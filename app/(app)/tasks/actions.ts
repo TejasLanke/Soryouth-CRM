@@ -27,6 +27,8 @@ function mapPrismaGeneralTask(task: any): GeneralTask {
             id: task.createdBy.id,
             name: task.createdBy.name,
         } : null,
+        amcTaskId: task.amcTaskId,
+        dealId: task.dealId,
     };
 }
 

@@ -405,6 +405,8 @@ export interface Deal {
   poWoDate: string; // ISO string
   createdAt: string;
   updatedAt: string;
+  amcDurationInMonths?: number | null;
+  amcEffectiveDate?: string | null;
 }
 
 export type TaskNotification = {
@@ -433,6 +435,8 @@ export interface GeneralTask {
     assignedTo: { id: string; name: string; };
     createdById: string | null;
     createdBy: { id: string; name: string; } | null;
+    amcTaskId?: string | null;
+    dealId?: string | null;
 }
 
 export type CreateGeneralTaskData = {
@@ -440,6 +444,8 @@ export type CreateGeneralTaskData = {
     taskDate: Date;
     priority: GeneralTaskPriority;
     comment: string;
+    amcTaskId?: string;
+    dealId?: string;
 }
 
 export type TicketStatus = 'Open' | 'On Hold' | 'Closed';

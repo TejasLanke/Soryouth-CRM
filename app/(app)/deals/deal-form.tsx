@@ -31,7 +31,7 @@ import {
 } from '@/components/ui/select';
 import React, { useEffect, useMemo, useState, useTransition } from 'react';
 import { DEAL_PIPELINES, ALL_DEAL_STAGES, type DealPipelineType, type DealStage } from '@/lib/constants';
-import type { User, Client, CreateClientData, CustomSetting, LeadSourceOptionType } from '@/types';
+import type { User, Client, CreateClientData, CustomSetting, LeadSourceOptionType, Lead } from '@/types';
 import { IndianRupee, Calendar as CalendarIcon, ChevronsUpDown, Check, PlusCircle } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -56,6 +56,7 @@ const getDealSchema = (sources: string[]) => z.object({
   dealValue: z.coerce.number().min(0, { message: "Deal value cannot be negative." }),
   assignedTo: z.string().optional(),
   poWoDate: z.date({ required_error: "A PO/WO date is required." }),
+  amcDurationInMonths: z.coerce.number().int().min(0).optional(),
 });
 
 export type DealFormValues = z.infer<ReturnType<typeof getDealSchema>>;
@@ -98,6 +99,7 @@ export function DealForm({ isOpen, onClose, onSubmit, users, clients, deal, pipe
       dealValue: 0,
       assignedTo: undefined,
       poWoDate: new Date(),
+      amcDurationInMonths: 0,
     },
   });
 
@@ -155,6 +157,7 @@ export function DealForm({ isOpen, onClose, onSubmit, users, clients, deal, pipe
         dealValue: deal?.dealValue || 0,
         assignedTo: deal?.assignedTo || undefined,
         poWoDate: deal?.poWoDate ? (deal.poWoDate instanceof Date ? deal.poWoDate : new Date(deal.poWoDate)) : new Date(),
+        amcDurationInMonths: deal?.amcDurationInMonths || 0,
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -291,6 +294,15 @@ export function DealForm({ isOpen, onClose, onSubmit, users, clients, deal, pipe
                     <FormMessage />
                 </FormItem>
             )} />
+            {watchedPipeline === 'AMC' && (
+                <FormField control={form.control} name="amcDurationInMonths" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>AMC Duration (in months)</FormLabel>
+                        <FormControl><Input type="number" placeholder="e.g., 12" {...field} /></FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )} />
+            )}
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <FormField control={form.control} name="assignedTo" render={({ field }) => (
                     <FormItem>

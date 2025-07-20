@@ -15,13 +15,15 @@ import { Label } from "@/components/ui/label";
 import { DEAL_PIPELINES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES } from '@/lib/constants';
 import type { Deal, User, FollowUp, FollowUpStatus, AddActivityData, FollowUpType, DealStage, Client } from '@/types';
 import { format, parseISO, isValid } from 'date-fns';
-import { ChevronLeft, Phone, MessageSquare, Mail, MessageCircle, UserCircle2, Loader2, Save, Send, Video, Building, IndianRupee } from 'lucide-react';
+import { ChevronLeft, Phone, MessageSquare, Mail, MessageCircle, UserCircle2, Loader2, Save, Send, Video, Building, IndianRupee, Calendar as CalendarIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
-import { getDealById, addDealActivity, getActivitiesForDeal, updateDealStage } from '@/app/(app)/deals/actions';
+import { getDealById, addDealActivity, getActivitiesForDeal, updateDealStage, updateDealEffectiveDate } from '@/app/(app)/deals/actions';
 import { getUsers } from '@/app/(app)/users/actions';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 
 const ActivityIcon = ({ type, className }: { type: string, className?: string }) => {
   const defaultClassName = "h-4 w-4";
@@ -47,6 +49,7 @@ export default function DealDetailsPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [isFormPending, startFormTransition] = useTransition();
   const [isUpdating, startUpdateTransition] = useTransition();
+  const [isAmcDateUpdating, startAmcDateUpdateTransition] = useTransition();
   
   const [activities, setActivities] = useState<FollowUp[]>([]);
   const [isActivitiesLoading, setActivitiesLoading] = useState(true);
@@ -60,7 +63,8 @@ export default function DealDetailsPage() {
   const [taskForUser, setTaskForUser] = useState<string | undefined>(undefined);
   const [taskDate, setTaskDate] = useState('');
   const [taskTime, setTaskTime] = useState('');
-
+  
+  const [effectiveAmcDate, setEffectiveAmcDate] = useState<Date | undefined>();
 
   useEffect(() => {
     if (dealId) {
@@ -76,6 +80,10 @@ export default function DealDetailsPage() {
           setDeal(fetchedDeal);
           setUsers(fetchedUsers);
           setActivities(fetchedActivities);
+          
+          if(fetchedDeal?.amcEffectiveDate) {
+              setEffectiveAmcDate(parseISO(fetchedDeal.amcEffectiveDate));
+          }
 
           if (fetchedUsers.length > 0) {
             setTaskForUser(fetchedUsers[0].name);
@@ -154,20 +162,49 @@ export default function DealDetailsPage() {
 
     startUpdateTransition(async () => {
         const result = await updateDealStage(deal.id, newStage);
-        if (result) {
-            setDeal(result);
+        if (result.success && result.deal) {
+            setDeal(result.deal);
             toast({
                 title: "Deal Stage Updated",
                 description: `Deal stage set to "${newStage}".`,
             });
+            if(result.tasksCreatedCount && result.tasksCreatedCount > 0) {
+              toast({
+                title: "AMC Tasks Created",
+                description: `${result.tasksCreatedCount} quarterly tasks have been automatically scheduled.`
+              });
+            }
         } else {
             setDeal(originalDeal);
             toast({
                 title: "Update Failed",
-                description: "Could not update deal stage.",
+                description: result.error || "Could not update deal stage.",
                 variant: "destructive",
             });
         }
+    });
+  };
+
+  const handleUpdateAmcDate = () => {
+    if (!deal || !effectiveAmcDate || isAmcDateUpdating) return;
+    startAmcDateUpdateTransition(async () => {
+      const result = await updateDealEffectiveDate(deal.id, effectiveAmcDate);
+      if (result.success && result.deal) {
+        setDeal(result.deal);
+        setEffectiveAmcDate(parseISO(result.deal.amcEffectiveDate!));
+        toast({
+          title: "Effective Date Updated",
+          description: `AMC effective date has been updated.`
+        });
+        if (result.tasksCreatedCount && result.tasksCreatedCount > 0) {
+          toast({
+            title: "AMC Tasks Regenerated",
+            description: `${result.tasksCreatedCount} quarterly tasks have been rescheduled based on the new date.`
+          });
+        }
+      } else {
+        toast({ title: "Update Failed", description: result.error, variant: "destructive" });
+      }
     });
   }
 
@@ -265,6 +302,35 @@ export default function DealDetailsPage() {
                 <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" disabled><MessageCircle className="h-5 w-5" /></Button>
               </CardContent>
             </Card>
+            
+            {deal.pipeline === 'AMC' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-md">AMC Details</CardTitle>
+                  <CardDescription>Duration: {deal.amcDurationInMonths} months</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="amc-date" className="text-xs">Effective AMC Date</Label>
+                     <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal h-9 text-xs", !effectiveAmcDate && "text-muted-foreground")}>
+                                {effectiveAmcDate ? format(effectiveAmcDate, "PPP") : <span>Pick a date</span>}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar mode="single" selected={effectiveAmcDate} onSelect={setEffectiveAmcDate} initialFocus />
+                        </PopoverContent>
+                    </Popover>
+                  </div>
+                  <Button size="sm" className="w-full" onClick={handleUpdateAmcDate} disabled={isAmcDateUpdating}>
+                    {isAmcDateUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                    Update Date & Reschedule Tasks
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
 
           </div>
 

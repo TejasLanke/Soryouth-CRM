@@ -2,12 +2,14 @@
 'use server';
 
 import prisma from '@/lib/prisma';
-import type { Deal, DealPipelineType, DealStage, User, LeadSourceOptionType, FollowUp, AddActivityData } from '@/types';
+import type { Deal, DealPipelineType, DealStage, User, LeadSourceOptionType, FollowUp, AddActivityData, CreateGeneralTaskData } from '@/types';
 import { revalidatePath } from 'next/cache';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, add } from 'date-fns';
 import { verifySession } from '@/lib/auth';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { DEAL_PIPELINES } from '@/lib/constants';
+import { createGeneralTask } from '../tasks/actions';
+import { randomUUID } from 'crypto';
 
 function mapPrismaDeal(deal: any): Deal {
     return {
@@ -19,6 +21,8 @@ function mapPrismaDeal(deal: any): Deal {
         assignedTo: deal.assignedTo?.name,
         clientId: deal.clientId ?? undefined,
         clientName: deal.client?.name ?? deal.clientName,
+        amcDurationInMonths: deal.amcDurationInMonths,
+        amcEffectiveDate: deal.amcEffectiveDate ? deal.amcEffectiveDate.toISOString() : null,
     };
 }
 
@@ -58,6 +62,41 @@ async function updateTotalDealValueForClient(clientId: string, tx: Prisma.Transa
     });
 }
 
+// Centralized function for creating AMC tasks
+async function createAmcTasks(tx: Prisma.TransactionClient | PrismaClient, deal: any): Promise<number> {
+    if (!deal || deal.pipeline !== 'AMC' || deal.stage !== 'Active' || !deal.amcDurationInMonths || !deal.assignedToId || !deal.amcEffectiveDate) {
+        return 0;
+    }
+
+    const amcId = randomUUID();
+    const duration = deal.amcDurationInMonths;
+    const quarters = Math.floor(duration / 3);
+    const startDate = deal.amcEffectiveDate;
+    
+    // First, delete any previous AMC tasks for this deal
+    await tx.generalTask.deleteMany({
+        where: { dealId: deal.id }
+    });
+
+    const taskPromises = [];
+    for (let i = 1; i <= quarters; i++) {
+        const dueDate = add(startDate, { months: i * 3 });
+        const taskData: CreateGeneralTaskData = {
+            assignedToId: deal.assignedToId,
+            dealId: deal.id,
+            amcTaskId: amcId,
+            taskDate: dueDate,
+            priority: 'Medium',
+            comment: `Quarterly AMC check for deal with ${deal.clientName} (Quarter ${i}/${quarters})`
+        };
+        taskPromises.push(createGeneralTask(taskData));
+    }
+
+    await Promise.all(taskPromises);
+    return quarters;
+}
+
+
 export async function createOrUpdateDeal(data: Partial<Deal>): Promise<Deal | null> {
     const session = await verifySession();
     if (!session?.userId) {
@@ -90,6 +129,8 @@ export async function createOrUpdateDeal(data: Partial<Deal>): Promise<Deal | nu
                 stage: data.stage || DEAL_PIPELINES['Solar PV Plant'][0],
                 dealValue: data.dealValue || 0,
                 poWoDate: data.poWoDate ? parseISO(data.poWoDate as string) : new Date(),
+                amcDurationInMonths: data.amcDurationInMonths,
+                amcEffectiveDate: (data.pipeline === 'AMC' && data.stage === 'Active') ? new Date() : null,
             };
 
             const relationalData = {
@@ -101,26 +142,22 @@ export async function createOrUpdateDeal(data: Partial<Deal>): Promise<Deal | nu
             if (data.id) {
                 resultDeal = await tx.deal.update({
                     where: { id: data.id },
-                    data: {
-                        ...dataToSave,
-                        ...relationalData,
-                    },
+                    data: { ...dataToSave, ...relationalData, },
                     include: { client: true, assignedTo: true }
                 });
             } else {
                  resultDeal = await tx.deal.create({
-                    data: {
-                        ...dataToSave,
-                        createdBy: { connect: { id: session.userId! } },
-                        ...relationalData,
-                    },
+                    data: { ...dataToSave, createdBy: { connect: { id: session.userId! } }, ...relationalData, },
                     include: { client: true, assignedTo: true }
                 });
             }
 
-            if(resultDeal.clientId) {
+            if (resultDeal.clientId) {
                 await updateTotalDealValueForClient(resultDeal.clientId, tx);
             }
+            
+            // Trigger AMC task creation if created as Active
+            await createAmcTasks(tx, resultDeal);
 
             return resultDeal;
         });
@@ -165,18 +202,60 @@ export async function getAllDeals(): Promise<Deal[]> {
     }
 }
 
-export async function updateDealStage(dealId: string, newStage: DealStage): Promise<Deal | null> {
+export async function updateDealStage(dealId: string, newStage: DealStage): Promise<{ success: boolean; deal?: Deal, tasksCreatedCount?: number, error?: string }> {
     try {
-        const updatedDeal = await prisma.deal.update({
-            where: { id: dealId },
-            data: { stage: newStage },
-            include: { assignedTo: true, client: true }
+        let tasksCreatedCount = 0;
+        const updatedDeal = await prisma.$transaction(async (tx) => {
+            const dealToUpdate = await tx.deal.findUnique({ where: { id: dealId } });
+            
+            if(!dealToUpdate) throw new Error("Deal not found");
+
+            const isBecomingActiveAmc = dealToUpdate.pipeline === 'AMC' && newStage === 'Active' && dealToUpdate.stage !== 'Active';
+
+            const deal = await tx.deal.update({
+                where: { id: dealId },
+                data: { 
+                    stage: newStage,
+                    // Set effective date only if it's the first time moving to Active
+                    amcEffectiveDate: isBecomingActiveAmc && !dealToUpdate.amcEffectiveDate ? new Date() : dealToUpdate.amcEffectiveDate,
+                 },
+                include: { assignedTo: true, client: true }
+            });
+            
+            const dealWithDate = await tx.deal.findUnique({ where: {id: dealId}});
+
+            tasksCreatedCount = await createAmcTasks(tx, dealWithDate);
+
+            return deal;
         });
+
         revalidatePath('/deals');
-        return mapPrismaDeal(updatedDeal);
+        return { success: true, deal: mapPrismaDeal(updatedDeal), tasksCreatedCount };
     } catch (error) {
         console.error(`Failed to update stage for deal ${dealId}:`, error);
-        return null;
+        return { success: false, error: (error as Error).message };
+    }
+}
+
+export async function updateDealEffectiveDate(dealId: string, newDate: Date): Promise<{ success: boolean; deal?: Deal, tasksCreatedCount?: number, error?: string }> {
+    try {
+        let tasksCreatedCount = 0;
+        const updatedDeal = await prisma.$transaction(async (tx) => {
+            const deal = await tx.deal.update({
+                where: { id: dealId },
+                data: { amcEffectiveDate: newDate },
+                include: { assignedTo: true, client: true },
+            });
+
+            tasksCreatedCount = await createAmcTasks(tx, deal);
+            return deal;
+        });
+
+        revalidatePath(`/deals/${dealId}`);
+        return { success: true, deal: mapPrismaDeal(updatedDeal), tasksCreatedCount };
+    } catch (error) {
+        console.error(`Failed to update effective date for deal ${dealId}:`, error);
+        return { success: false, error: (error as Error).message };
     }
 }
 
