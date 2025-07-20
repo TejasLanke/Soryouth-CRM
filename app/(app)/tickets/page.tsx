@@ -156,8 +156,16 @@ export default function TicketsPage() {
       if (filters.status !== 'all' && ticket.status !== filters.status) return false;
       if (filters.priority !== 'all' && ticket.priority !== filters.priority) return false;
       if (filters.assignedToId !== 'all' && ticket.assignedToId !== filters.assignedToId) return false;
-      if (filters.isOverdue && (new Date(ticket.dueDate) >= startOfDay(new Date()) || ticket.status === 'Closed')) return false;
       if (filters.dueDate && format(new Date(ticket.dueDate), 'yyyy-MM-dd') !== format(filters.dueDate, 'yyyy-MM-dd')) return false;
+      
+      // Corrected overdue logic
+      if (filters.isOverdue) {
+        const isTicketOverdue = isBefore(new Date(ticket.dueDate), startOfDay(new Date()));
+        if (!isTicketOverdue || ticket.status === 'Closed') {
+          return false;
+        }
+      }
+
       return true;
     });
   }, [tickets, filters]);
@@ -204,6 +212,7 @@ export default function TicketsPage() {
                     <TableRow>
                       <TableHead>Ticket ID</TableHead>
                       <TableHead>Subject</TableHead>
+                      <TableHead>Description</TableHead>
                       <TableHead>Client</TableHead>
                       <TableHead>Priority</TableHead>
                       <TableHead>Status</TableHead>
@@ -215,14 +224,15 @@ export default function TicketsPage() {
                   </TableHeader>
                   <TableBody>
                     {filteredTickets.length === 0 ? (
-                        <TableRow><TableCell colSpan={9} className="text-center h-24">No tickets found.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={10} className="text-center h-24">No tickets found.</TableCell></TableRow>
                     ) : (
                         filteredTickets.map((ticket) => (
                         <TableRow key={ticket.id}>
                             <TableCell className="font-medium">#{ticket.id.slice(-6)}</TableCell>
                             <TableCell>{ticket.subject}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground whitespace-pre-wrap">{ticket.description}</TableCell>
                             <TableCell>
-                                <Link href={`/clients/${ticket.clientId}`} className="hover:underline text-primary">{ticket.client.name}</Link>
+                                <Link href={`/clients/${ticket.clientId}`} className="hover:underline text-primary">{ticket.clientName}</Link>
                             </TableCell>
                             <TableCell>
                                 <Badge variant={getPriorityBadgeVariant(ticket.priority)}>{ticket.priority}</Badge>
