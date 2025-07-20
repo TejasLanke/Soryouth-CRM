@@ -43,6 +43,7 @@ const getTicketSchema = (userIds: string[]) => z.object({
     description: z.string().min(10, 'Description must be at least 10 characters.'),
     assignedToId: z.string().optional(),
     dueDate: z.date({ required_error: "Due date is required." }),
+    dealId: z.string().optional(),
 });
 
 type TicketFormValues = z.infer<ReturnType<typeof getTicketSchema>>;
@@ -79,6 +80,7 @@ export const CreateTicketForm: React.FC<CreateTicketFormProps> = ({ isOpen, onCl
         description: '',
         assignedToId: undefined,
         dueDate: new Date(),
+        dealId: undefined,
     },
   });
 
@@ -101,6 +103,12 @@ export const CreateTicketForm: React.FC<CreateTicketFormProps> = ({ isOpen, onCl
     form.setValue('address', client.address || '');
     const clientDeals = await getDealsForClient(client.id);
     setDeals(clientDeals);
+    form.setValue('dealId', undefined); // Reset dealId when client changes
+  };
+  
+  const handleDealSelect = (deal: Deal) => {
+      form.setValue('ticketFor', deal.dealFor || `Deal ID: ${deal.id}`);
+      form.setValue('dealId', deal.id);
   };
 
   const onSubmit = (data: TicketFormValues) => {
@@ -153,12 +161,15 @@ export const CreateTicketForm: React.FC<CreateTicketFormProps> = ({ isOpen, onCl
               <FormItem>
                   <FormLabel>Ticket For (Product/Deal)</FormLabel>
                   <div className="flex gap-2">
-                    <Select onValueChange={(value) => field.onChange(value)} >
+                    <Select onValueChange={(dealId) => {
+                        const deal = deals.find(d => d.id === dealId);
+                        if (deal) handleDealSelect(deal);
+                    }}>
                         <SelectTrigger className="w-[45%]">
                             <SelectValue placeholder="Select deal" />
                         </SelectTrigger>
                         <SelectContent>
-                            {deals.map(d => <SelectItem key={d.id} value={d.dealFor || `Deal ID: ${d.id}`}>{d.dealFor || `Deal ID: ${d.id}`}</SelectItem>)}
+                            {deals.map(d => <SelectItem key={d.id} value={d.id}>{d.dealFor || `Deal ID: ${d.id}`}</SelectItem>)}
                         </SelectContent>
                     </Select>
                     <FormControl>

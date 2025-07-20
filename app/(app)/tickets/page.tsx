@@ -2,7 +2,7 @@
 'use client';
 
 import { PageHeader } from '@/components/page-header';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -11,17 +11,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { useState, useEffect, useMemo } from 'react';
-import { Ticket, PlusCircle, CalendarIcon, UserCircle, Users, ChevronDown, Loader2 } from 'lucide-react';
+import { useState, useEffect, useMemo, useTransition } from 'react';
+import { Ticket, PlusCircle, CalendarIcon, UserCircle, Users, ChevronDown, Loader2, Filter, MoreVertical } from 'lucide-react';
 import { format, isBefore, startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { getTickets } from './actions';
+import { getTickets, updateTicketStatus } from './actions';
 import { getUsers } from '../users/actions';
-import type { Tickets as TicketsType, User } from '@/types';
+import type { Tickets as TicketsType, User, TicketStatus } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { CreateTicketForm } from '@/components/create-ticket-form';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 
 type TicketFilters = {
   dueDate: Date | undefined;
@@ -34,11 +37,65 @@ type TicketFilters = {
 const TICKET_STATUSES = ['Open', 'On Hold', 'Closed'];
 const TICKET_PRIORITIES = ['High', 'Medium', 'Low'];
 
+
+function RemarkDialog({
+    isOpen,
+    onClose,
+    onSubmit,
+    ticketId,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    onSubmit: (ticketId: string, remark: string) => void;
+    ticketId: string;
+}) {
+    const [remark, setRemark] = useState('');
+    const [isSubmitting, startSubmitTransition] = useTransition();
+
+    const handleSubmit = () => {
+        startSubmitTransition(() => {
+            onSubmit(ticketId, remark);
+        });
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Status Update Remark</DialogTitle>
+                    <DialogDescription>
+                        Please provide a remark for the status update.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                    <Label htmlFor="remark" className="sr-only">Remark</Label>
+                    <Textarea
+                        id="remark"
+                        value={remark}
+                        onChange={(e) => setRemark(e.target.value)}
+                        placeholder="e.g., Client provided necessary documents, waiting for internal review..."
+                    />
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={onClose} disabled={isSubmitting}>Cancel</Button>
+                    <Button onClick={handleSubmit} disabled={isSubmitting || !remark.trim()}>
+                        {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2"/>}
+                        Save Remark
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 export default function TicketsPage() {
   const [tickets, setTickets] = useState<TicketsType[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isFilterSidebarOpen, setIsFilterSidebarOpen] = useState(true);
+  const [isRemarkDialogOpen, setIsRemarkDialogOpen] = useState(false);
+  const [ticketForRemark, setTicketForRemark] = useState<{ id: string, status: TicketStatus } | null>(null);
   const { toast } = useToast();
 
   const [filters, setFilters] = useState<TicketFilters>({
@@ -63,6 +120,25 @@ export default function TicketsPage() {
 
   const handleFilterChange = <K extends keyof TicketFilters>(key: K, value: TicketFilters[K]) => {
     setFilters(prev => ({ ...prev, [key]: value }));
+  };
+  
+  const handleStatusChangeRequest = (ticketId: string, status: TicketStatus) => {
+    setTicketForRemark({ id: ticketId, status });
+    setIsRemarkDialogOpen(true);
+  };
+
+  const handleRemarkSubmit = async (ticketId: string, remark: string) => {
+    if (!ticketForRemark) return;
+    
+    const result = await updateTicketStatus(ticketId, ticketForRemark.status, remark);
+    if(result.success) {
+      toast({ title: "Status Updated", description: "The ticket status and remark have been updated." });
+      refreshTickets();
+    } else {
+      toast({ title: "Error", description: result.error, variant: "destructive" });
+    }
+    setIsRemarkDialogOpen(false);
+    setTicketForRemark(null);
   };
 
   const statusCounts = useMemo(() => {
@@ -97,15 +173,27 @@ export default function TicketsPage() {
 
   return (
     <>
-      <PageHeader title="Tickets" description="View and manage your support tickets." icon={Ticket} />
+      <PageHeader
+        title="Tickets"
+        description="View and manage your support tickets."
+        icon={Ticket}
+        actions={
+            <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setIsFilterSidebarOpen(!isFilterSidebarOpen)}>
+                    <Filter className="mr-2 h-4 w-4" />
+                    <span>{isFilterSidebarOpen ? 'Hide' : 'Show'} Filters</span>
+                </Button>
+                <Button size="sm" onClick={() => setIsFormOpen(true)}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Create Ticket
+                </Button>
+            </div>
+        }
+      />
       <div className="flex gap-6 h-full">
-        <main className="flex-1 space-y-4">
+        <main className="flex-1 space-y-4 transition-all duration-300">
           <Card>
             <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">All Tickets</CardTitle>
-              <Button size="sm" onClick={() => setIsFormOpen(true)}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Create Ticket
-              </Button>
             </CardHeader>
             <CardContent>
               {isLoading ? (
@@ -119,13 +207,15 @@ export default function TicketsPage() {
                       <TableHead>Client</TableHead>
                       <TableHead>Priority</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Remark</TableHead>
                       <TableHead>Due Date</TableHead>
                       <TableHead>Assigned To</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredTickets.length === 0 ? (
-                        <TableRow><TableCell colSpan={7} className="text-center h-24">No tickets found.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={9} className="text-center h-24">No tickets found.</TableCell></TableRow>
                     ) : (
                         filteredTickets.map((ticket) => (
                         <TableRow key={ticket.id}>
@@ -138,8 +228,19 @@ export default function TicketsPage() {
                                 <Badge variant={getPriorityBadgeVariant(ticket.priority)}>{ticket.priority}</Badge>
                             </TableCell>
                             <TableCell>{ticket.status}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{ticket.remark || '-'}</TableCell>
                             <TableCell>{format(new Date(ticket.dueDate), 'dd MMM, yyyy')}</TableCell>
                             <TableCell>{ticket.assignedTo?.name || 'Unassigned'}</TableCell>
+                             <TableCell className="text-right">
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4"/></Button></DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={() => handleStatusChangeRequest(ticket.id, 'Open')}>Mark as Open</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleStatusChangeRequest(ticket.id, 'On Hold')}>Mark as On Hold</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleStatusChangeRequest(ticket.id, 'Closed')}>Mark as Closed</DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </TableCell>
                         </TableRow>
                         ))
                     )}
@@ -150,7 +251,7 @@ export default function TicketsPage() {
           </Card>
         </main>
 
-        <aside className="w-64 flex-shrink-0">
+        <aside className={cn("w-64 flex-shrink-0 transition-all duration-300 ease-in-out", isFilterSidebarOpen ? 'ml-0' : '-ml-72 opacity-0')}>
           <Card>
             <CardHeader><CardTitle className="text-base">Filter tickets by</CardTitle></CardHeader>
             <CardContent className="space-y-6">
@@ -209,6 +310,14 @@ export default function TicketsPage() {
         </aside>
       </div>
       <CreateTicketForm isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} onTicketCreated={refreshTickets} />
+      {ticketForRemark && (
+          <RemarkDialog
+            isOpen={isRemarkDialogOpen}
+            onClose={() => setIsRemarkDialogOpen(false)}
+            onSubmit={handleRemarkSubmit}
+            ticketId={ticketForRemark.id}
+          />
+      )}
     </>
   );
 }

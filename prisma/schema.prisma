@@ -427,6 +427,7 @@ model Ticket {
   priority      String      // High, Medium, Low
   dueDate       DateTime
   ticketFor     String?     // Product/Deal description
+  remark        String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   

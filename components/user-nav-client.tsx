@@ -67,7 +67,10 @@ export function UserNavClient({ user }: { user: User }) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top" align="start" className="w-56 mb-2 ml-2">
-        <DropdownMenuLabel>My Account</DropdownMenuLabel>
+        <DropdownMenuLabel>
+            <div className="font-semibold">{user.name}</div>
+            <div className="text-xs text-muted-foreground font-normal">{user.email}</div>
+        </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem>
           <Settings className="mr-2 h-4 w-4" />

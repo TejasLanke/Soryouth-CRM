@@ -453,6 +453,7 @@ export interface Tickets {
   priority: TicketPriority;
   dueDate: string;
   ticketFor?: string | null;
+  remark?: string | null;
   createdAt: string;
   updatedAt: string;
 

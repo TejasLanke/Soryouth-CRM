@@ -2,7 +2,7 @@
 'use server';
 
 import prisma from '@/lib/prisma';
-import type { Tickets, CreateTicketData } from '@/types';
+import type { Tickets, CreateTicketData, TicketStatus } from '@/types';
 import { revalidatePath } from 'next/cache';
 import { verifySession } from '@/lib/auth';
 import { parseISO } from 'date-fns';
@@ -77,5 +77,56 @@ export async function getTickets(): Promise<Tickets[]> {
     } catch (error) {
         console.error('Failed to get tickets:', error);
         return [];
+    }
+}
+
+export async function getOpenTicketsForCurrentUser(): Promise<Tickets[]> {
+    const session = await verifySession();
+    if (!session?.userId) return [];
+
+    try {
+        const tickets = await prisma.ticket.findMany({
+            where: {
+                assignedToId: session.userId,
+                status: {
+                    not: 'Closed',
+                }
+            },
+            include: {
+                client: true,
+                deal: true,
+                createdBy: true,
+                assignedTo: true,
+            },
+            orderBy: {
+                dueDate: 'asc'
+            }
+        });
+        return tickets.map(mapPrismaTicket);
+    } catch (error) {
+        console.error('Failed to get open tickets for user:', error);
+        return [];
+    }
+}
+
+export async function updateTicketStatus(ticketId: string, status: TicketStatus, remark: string): Promise<{ success: boolean; error?: string }> {
+    const session = await verifySession();
+    if (!session?.userId) {
+        return { success: false, error: 'Authentication required.' };
+    }
+
+    try {
+        await prisma.ticket.update({
+            where: { id: ticketId },
+            data: {
+                status: status,
+                remark: remark,
+            },
+        });
+        revalidatePath('/tickets');
+        return { success: true };
+    } catch (error) {
+        console.error(`Failed to update ticket ${ticketId}:`, error);
+        return { success: false, error: 'An unexpected error occurred.' };
     }
 }
