@@ -87,6 +87,7 @@ export interface Client {
   name: string;
   email?: string | null;
   phone?: string | null;
+  source?: LeadSourceOptionType | null;
   status: ClientStatusType;
   priority?: ClientPriorityType | null;
   assignedTo?: string | null;

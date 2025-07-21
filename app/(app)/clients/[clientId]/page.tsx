@@ -22,7 +22,7 @@ import { getProposalsForClient, createOrUpdateProposal } from '@/app/(app)/propo
 import { getDealsForClient, createOrUpdateDeal } from '@/app/(app)/deals/actions';
 import { getSurveysForClient } from '@/app/(app)/site-survey/actions';
 import { getUsers } from '@/app/(app)/users/actions';
-import { getClientStatuses } from '@/app/(app)/settings/actions';
+import { getClientStatuses, getLeadSources } from '@/app/(app)/settings/actions';
 import { ClientForm } from '@/app/(app)/clients/client-form';
 import { DealForm, type DealFormValues } from '@/app/(app)/deals/deal-form';
 import { Separator } from '@/components/ui/separator';
@@ -96,6 +96,7 @@ export default function ClientDetailsPage() {
   const [client, setClient] = useState<Client | null | undefined>(undefined);
   const [users, setUsers] = useState<User[]>([]);
   const [statuses, setStatuses] = useState<CustomSetting[]>([]);
+  const [sources, setSources] = useState<CustomSetting[]>([])
   const [isFormPending, startFormTransition] = useTransition();
   const [isUpdating, startUpdateTransition] = useTransition();
   const [isConverting, startConversionTransition] = useTransition();
@@ -155,13 +156,14 @@ export default function ClientDetailsPage() {
       const fetchDetails = async () => {
         setClient(undefined);
         try {
-           const [fetchedClient, fetchedUsers, fetchedActivities, fetchedProposals, fetchedDeals, fetchedStatuses, fetchedSurveys] = await Promise.all([
+           const [fetchedClient, fetchedUsers, fetchedActivities, fetchedProposals, fetchedDeals, fetchedStatuses,fetchedSources, fetchedSurveys] = await Promise.all([
             getClientById(clientId),
             getUsers(),
             getActivitiesForClient(clientId),
             getProposalsForClient(clientId),
             getDealsForClient(clientId),
             getClientStatuses(),
+            getLeadSources(),
             getSurveysForClient(clientId),
           ]);
 
@@ -171,6 +173,7 @@ export default function ClientDetailsPage() {
           setProposals(fetchedProposals);
           setDeals(fetchedDeals);
           setStatuses(fetchedStatuses);
+          setSources(fetchedSources);
           setSurveys(fetchedSurveys);
 
           if (fetchedClient) {
@@ -385,7 +388,7 @@ export default function ClientDetailsPage() {
   };
   
   const handleAttributeChange = (
-    key: 'status' | 'priority' | 'assignedTo' | 'clientType' | 'kilowatt',
+    key: 'status' | 'priority' | 'assignedTo' | 'clientType' | 'kilowatt' | 'source',
     value: string | number
   ) => {
     if (!client || value === undefined || isUpdating) return;
@@ -608,6 +611,17 @@ export default function ClientDetailsPage() {
                                 {CLIENT_TYPES.map(p => <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>)}
                             </SelectContent>
                         </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="client-source" className="text-xs font-medium">Source</Label>
+                      <Select value={client.source || ''} onValueChange={(value) => handleAttributeChange('source', value)} disabled={isUpdating}>
+                        <SelectTrigger id="client-source" className="h-8 text-xs">
+                          <SelectValue placeholder="Select source" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sources.map(source => <SelectItem key={source.id} value={source.name} className="text-xs">{source.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
                     </div>
                 </CardContent>
             </Card>
@@ -939,7 +953,7 @@ export default function ClientDetailsPage() {
         />
       )}
 
-      {isEditFormOpen && client && (<ClientForm isOpen={isEditFormOpen} onClose={() => setIsEditFormOpen(false)} onSubmit={handleEditFormSubmit} client={client} users={users} statuses={statuses} />)}
+      {isEditFormOpen && client && (<ClientForm isOpen={isEditFormOpen} onClose={() => setIsEditFormOpen(false)} onSubmit={handleEditFormSubmit} client={client} users={users} statuses={statuses} sources={sources}/>)}
       
       {isPreviewOpen && selectedProposalForPreview && (
         <ProposalPreviewDialog

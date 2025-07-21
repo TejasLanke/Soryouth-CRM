@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { format, parseISO, startOfDay, isSameDay } from 'date-fns';
 import { getActiveClients, createClient, updateClient, deleteClient, bulkUpdateClients } from './actions';
 import { getUsers } from '@/app/(app)/users/actions';
-import { getClientStatuses } from '@/app/(app)/settings/actions';
+import { getClientStatuses, getLeadSources } from '@/app/(app)/settings/actions';
 import { SettingsDialog } from '@/app/(app)/settings/settings-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuCheckboxItem, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -26,6 +26,7 @@ const allColumns: Record<string, string> = {
     email: 'Email',
     phone: 'Mobile No.',
     status: 'Stage',
+    source: 'Source',
     lastCommentText: 'Last Comment',
     nextFollowUpDate: 'Next Follow-up',
     followupCount: 'Followups',
@@ -38,6 +39,7 @@ export default function ClientsListPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [statuses, setStatuses] = useState<CustomSetting[]>([]);
+  const [sources, setSources] = useState<CustomSetting[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
@@ -63,20 +65,22 @@ export default function ClientsListPage() {
 
 
   const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({
-    email: true, phone: true, status: true, lastCommentText: false,
+    email: true, phone: true, status: true, source: true, lastCommentText: false,
     nextFollowUpDate: true,
     followupCount: true, kilowatt: true, priority: true, assignedTo: true,
   });
 
   const refreshData = async () => {
-    const [allClients, allUsers, allStatuses] = await Promise.all([
+    const [allClients, allUsers, allStatuses, allSources] = await Promise.all([
       getActiveClients(),
       getUsers(),
-      getClientStatuses()
+      getClientStatuses(),
+      getLeadSources()
     ]);
     setClients(allClients);
     setUsers(allUsers);
     setStatuses(allStatuses);
+    setSources(allSources);
   };
 
   useEffect(() => {
@@ -418,6 +422,7 @@ export default function ClientsListPage() {
           client={selectedClientForEdit}
           users={users}
           statuses={statuses}
+          sources={sources}
         />
       )}
       {isSettingsDialogOpen && (
