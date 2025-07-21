@@ -3,19 +3,23 @@
 
 import { useState, useEffect, useTransition } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { PageHeader } from '@/components/page-header';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { DOCUMENT_TYPES_CONFIG } from '@/lib/constants';
-import { Loader2, ArrowLeft, FileText, Trash2, Eye, Edit } from 'lucide-react';
-import { getGeneratedDocuments, deleteGeneratedDocument } from '../actions';
-import type { GeneratedDocument, CustomSetting } from '@/types';
+import { Loader2, ArrowLeft, FileText, Trash2, Eye, Edit, ShieldCheck, Clock } from 'lucide-react';
+import { getGeneratedDocuments, deleteGeneratedDocument, getFinancialDocuments, deleteFinancialDocument } from '../actions';
+import type { GeneratedDocument, FinancialDocument, CustomSetting, FinancialDocumentStatus } from '@/types';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ProposalPreviewDialog } from '@/app/(app)/proposals/proposal-preview-dialog';
-import { getDocumentTypes } from '@/app/(app)/settings/actions';
+import { getDocumentTypes, getFinancialDocumentTypes } from '@/app/(app)/settings/actions';
 import { DocumentCreationDialog } from '../document-creation-dialog';
+import { Badge } from '@/components/ui/badge';
+
+type AnyDocument = (GeneratedDocument & { docCategory?: 'standard' }) | (FinancialDocument & { docCategory?: 'financial' });
 
 export default function GeneratedDocumentsPage() {
     const router = useRouter();
@@ -26,52 +30,66 @@ export default function GeneratedDocumentsPage() {
     const documentTypeParam = params.documentType;
     const documentType = documentTypeParam ? decodeURIComponent(Array.isArray(documentTypeParam) ? documentTypeParam[0] : documentTypeParam) : undefined;
     
-    const [documents, setDocuments] = useState<GeneratedDocument[]>([]);
-    const [documentTypes, setDocumentTypes] = useState<CustomSetting[]>([]);
+    const [documents, setDocuments] = useState<AnyDocument[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isValidDocType, setIsValidDocType] = useState(false);
     const [previewUrls, setPreviewUrls] = useState<{ pdfUrl: string, docxUrl: string } | null>(null);
 
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-    const [documentToEdit, setDocumentToEdit] = useState<GeneratedDocument | null>(null);
-
-    const documentConfig = documentType ? DOCUMENT_TYPES_CONFIG.find(dt => dt.type === documentType) : undefined;
+    const [documentToEdit, setDocumentToEdit] = useState<AnyDocument | null>(null);
 
     const refreshDocuments = async () => {
         if (documentType) {
-            const fetchedDocs = await getGeneratedDocuments(documentType);
+            setIsLoading(true);
+            // First, determine if the document type is valid and its category (standard or financial)
+            const [stdDocTypes, finDocTypes] = await Promise.all([
+                getDocumentTypes(),
+                getFinancialDocumentTypes()
+            ]);
+
+            const isStandard = stdDocTypes.some(d => d.name === documentType);
+            const isFinancial = finDocTypes.some(f => f.name === documentType);
+
+            if (!isStandard && !isFinancial) {
+                setIsValidDocType(false);
+                setIsLoading(false);
+                return;
+            }
+            setIsValidDocType(true);
+            
+            // Now, fetch the correct documents
+            let fetchedDocs: AnyDocument[] = [];
+            if (isFinancial) {
+                 const finDocs = await getFinancialDocuments(documentType);
+                 fetchedDocs = finDocs.map(d => ({ ...d, docCategory: 'financial' }));
+            } else {
+                 const genDocs = await getGeneratedDocuments(documentType);
+                 fetchedDocs = genDocs.map(d => ({ ...d, docCategory: 'standard' }));
+            }
             setDocuments(fetchedDocs);
+            setIsLoading(false);
         }
     };
     
     useEffect(() => {
-        const fetchPageData = async () => {
-            setIsLoading(true);
-            const [fetchedDocTypes, fetchedDocs] = await Promise.all([
-                getDocumentTypes(),
-                documentType ? getGeneratedDocuments(documentType) : Promise.resolve([]),
-            ]);
-            setDocumentTypes(fetchedDocTypes);
-            setDocuments(fetchedDocs);
-            setIsLoading(false);
-        };
-        fetchPageData();
+        refreshDocuments();
     }, [documentType]);
     
-    const isValidDocType = documentType && documentTypes.some(dt => dt.name === documentType);
-
-    const handleDelete = (doc: GeneratedDocument) => {
+    const handleDelete = (doc: AnyDocument) => {
         startDeleteTransition(async () => {
-            const result = await deleteGeneratedDocument(doc.pdfUrl);
+            const deleteAction = doc.docCategory === 'financial' ? deleteFinancialDocument : deleteGeneratedDocument;
+            const result = await deleteAction(doc.id);
+
             if(result.success) {
                 toast({ title: 'Document Deleted', description: `Successfully deleted document for ${doc.clientName}.` });
-                setDocuments(prev => prev.filter(d => d.pdfUrl !== doc.pdfUrl));
+                setDocuments(prev => prev.filter(d => d.id !== doc.id));
             } else {
                 toast({ title: 'Error', description: result.error || 'Failed to delete the document.', variant: 'destructive' });
             }
         });
     };
 
-    const handleEdit = (doc: GeneratedDocument) => {
+    const handleEdit = (doc: AnyDocument) => {
         setDocumentToEdit(doc);
         setIsCreateDialogOpen(true);
     };
@@ -86,6 +104,15 @@ export default function GeneratedDocumentsPage() {
     const closeCreationDialogs = () => {
         setIsCreateDialogOpen(false);
         setDocumentToEdit(null);
+    };
+
+    const getStatusBadgeVariant = (status: FinancialDocumentStatus) => {
+        switch (status) {
+          case 'Approved': return 'default';
+          case 'Pending': return 'secondary';
+          case 'Rejected': return 'destructive';
+          default: return 'outline';
+        }
     };
 
     if (isLoading) {
@@ -123,7 +150,7 @@ export default function GeneratedDocumentsPage() {
             <PageHeader
                 title={documentType!}
                 description={`Manage all generated ${documentType!.toLowerCase()} documents.`}
-                icon={documentConfig?.icon || FileText}
+                icon={FileText}
                 actions={
                     <Button onClick={() => router.push('/documents')} variant="outline">
                         <ArrowLeft className="mr-2 h-4 w-4" /> Back to Document Types
@@ -140,46 +167,65 @@ export default function GeneratedDocumentsPage() {
                 </Card>
             ) : (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {documents.map((doc) => (
-                        <Card key={doc.pdfUrl} className="flex flex-col">
-                            <CardHeader>
-                                <CardTitle className="font-headline">{doc.clientName}</CardTitle>
-                                <CardDescription>
-                                    Generated: {format(new Date(doc.createdAt), 'dd MMM, yyyy p')}
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="flex-grow" />
-                            <CardFooter className="flex justify-end gap-2">
-                                <Button variant="outline" size="sm" onClick={() => setPreviewUrls({ pdfUrl: doc.pdfUrl, docxUrl: doc.docxUrl })}>
-                                    <Eye className="mr-2 h-4 w-4" /> View
-                                </Button>
-                                <Button variant="secondary" size="sm" onClick={() => handleEdit(doc)}>
-                                    <Edit className="mr-2 h-4 w-4" /> Edit & Regenerate
-                                </Button>
-                                <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                        <Button variant="destructive" size="icon" title="Delete Document">
-                                            <Trash2 className="h-4 w-4" />
+                    {documents.map((doc) => {
+                        const isFinancial = doc.docCategory === 'financial';
+                        const isApproved = isFinancial && (doc as FinancialDocument).status === 'Approved';
+                        const isPending = isFinancial && (doc as FinancialDocument).status === 'Pending';
+                        return (
+                            <Card key={doc.id} className="flex flex-col">
+                                <CardHeader>
+                                    <div className="flex justify-between items-start">
+                                        <CardTitle className="font-headline">{doc.clientName}</CardTitle>
+                                        {isFinancial && <Badge variant={getStatusBadgeVariant((doc as FinancialDocument).status)}>{(doc as FinancialDocument).status}</Badge>}
+                                    </div>
+                                    <CardDescription>
+                                        Generated: {format(new Date(doc.createdAt), 'dd MMM, yyyy p')}
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="flex-grow" />
+                                <CardFooter className="flex justify-end gap-2">
+                                    {(doc.docCategory === 'standard' || isApproved) && (
+                                        <>
+                                            <Button variant="outline" size="sm" onClick={() => setPreviewUrls({ pdfUrl: doc.pdfUrl, docxUrl: doc.docxUrl })}>
+                                                <Eye className="mr-2 h-4 w-4" /> View
+                                            </Button>
+                                            <Button variant="secondary" size="sm" onClick={() => handleEdit(doc)}>
+                                                <Edit className="mr-2 h-4 w-4" /> Edit
+                                            </Button>
+                                        </>
+                                    )}
+                                    {isPending && (
+                                        <Button asChild size="sm">
+                                            <Link href={`/financial-documents/approve/${doc.id}`}>
+                                                <ShieldCheck className="mr-2 h-4 w-4" /> Approve/Reject
+                                            </Link>
                                         </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                                This will permanently delete both the PDF and DOCX files for "{doc.clientName}". This action cannot be undone.
-                                            </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                            <AlertDialogAction onClick={() => handleDelete(doc)} disabled={isDeleting} className={buttonVariants({ variant: 'destructive'})}>
-                                                {isDeleting ? 'Deleting...' : 'Yes, Delete'}
-                                            </AlertDialogAction>
-                                        </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
-                            </CardFooter>
-                        </Card>
-                    ))}
+                                    )}
+                                     <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <Button variant="destructive" size="icon" title="Delete Document" disabled={isDeleting}>
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    This will permanently delete both the PDF and DOCX files for "{doc.clientName}". This action cannot be undone.
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                <AlertDialogAction onClick={() => handleDelete(doc)} disabled={isDeleting} className={buttonVariants({ variant: 'destructive'})}>
+                                                    {isDeleting ? 'Deleting...' : 'Yes, Delete'}
+                                                </AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                </CardFooter>
+                            </Card>
+                        )
+                    })}
                 </div>
             )}
              {previewUrls && (

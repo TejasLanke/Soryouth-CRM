@@ -8,16 +8,18 @@ import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue, SelectSeparator } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { saveTemplate } from './actions';
 import type { Template, DocumentType, CustomSetting } from '@/types';
-import { PLACEHOLDER_DEFINITIONS_PROPOSAL} from '@/lib/constants';
+import { PLACEHOLDER_DEFINITIONS_PROPOSAL } from '@/lib/constants';
 import { Copy, Loader2, UploadCloud, File, Download } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { getDocumentTypes, getFinancialDocumentTypes } from '@/app/(app)/settings/actions';
+
 
 const templateSchema = z.object({
   name: z.string().min(3, 'Template name must be at least 3 characters long.'),
@@ -33,13 +35,17 @@ interface TemplateEditorProps {
   documentTypes: CustomSetting[];
 }
 
-export function TemplateEditor({ template, documentTypes }: TemplateEditorProps) {
+export function TemplateEditor({ template }: TemplateEditorProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [isUploading, setIsUploading] = useState(false);
   const [extractedPlaceholders, setExtractedPlaceholders] = useState<string[]>([]);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(template?.originalDocxPath || null);
+  
+  const [documentTypes, setDocumentTypes] = useState<CustomSetting[]>([]);
+  const [financialDocumentTypes, setFinancialDocumentTypes] = useState<CustomSetting[]>([]);
+  const [isLoadingTypes, setIsLoadingTypes] = useState(true);
 
   const form = useForm<TemplateFormValues>({
     resolver: zodResolver(templateSchema),
@@ -52,6 +58,20 @@ export function TemplateEditor({ template, documentTypes }: TemplateEditorProps)
   });
   
   const watchedTemplateType = form.watch('type');
+
+  useEffect(() => {
+    async function fetchTypes() {
+        setIsLoadingTypes(true);
+        const [docTypes, finDocTypes] = await Promise.all([
+            getDocumentTypes(),
+            getFinancialDocumentTypes()
+        ]);
+        setDocumentTypes(docTypes);
+        setFinancialDocumentTypes(finDocTypes);
+        setIsLoadingTypes(false);
+    }
+    fetchTypes();
+  }, []);
 
   useEffect(() => {
     if (template) {
@@ -109,8 +129,10 @@ export function TemplateEditor({ template, documentTypes }: TemplateEditorProps)
         }
         toast({ title: "Upload Successful", description: `File '${file.name}' has been uploaded.` });
         
-        // If not a proposal, extract placeholders
-        if (form.getValues('type') !== 'Proposal') {
+        const currentType = form.getValues('type');
+        const isFinancial = financialDocumentTypes.some(f => f.name === currentType);
+
+        if (currentType && currentType !== 'Proposal') {
             const extractFormData = new FormData();
             extractFormData.append('file', file);
             const extractResponse = await fetch('/api/templates/extract-placeholders', {
@@ -137,9 +159,14 @@ export function TemplateEditor({ template, documentTypes }: TemplateEditorProps)
 
   const onSubmit = (values: TemplateFormValues) => {
     startTransition(async () => {
+      // The `type` from `values.type` is already the correct string selected in the dropdown.
+      // No need for extra logic.
       const dataToSave = {
         id: template?.id,
-        ...values,
+        name: values.name,
+        type: values.type, // Directly use the selected value
+        originalDocxPath: values.originalDocxPath,
+        placeholdersJson: values.placeholdersJson,
       };
 
       const result = await saveTemplate(dataToSave as any);
@@ -241,17 +268,28 @@ export function TemplateEditor({ template, documentTypes }: TemplateEditorProps)
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Template Type</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} disabled={!!template}>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={!!template || isLoadingTypes}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select a type" />
+                              <SelectValue placeholder={isLoadingTypes ? "Loading types..." : "Select a type"} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="Proposal">Proposal</SelectItem>
-                            {documentTypes.map(docType => (
-                                <SelectItem key={docType.id} value={docType.name}>{docType.name}</SelectItem>
-                            ))}
+                             <SelectItem value="Proposal">Proposal</SelectItem>
+                             <SelectSeparator />
+                             <SelectGroup>
+                                 <SelectLabel>Document Types</SelectLabel>
+                                 {documentTypes.map(docType => (
+                                     <SelectItem key={docType.id} value={docType.name}>{docType.name}</SelectItem>
+                                 ))}
+                             </SelectGroup>
+                              <SelectSeparator />
+                             <SelectGroup>
+                                 <SelectLabel>Financial Document Types</SelectLabel>
+                                 {financialDocumentTypes.map(docType => (
+                                     <SelectItem key={docType.id} value={docType.name}>{docType.name}</SelectItem>
+                                 ))}
+                             </SelectGroup>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -303,7 +341,7 @@ export function TemplateEditor({ template, documentTypes }: TemplateEditorProps)
         <Card>
           <CardHeader>
             <CardTitle>Available Placeholders</CardTitle>
-            <CardDescription>Click to copy and then paste them (including the 'Curly' brackets) into your Word document template.</CardDescription>
+            <CardDescription>Click to copy and then paste them (including the `Curly` brackets) into your Word document template.</CardDescription>
           </CardHeader>
           <CardContent>
             {renderPlaceholders()}

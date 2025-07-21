@@ -48,6 +48,7 @@ model User {
   generalTasksCreated  GeneralTask[]           @relation("TasksCreatedBy")
   createdTickets          Ticket[]       @relation("CreatedTickets")
   assignedTickets         Ticket[]       @relation("AssignedTickets")
+  financialDocsReviewed   FinancialDocument[] @relation("FinancialDocReviewedBy")
 }
 
 model Lead {
@@ -218,6 +219,7 @@ model Template {
   updatedAt        DateTime @updatedAt
 
   documents        GeneratedDocument[]
+  financialDocuments FinancialDocument[]
   proposals        Proposal[]
 }
 
@@ -288,6 +290,7 @@ enum SettingType {
   LEAD_SOURCE
   CLIENT_STATUS
   DOCUMENT_TYPE
+  FINANCIAL_DOCUMENT_TYPE
   USER_ROLE
 }
 
@@ -466,4 +469,21 @@ model GeneralTask {
 
   dealId        String?
   deal          Deal?     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+}
+
+model FinancialDocument {
+  id            String   @id @default(cuid())
+  clientName    String
+  documentType  String
+  pdfUrl        String   @unique
+  docxUrl       String   @unique
+  formData      String // JSON string of the form data
+  status        String   @default("Pending") // Pending, Approved, Rejected
+  createdAt     DateTime @default(now())
+  reviewedAt    DateTime?
+  reviewedById  String?
+  reviewedBy    User?    @relation("FinancialDocReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  template   Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  templateId String
 }

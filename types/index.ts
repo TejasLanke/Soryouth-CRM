@@ -6,6 +6,7 @@ export type LeadStatusType = string;
 export type LeadSourceOptionType = string;
 export type ClientStatusType = string;
 export type DocumentType = string;
+export type FinancialDocumentType = string;
 export type UserRole = string;
 
 export type LeadPriorityType = typeof LEAD_PRIORITY_OPTIONS[number];
@@ -172,6 +173,23 @@ export interface GeneratedDocument {
   templateId: string;
   formData: string; // JSON string
   createdAt: string;
+}
+
+export type FinancialDocumentStatus = 'Pending' | 'Approved' | 'Rejected';
+
+export interface FinancialDocument {
+  id: string;
+  clientName: string;
+  documentType: string;
+  pdfUrl: string;
+  docxUrl: string;
+  templateId: string;
+  formData: string; // JSON string
+  status: FinancialDocumentStatus;
+  createdAt: string;
+  reviewedAt?: string | null;
+  reviewedById?: string | null;
+  reviewedBy?: User | null;
 }
 
 export interface Communication {
@@ -353,7 +371,7 @@ export interface SurveyStatusFilterItem {
 }
 
 
-export type ProposalOrDocumentType = 'Proposal' | DocumentType;
+export type ProposalOrDocumentType = 'Proposal' | DocumentType | FinancialDocumentType;
 
 export interface Template {
   id: string;
@@ -367,7 +385,7 @@ export interface Template {
 
 export type CreateTemplateData = Omit<Template, 'id' | 'createdAt' | 'updatedAt'>;
 
-export type SettingType = 'LEAD_STATUS' | 'LEAD_SOURCE' | 'CLIENT_STATUS' | 'DOCUMENT_TYPE' | 'USER_ROLE';
+export type SettingType = 'LEAD_STATUS' | 'LEAD_SOURCE' | 'CLIENT_STATUS' | 'DOCUMENT_TYPE' | 'FINANCIAL_DOCUMENT_TYPE' |'USER_ROLE';
 
 export interface CustomSetting {
     id: string;

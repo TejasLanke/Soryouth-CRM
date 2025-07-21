@@ -7,10 +7,10 @@ import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ClipboardPaste, PlusCircle, Edit, Trash2, FileText, Settings } from 'lucide-react';
+import { ClipboardPaste, PlusCircle, Edit, Trash2, FileText, Settings, Banknote, Files } from 'lucide-react';
 import type { Template, CustomSetting } from '@/types';
 import { getTemplates, deleteTemplate } from './actions';
-import { getDocumentTypes } from '@/app/(app)/settings/actions';
+import { getDocumentTypes, getFinancialDocumentTypes } from '@/app/(app)/settings/actions';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -20,6 +20,7 @@ import { SettingsDialog } from '@/app/(app)/settings/settings-dialog';
 export default function ManageTemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [documentTypes, setDocumentTypes] = useState<CustomSetting[]>([]);
+  const [financialDocumentTypes, setFinancialDocumentTypes] = useState<CustomSetting[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, startDeleteTransition] = useTransition();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -27,12 +28,14 @@ export default function ManageTemplatesPage() {
 
   const fetchData = async () => {
     setIsLoading(true);
-    const [fetchedTemplates, fetchedDocTypes] = await Promise.all([
+    const [fetchedTemplates, fetchedDocTypes, fetchedFinDocTypes] = await Promise.all([
       getTemplates(),
       getDocumentTypes(),
+      getFinancialDocumentTypes(),
     ]);
     setTemplates(fetchedTemplates);
     setDocumentTypes(fetchedDocTypes);
+    setFinancialDocumentTypes(fetchedFinDocTypes);
     setIsLoading(false);
   };
 
@@ -52,8 +55,13 @@ export default function ManageTemplatesPage() {
     });
   };
 
+  const documentTypeNames = documentTypes.map(d => d.name);
+  const financialDocumentTypeNames = financialDocumentTypes.map(f => f.name);
+
   const proposalTemplates = templates.filter(t => t.type === 'Proposal');
-  const documentTemplates = templates.filter(t => t.type !== 'Proposal');
+  const documentTemplates = templates.filter(t => documentTypeNames.includes(t.type));
+  const financialTemplates = templates.filter(t => financialDocumentTypeNames.includes(t.type));
+
 
   const renderTemplateList = (templateList: Template[]) => {
     if (isLoading) {
@@ -134,15 +142,19 @@ export default function ManageTemplatesPage() {
         }
       />
       <Tabs defaultValue="proposal">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="proposal">Proposal Templates ({proposalTemplates.length})</TabsTrigger>
-          <TabsTrigger value="document">Document Templates ({documentTemplates.length})</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="proposal"><FileText className="mr-2 h-4 w-4" />Proposal Templates ({proposalTemplates.length})</TabsTrigger>
+          <TabsTrigger value="document"><Files className="mr-2 h-4 w-4" />Document Templates ({documentTemplates.length})</TabsTrigger>
+          <TabsTrigger value="financial"><Banknote className="mr-2 h-4 w-4" />Financial Templates ({financialTemplates.length})</TabsTrigger>
         </TabsList>
         <TabsContent value="proposal" className="mt-6">
           {renderTemplateList(proposalTemplates)}
         </TabsContent>
         <TabsContent value="document" className="mt-6">
           {renderTemplateList(documentTemplates)}
+        </TabsContent>
+        <TabsContent value="financial" className="mt-6">
+          {renderTemplateList(financialTemplates)}
         </TabsContent>
       </Tabs>
       <SettingsDialog 
@@ -151,7 +163,10 @@ export default function ManageTemplatesPage() {
             setIsSettingsOpen(false);
             fetchData();
         }}
-        settingTypes={[{ title: 'Document Types', type: 'DOCUMENT_TYPE'}]}
+        settingTypes={[
+            { title: 'Document Types', type: 'DOCUMENT_TYPE'},
+            { title: 'Financial Document Types', type: 'FINANCIAL_DOCUMENT_TYPE'},
+        ]}
       />
     </>
   );

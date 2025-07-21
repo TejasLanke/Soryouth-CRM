@@ -31,6 +31,7 @@ import {
   ClipboardCheck,
   Handshake,
   Ticket,
+  IndianRupee,
 } from 'lucide-react';
 import { format, parseISO, addDays, subDays } from 'date-fns';
 
@@ -64,6 +65,7 @@ export const TOOLS_NAV_ITEMS: NavItem[] = [
   { href: '/proposals/batch', label: 'Batch Proposals', icon: Rows },
   { href: '/site-survey', label: 'Site Survey Form', icon: ClipboardEdit },
   { href: '/documents', label: 'Documents', icon: Files },
+  { href: '', label: 'Financial Documents', icon: IndianRupee },
 ];
 
 export const DEAL_STAGES_SOLAR = ['Deal Done', 'Procurement', 'Installation', 'Commissioning', 'Handover'] as const;

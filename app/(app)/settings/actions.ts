@@ -4,7 +4,7 @@
 import prisma from '@/lib/prisma';
 import type { CustomSetting, SettingType, Template } from '@/types';
 import { revalidatePath } from 'next/cache';
-import { deleteGeneratedDocument } from '@/app/(app)/documents/actions';
+import { deleteGeneratedDocument, deleteFinancialDocument } from '@/app/(app)/documents/actions';
 import { deleteTemplate as deleteTemplateFile } from '@/app/(app)/manage-templates/actions';
 
 // Helper to map Prisma CustomSetting to frontend CustomSetting type
@@ -46,6 +46,10 @@ export async function getDocumentTypes(): Promise<CustomSetting[]> {
     return getSettingsByType('DOCUMENT_TYPE');
 }
 
+export async function getFinancialDocumentTypes(): Promise<CustomSetting[]> {
+    return getSettingsByType('FINANCIAL_DOCUMENT_TYPE');
+}
+
 export async function getUserRoles(): Promise<CustomSetting[]> {
     const roles = await getSettingsByType('USER_ROLE');
     if (roles.length === 0) {
@@ -79,7 +83,7 @@ export async function addSetting(type: SettingType, name: string): Promise<Custo
         if (type === 'LEAD_STATUS' || type === 'LEAD_SOURCE') revalidatePath('/leads-list');
         if (type === 'CLIENT_STATUS') revalidatePath('/clients-list');
         if (type === 'USER_ROLE') revalidatePath('/users');
-        if (type === 'DOCUMENT_TYPE') {
+        if (type === 'DOCUMENT_TYPE' || type === 'FINANCIAL_DOCUMENT_TYPE') {
             revalidatePath('/documents');
             revalidatePath('/manage-templates');
         }
@@ -108,7 +112,7 @@ export async function deleteSetting(id: string): Promise<{ success: boolean; err
         if (settingToDelete.type === 'LEAD_STATUS' || settingToDelete.type === 'LEAD_SOURCE') revalidatePath('/leads-list');
         if (settingToDelete.type === 'CLIENT_STATUS') revalidatePath('/clients-list');
         if (settingToDelete.type === 'USER_ROLE') revalidatePath('/users');
-        if (settingToDelete.type === 'DOCUMENT_TYPE') {
+        if (settingToDelete.type === 'DOCUMENT_TYPE' || settingToDelete.type === 'FINANCIAL_DOCUMENT_TYPE') {
             revalidatePath('/documents');
             revalidatePath('/manage-templates');
         }
@@ -130,6 +134,17 @@ export async function getDeletionImpactForDocumentType(typeName: string): Promis
     return { templateCount, documentCount };
 }
 
+export async function getDeletionImpactForFinancialDocumentType(typeName: string): Promise<{ templateCount: number, documentCount: number }> {
+    const templateCount = await prisma.template.count({
+        where: { type: typeName }
+    });
+    const documentCount = await prisma.financialDocument.count({
+        where: { documentType: typeName }
+    });
+    return { templateCount, documentCount };
+}
+
+
 export async function deleteDocumentTypeAndContents(settingId: string): Promise<{ success: boolean, error?: string }> {
     try {
         const settingToDelete = await prisma.customSetting.findUnique({ where: { id: settingId } });
@@ -146,7 +161,7 @@ export async function deleteDocumentTypeAndContents(settingId: string): Promise<
 
         // Delete all associated files from S3 and records from DB
         for (const doc of documentsToDelete) {
-            await deleteGeneratedDocument(doc.pdfUrl); // This handles both S3 files and DB record
+            await deleteGeneratedDocument(doc.id);
         }
         
         // Find all templates of this type
@@ -169,6 +184,49 @@ export async function deleteDocumentTypeAndContents(settingId: string): Promise<
 
     } catch (error) {
         console.error('Failed to delete document type and its contents:', error);
+        return { success: false, error: 'An unexpected error occurred during deletion.' };
+    }
+}
+
+export async function deleteFinancialDocumentTypeAndContents(settingId: string): Promise<{ success: boolean, error?: string }> {
+    try {
+        const settingToDelete = await prisma.customSetting.findUnique({ where: { id: settingId } });
+        if (!settingToDelete || settingToDelete.type !== 'FINANCIAL_DOCUMENT_TYPE') {
+            return { success: false, error: 'Financial Document type setting not found.' };
+        }
+        
+        const typeName = settingToDelete.name;
+
+        // Find all generated documents of this type
+        const documentsToDelete = await prisma.financialDocument.findMany({
+            where: { documentType: typeName },
+        });
+
+        // Delete all associated files from S3 and records from DB
+        for (const doc of documentsToDelete) {
+            await deleteFinancialDocument(doc.id);
+        }
+        
+        // Find all templates of this type
+        const templatesToDelete = await prisma.template.findMany({
+            where: { type: typeName },
+        });
+
+        // Delete all associated template files from S3 and records from DB
+        for (const template of templatesToDelete) {
+            await deleteTemplateFile(template.id);
+        }
+
+        // Finally, delete the setting itself
+        await prisma.customSetting.delete({ where: { id: settingId } });
+        
+        revalidatePath('/documents');
+        revalidatePath('/manage-templates');
+
+        return { success: true };
+
+    } catch (error) {
+        console.error('Failed to delete financial document type and its contents:', error);
         return { success: false, error: 'An unexpected error occurred during deletion.' };
     }
 }

@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { CustomSetting, SettingType } from '@/types';
-import { getSettingsByType, addSetting, deleteSetting, getDeletionImpactForDocumentType, deleteDocumentTypeAndContents } from './actions';
+import { getSettingsByType, addSetting, deleteSetting, getDeletionImpactForDocumentType, deleteDocumentTypeAndContents, getDeletionImpactForFinancialDocumentType, deleteFinancialDocumentTypeAndContents } from './actions';
 import { CustomizationSection } from './customization-section';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -65,6 +65,10 @@ export function SettingsDialog({ isOpen, onClose, settingTypes }: SettingsDialog
         const impact = await getDeletionImpactForDocumentType(name);
         setDeleteImpact(impact);
     }
+    if (type === 'FINANCIAL_DOCUMENT_TYPE') {
+        const impact = await getDeletionImpactForFinancialDocumentType(name);
+        setDeleteImpact(impact);
+    }
     setIsAlertOpen(true);
   };
   
@@ -74,6 +78,8 @@ export function SettingsDialog({ isOpen, onClose, settingTypes }: SettingsDialog
     let result;
     if (deleteCandidate.type === 'DOCUMENT_TYPE') {
         result = await deleteDocumentTypeAndContents(deleteCandidate.id);
+    } else if (deleteCandidate.type === 'FINANCIAL_DOCUMENT_TYPE') {
+        result = await deleteFinancialDocumentTypeAndContents(deleteCandidate.id);
     } else {
         result = await deleteSetting(deleteCandidate.id);
     }

@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { CalendarDays, UserCircle, CheckCircle2, Play, ThumbsDown, Loader2, LinkIcon, Phone, Ticket } from 'lucide-react';
+import { CalendarDays, UserCircle, CheckCircle2, Play, ThumbsDown, Loader2, LinkIcon, Phone, Ticket, ShieldCheck, FileText } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
@@ -11,8 +11,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { getOpenGeneralTasksForCurrentUser, updateGeneralTaskStatus } from '@/app/(app)/tasks/actions';
 import { getTasksForCurrentUser } from '@/app/(app)/leads-list/actions';
 import { getOpenTicketsForCurrentUser } from '@/app/(app)/tickets/actions';
+import { getFinancialDocuments } from '@/app/(app)/documents/actions';
 import { format, formatDistanceToNow, parse, parseISO } from 'date-fns';
-import type { GeneralTask, GeneralTaskStatus, TaskNotification, Tickets as TicketType } from '@/types';
+import type { GeneralTask, GeneralTaskStatus, TaskNotification, Tickets as TicketType, FinancialDocument } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from './ui/separator';
 import { cn } from '@/lib/utils';
@@ -22,15 +23,15 @@ import { Label } from './ui/label';
 
 type UnifiedTask = {
   id: string;
-  type: 'general' | 'follow-up' | 'ticket';
+  type: 'general' | 'follow-up' | 'ticket' | 'financial-doc';
   comment: string;
-  time: string;
+  time?: string;
   dueDate: Date;
   customerName?: string;
   priority?: string;
   link?: string;
   status: 'Open' | 'Closed' | GeneralTaskStatus;
-  data: GeneralTask | TaskNotification | TicketType;
+  data: GeneralTask | TaskNotification | TicketType | FinancialDocument;
 };
 
 function FailureReasonDialog({
@@ -141,10 +142,11 @@ export function TaskNotifications() {
 
   const fetchTasks = async () => {
     setIsLoading(true);
-    const [generalTasks, followupTasks, ticketTasks] = await Promise.all([
+    const [generalTasks, followupTasks, ticketTasks, finDocs] = await Promise.all([
       getOpenGeneralTasksForCurrentUser(),
       getTasksForCurrentUser(),
       getOpenTicketsForCurrentUser(),
+      getFinancialDocuments(''), // Fetch all types initially
     ]);
 
     const unifiedGeneralTasks: UnifiedTask[] = generalTasks.map(task => ({
@@ -165,7 +167,7 @@ export function TaskNotifications() {
         type: 'follow-up',
         comment: task.comment,
         time: task.time,
-        dueDate: parse(task.time, 'HH:mm', new Date()),
+        dueDate: parse(task.time!, 'HH:mm', new Date()),
         customerName: task.customerName,
         link: task.link,
         status: task.status,
@@ -183,7 +185,20 @@ export function TaskNotifications() {
         data: task
     }));
     
-    const allTasks = [...unifiedGeneralTasks, ...unifiedFollowupTasks, ...unifiedTicketTasks].sort(
+    const unifiedFinancialDocs: UnifiedTask[] = finDocs
+      .filter(doc => doc.status === 'Pending')
+      .map(doc => ({
+        id: doc.id,
+        type: 'financial-doc',
+        comment: `Review: ${doc.documentType}`,
+        dueDate: parseISO(doc.createdAt),
+        customerName: doc.clientName,
+        link: `/financial-documents/approve/${doc.id}`,
+        status: 'Open',
+        data: doc,
+      }));
+    
+    const allTasks = [...unifiedGeneralTasks, ...unifiedFollowupTasks, ...unifiedTicketTasks, ...unifiedFinancialDocs].sort(
         (a, b) => a.dueDate.getTime() - b.dueDate.getTime()
     );
 
@@ -247,7 +262,7 @@ export function TaskNotifications() {
       </PopoverTrigger>
       <PopoverContent className="w-96" align="end">
         <div className="p-4">
-          <h3 className="text-lg font-medium">Your Tasks for Today</h3>
+          <h3 className="text-lg font-medium">Your Tasks & Notifications</h3>
           <p className="text-sm text-muted-foreground">
             {openTasksCount > 0 ? `${openTasksCount} item(s) require your attention.` : 'You have no open tasks for today.'}
           </p>
@@ -260,8 +275,13 @@ export function TaskNotifications() {
                  <p className="text-sm text-center text-muted-foreground py-8">All caught up! 🎉</p>
             ) : (
                 tasks.map((task) => {
-                    const icon = task.type === 'ticket' ? Ticket : UserCircle;
-                    const IconComponent = icon;
+                    const iconMap = {
+                        'general': UserCircle,
+                        'follow-up': UserCircle,
+                        'ticket': Ticket,
+                        'financial-doc': FileText,
+                    };
+                    const IconComponent = iconMap[task.type];
                     return (
                         <div key={task.id} className="block p-3 rounded-md border bg-card cursor-pointer hover:bg-muted/50"
                            onClick={task.type === 'ticket' ? () => handleTicketClick(task.data as TicketType) : undefined}
@@ -271,16 +291,11 @@ export function TaskNotifications() {
                                 <div className="flex-grow">
                                     <p className="text-sm font-medium leading-tight">{task.comment}</p>
                                     <p className="text-xs text-muted-foreground mt-1">
-                                        Due: {formatDistanceToNow(task.dueDate, { addSuffix: true })} {task.type !== 'ticket' ? ` at ${task.time}` : ''}
+                                        Due: {formatDistanceToNow(task.dueDate, { addSuffix: true })} {task.time ? ` at ${task.time}` : ''}
                                     </p>
-                                    {task.type === 'follow-up' && (
+                                    {task.customerName && (
                                         <p className="text-xs text-primary font-medium mt-1">
-                                            Follow-up with: {task.customerName}
-                                        </p>
-                                    )}
-                                     {task.type === 'ticket' && (
-                                        <p className="text-xs text-primary font-medium mt-1">
-                                            Ticket For: {(task.data as TicketType).ticketFor}
+                                            For: {task.customerName}
                                         </p>
                                     )}
                                 </div>
@@ -290,10 +305,12 @@ export function TaskNotifications() {
                                 <Badge variant={
                                     task.type === 'ticket' ? (task.priority === 'High' ? 'destructive' : 'secondary') :
                                     task.type === 'general' && task.priority === 'High' ? 'destructive' : 
-                                    task.type === 'follow-up' ? 'default' : 'secondary'
+                                    task.type === 'follow-up' ? 'default' : 
+                                    task.type === 'financial-doc' ? 'secondary' : 'secondary'
                                 }>
                                     {task.type === 'general' ? `General: ${task.priority}` :
                                      task.type === 'ticket' ? `Ticket: ${task.priority}` :
+                                     task.type === 'financial-doc' ? 'Approval' :
                                      'Follow-up'}
                                 </Badge>
                                 {task.type === 'general' ? (
@@ -302,13 +319,13 @@ export function TaskNotifications() {
                                         <Button onClick={() => handleUpdateStatus(task.id, 'In Progress')} variant="ghost" size="icon" title="Mark as In Progress" disabled={isUpdating}><Play className="h-5 w-5 text-blue-600"/></Button>
                                         <Button onClick={() => openFailureDialog(task.id)} variant="ghost" size="icon" title="Mark as Failed" disabled={isUpdating}><ThumbsDown className="h-5 w-5 text-red-600"/></Button>
                                     </div>
-                                ) : task.type === 'follow-up' ? (
+                                ) : (task.type === 'follow-up' || task.type === 'financial-doc') ? (
                                     <Link href={task.link || '#'} className={cn(buttonVariants({variant: 'outline', size: 'sm'}), 'text-xs')}>
                                         <LinkIcon className="h-3 w-3 mr-1.5"/>
-                                        View Lead
+                                        View
                                     </Link>
                                 ) : (
-                                    <span className="text-xs text-muted-foreground">Click to view details</span>
+                                    <span className="text-xs text-muted-foreground">Click card to view</span>
                                 )}
                             </div>
                         </div>

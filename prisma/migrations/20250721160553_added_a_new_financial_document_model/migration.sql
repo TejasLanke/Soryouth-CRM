@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "SettingType" ADD VALUE 'FINANCIAL_DOCUMENT_TYPE';
