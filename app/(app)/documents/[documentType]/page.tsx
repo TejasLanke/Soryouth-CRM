@@ -18,6 +18,7 @@ import { ProposalPreviewDialog } from '@/app/(app)/proposals/proposal-preview-di
 import { getDocumentTypes, getFinancialDocumentTypes } from '@/app/(app)/settings/actions';
 import { DocumentCreationDialog } from '../document-creation-dialog';
 import { Badge } from '@/components/ui/badge';
+import { useSession } from '@/hooks/use-sessions';
 
 type AnyDocument = (GeneratedDocument & { docCategory?: 'standard' }) | (FinancialDocument & { docCategory?: 'financial' });
 
@@ -25,6 +26,7 @@ export default function GeneratedDocumentsPage() {
     const router = useRouter();
     const params = useParams();
     const { toast } = useToast();
+    const session = useSession();
     const [isDeleting, startDeleteTransition] = useTransition();
 
     const documentTypeParam = params.documentType;
@@ -171,6 +173,8 @@ export default function GeneratedDocumentsPage() {
                         const isFinancial = doc.docCategory === 'financial';
                         const isApproved = isFinancial && (doc as FinancialDocument).status === 'Approved';
                         const isPending = isFinancial && (doc as FinancialDocument).status === 'Pending';
+                        const isAdmin = session?.role === 'Admin';
+
                         return (
                             <Card key={doc.id} className="flex flex-col">
                                 <CardHeader>
@@ -194,7 +198,7 @@ export default function GeneratedDocumentsPage() {
                                             </Button>
                                         </>
                                     )}
-                                    {isPending && (
+                                    {isPending && isAdmin && (
                                         <Button asChild size="sm">
                                             <Link href={`/financial-documents/approve/${doc.id}`}>
                                                 <ShieldCheck className="mr-2 h-4 w-4" /> Approve/Reject

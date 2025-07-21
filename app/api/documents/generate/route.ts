@@ -9,6 +9,7 @@ import type { DocumentType } from '@/types';
 import { uploadFileToS3, getFileFromS3, deleteFileFromS3 } from '@/lib/s3';
 import prisma from '@/lib/prisma';
 import { verifySession } from '@/lib/auth';
+import { getFinancialDocumentTypes } from '@/app/(app)/settings/actions';
 
 function camelCaseToTitleCase(text: string) {
     const result = text.replace(/([A-Z])/g, " $1");
@@ -49,6 +50,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Template not found or has no associated file.' }, { status: 404 });
     }
     
+    // Determine if this is a financial document type
+    const financialDocTypes = await getFinancialDocumentTypes();
+    const financialDocTypeNames = financialDocTypes.map(t => t.name);
+    const isFinancialDocument = financialDocTypeNames.includes(documentType);
+    
     const s3Url = new URL(template.originalDocxPath);
     const templateKey = s3Url.pathname.substring(1);
     const templateBuffer = await getFileFromS3(templateKey);
@@ -83,14 +89,15 @@ export async function POST(request: NextRequest) {
     const pdfBuffer = Buffer.from(result.pdf_b64, 'base64');
     const docxBuffer = Buffer.from(result.docx_b64, 'base64');
 
-    const clientName = (formData.client_name || formData.clientName || 'document').toString();
+    const clientName = (formData.client_name || formData.clientName || formData.invoice_no || 'document').toString();
     const baseKey = `documents/${clientName.replace(/\s/g, '_')}_${documentType.replace(/\s/g, '_')}_${Date.now()}`;
     const pdfKey = `${baseKey}.pdf`;
     const docxKey = `${baseKey}.docx`;
 
     // If updating, delete old files from S3 first
     if (documentIdToUpdate) {
-        const oldDoc = await prisma.generatedDocument.findUnique({ where: { id: documentIdToUpdate } });
+        const dbModel = isFinancialDocument ? prisma.financialDocument : prisma.generatedDocument;
+        const oldDoc = await (dbModel as any).findUnique({ where: { id: documentIdToUpdate } });
         if (oldDoc) {
             await Promise.all([
                 deleteFileFromS3(new URL(oldDoc.pdfUrl).pathname.substring(1)),
@@ -103,32 +110,36 @@ export async function POST(request: NextRequest) {
         uploadFileToS3(pdfBuffer, pdfKey, 'application/pdf'),
         uploadFileToS3(docxBuffer, docxKey, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
     ]);
+    
+    const sharedData = {
+        clientName: clientName,
+        documentType: documentType,
+        pdfUrl: pdfUrl,
+        docxUrl: docxUrl,
+        templateId: template.id,
+        formData: JSON.stringify(formData),
+    };
 
     if (documentIdToUpdate) {
-        await prisma.generatedDocument.update({
+        const dbModel = isFinancialDocument ? prisma.financialDocument : prisma.generatedDocument;
+        await (dbModel as any).update({
             where: { id: documentIdToUpdate },
-            data: {
-                clientName: clientName,
-                documentType: documentType,
-                pdfUrl: pdfUrl,
-                docxUrl: docxUrl,
-                templateId: template.id,
-                formData: JSON.stringify(formData),
-            },
+            data: sharedData,
         });
     } else {
-        await prisma.generatedDocument.create({
-            data: {
-                clientName: clientName,
-                documentType: documentType,
-                pdfUrl: pdfUrl,
-                docxUrl: docxUrl,
-                templateId: template.id,
-                formData: JSON.stringify(formData),
-            },
-        });
+        if (isFinancialDocument) {
+             await prisma.financialDocument.create({
+                data: {
+                    ...sharedData,
+                    status: 'Pending',
+                },
+            });
+        } else {
+            await prisma.generatedDocument.create({
+                data: sharedData,
+            });
+        }
     }
-
 
     return NextResponse.json({
       success: true,
