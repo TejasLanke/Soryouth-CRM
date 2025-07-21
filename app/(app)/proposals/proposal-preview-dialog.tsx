@@ -11,13 +11,18 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Printer, Download, Loader2 } from 'lucide-react';
+import { Printer, Download, Loader2, ShieldCheck } from 'lucide-react';
+import { useSession } from '@/hooks/use-sessions';
+import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 interface DocumentPreviewDialogProps {
   isOpen: boolean;
   onClose: () => void;
   pdfUrl: string | null;
   docxUrl: string | null;
+  documentId?: string;
+  isFinancialDocument?: boolean;
 }
 
 // Helper function to fetch a presigned URL
@@ -39,11 +44,13 @@ const fetchPresignedUrl = async (s3Url: string | null): Promise<string | null> =
 };
 
 
-export function ProposalPreviewDialog({ isOpen, onClose, pdfUrl, docxUrl }: DocumentPreviewDialogProps) {
+export function ProposalPreviewDialog({ isOpen, onClose, pdfUrl, docxUrl, documentId, isFinancialDocument }: DocumentPreviewDialogProps) {
   const [viewableUrl, setViewableUrl] = useState<string | null>(null);
   const [downloadableDocxUrl, setDownloadableDocxUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const session = useSession();
+  const isAdmin = session?.role === 'Admin';
 
   useEffect(() => {
     if (isOpen) {
@@ -54,7 +61,6 @@ export function ProposalPreviewDialog({ isOpen, onClose, pdfUrl, docxUrl }: Docu
 
       const fetchAllUrls = async () => {
         try {
-          // pdfUrl can be a PDF or an image URL
           const [primaryUrl, docx] = await Promise.all([
             fetchPresignedUrl(pdfUrl),
             fetchPresignedUrl(docxUrl),
@@ -119,13 +125,17 @@ export function ProposalPreviewDialog({ isOpen, onClose, pdfUrl, docxUrl }: Docu
     };
   };
 
+  const shouldShowActions = !isFinancialDocument || (isFinancialDocument && isAdmin);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Document Preview</DialogTitle>
           <DialogDescription>
-            Preview your generated document. You can also print or download it.
+            {isFinancialDocument && !isAdmin 
+              ? "This is a preview. An administrator must approve this document before it can be downloaded or printed."
+              : "Preview your generated document. You can also print or download it."}
           </DialogDescription>
         </DialogHeader>
         <div className="flex-grow border rounded-md overflow-hidden bg-muted/20 flex items-center justify-center">
@@ -149,29 +159,43 @@ export function ProposalPreviewDialog({ isOpen, onClose, pdfUrl, docxUrl }: Docu
         </div>
         <DialogFooter className="sm:justify-between pt-4 flex-wrap">
           <div className="flex flex-wrap gap-2">
-            <Button asChild variant="secondary" disabled={!viewableUrl}>
-              <a href={viewableUrl || '#'} download>
-                  <Download className="mr-2 h-4 w-4" />
-                  Download {isImage ? 'Image' : 'PDF'}
-              </a>
-            </Button>
-            {docxUrl && (
-              <Button asChild variant="secondary" disabled={!downloadableDocxUrl}>
-                <a href={downloadableDocxUrl || '#'} download>
-                    <Download className="mr-2 h-4 w-4" />
-                    Download Word
-                </a>
-              </Button>
+            {shouldShowActions && (
+                <>
+                    <Button asChild variant="secondary" disabled={!viewableUrl}>
+                      <a href={viewableUrl || '#'} download>
+                          <Download className="mr-2 h-4 w-4" />
+                          Download {isImage ? 'Image' : 'PDF'}
+                      </a>
+                    </Button>
+                    {docxUrl && (
+                      <Button asChild variant="secondary" disabled={!downloadableDocxUrl}>
+                        <a href={downloadableDocxUrl || '#'} download>
+                            <Download className="mr-2 h-4 w-4" />
+                            Download Word
+                        </a>
+                      </Button>
+                    )}
+                </>
+            )}
+             {isFinancialDocument && isAdmin && documentId && (
+                <Button asChild>
+                    <Link href={`/financial-documents/approve/${documentId}`}>
+                        <ShieldCheck className="mr-2 h-4 w-4" />
+                        Approve Document
+                    </Link>
+                </Button>
             )}
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose}>
               Close
             </Button>
-            <Button onClick={handlePrint} disabled={!viewableUrl}>
-              <Printer className="mr-2 h-4 w-4" />
-              Print
-            </Button>
+            {shouldShowActions && (
+                <Button onClick={handlePrint} disabled={!viewableUrl}>
+                    <Printer className="mr-2 h-4 w-4" />
+                    Print
+                </Button>
+            )}
           </div>
         </DialogFooter>
       </DialogContent>

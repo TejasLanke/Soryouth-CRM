@@ -30,7 +30,7 @@ export default function DocumentsPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [documentTypeToCreate, setDocumentTypeToCreate] = useState<DocumentType | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
-  const [previewUrls, setPreviewUrls] = useState<{ pdfUrl: string, docxUrl: string } | null>(null);
+  const [previewData, setPreviewData] = useState<{ pdfUrl: string, docxUrl: string, documentId: string, isFinancialDocument: boolean } | null>(null);
   
   useEffect(() => {
     const fetchDocTypes = async () => {
@@ -57,9 +57,9 @@ export default function DocumentsPage() {
     setIsCreateDialogOpen(true);
   };
   
-  const handleGenerationSuccess = (urls: { pdfUrl: string, docxUrl: string }) => {
-    setIsCreateDialogOpen(false); // Close the creation form
-    setPreviewUrls(urls); // Set urls to open the preview
+  const handleGenerationSuccess = (data: { pdfUrl: string, docxUrl: string, documentId: string, isFinancialDocument: boolean }) => {
+    setIsCreateDialogOpen(false);
+    setPreviewData(data);
   };
 
   const closeCreationDialogs = () => {
@@ -158,12 +158,14 @@ export default function DocumentsPage() {
         />
       )}
       
-      {previewUrls && (
+      {previewData && (
         <ProposalPreviewDialog
-            isOpen={!!previewUrls}
-            onClose={() => setPreviewUrls(null)}
-            pdfUrl={previewUrls.pdfUrl}
-            docxUrl={previewUrls.docxUrl}
+            isOpen={!!previewData}
+            onClose={() => setPreviewData(null)}
+            pdfUrl={previewData.pdfUrl}
+            docxUrl={previewData.docxUrl}
+            documentId={previewData.documentId}
+            isFinancialDocument={previewData.isFinancialDocument}
         />
       )}
     </>

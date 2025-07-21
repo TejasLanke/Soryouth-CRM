@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
     const pdfBuffer = Buffer.from(result.pdf_b64, 'base64');
     const docxBuffer = Buffer.from(result.docx_b64, 'base64');
 
-    const clientName = (formData.client_name || formData.clientName || formData.invoice_no || 'document').toString();
+    const clientName = (formData.client_name || formData.clientName || 'document').toString();
     const baseKey = `documents/${clientName.replace(/\s/g, '_')}_${documentType.replace(/\s/g, '_')}_${Date.now()}`;
     const pdfKey = `${baseKey}.pdf`;
     const docxKey = `${baseKey}.docx`;
@@ -120,24 +120,29 @@ export async function POST(request: NextRequest) {
         formData: JSON.stringify(formData),
     };
 
+    let savedDocumentId;
+
     if (documentIdToUpdate) {
         const dbModel = isFinancialDocument ? prisma.financialDocument : prisma.generatedDocument;
-        await (dbModel as any).update({
+        const updatedDoc = await (dbModel as any).update({
             where: { id: documentIdToUpdate },
             data: sharedData,
         });
+        savedDocumentId = updatedDoc.id;
     } else {
         if (isFinancialDocument) {
-             await prisma.financialDocument.create({
+             const newDoc = await prisma.financialDocument.create({
                 data: {
                     ...sharedData,
                     status: 'Pending',
                 },
             });
+            savedDocumentId = newDoc.id;
         } else {
-            await prisma.generatedDocument.create({
+            const newDoc = await prisma.generatedDocument.create({
                 data: sharedData,
             });
+            savedDocumentId = newDoc.id;
         }
     }
 
@@ -145,6 +150,8 @@ export async function POST(request: NextRequest) {
       success: true,
       pdfUrl: pdfUrl,
       docxUrl: docxUrl,
+      documentId: savedDocumentId,
+      isFinancialDocument: isFinancialDocument,
     });
 
   } catch (error) {

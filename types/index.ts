@@ -370,6 +370,7 @@ export interface SurveyStatusFilterItem {
   value: SurveyStatusType | 'all';
 }
 
+export type AnyDocument = (GeneratedDocument & { docCategory?: 'standard' }) | (FinancialDocument & { docCategory?: 'financial' });
 
 export type ProposalOrDocumentType = 'Proposal' | DocumentType | FinancialDocumentType;
 

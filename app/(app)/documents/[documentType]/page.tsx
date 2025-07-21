@@ -35,42 +35,40 @@ export default function GeneratedDocumentsPage() {
     const [documents, setDocuments] = useState<AnyDocument[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isValidDocType, setIsValidDocType] = useState(false);
-    const [previewUrls, setPreviewUrls] = useState<{ pdfUrl: string, docxUrl: string } | null>(null);
+    const [previewData, setPreviewData] = useState<{ pdfUrl: string, docxUrl: string, documentId: string, isFinancialDocument: boolean } | null>(null);
 
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [documentToEdit, setDocumentToEdit] = useState<AnyDocument | null>(null);
 
     const refreshDocuments = async () => {
-        if (documentType) {
-            setIsLoading(true);
-            // First, determine if the document type is valid and its category (standard or financial)
-            const [stdDocTypes, finDocTypes] = await Promise.all([
-                getDocumentTypes(),
-                getFinancialDocumentTypes()
-            ]);
+        if (!documentType) return;
+        setIsLoading(true);
+        // Determine if the document type is valid and its category
+        const [stdDocTypes, finDocTypes] = await Promise.all([
+            getDocumentTypes(),
+            getFinancialDocumentTypes()
+        ]);
+        const isStandard = stdDocTypes.some(d => d.name === documentType);
+        const isFinancial = finDocTypes.some(f => f.name === documentType);
 
-            const isStandard = stdDocTypes.some(d => d.name === documentType);
-            const isFinancial = finDocTypes.some(f => f.name === documentType);
-
-            if (!isStandard && !isFinancial) {
-                setIsValidDocType(false);
-                setIsLoading(false);
-                return;
-            }
-            setIsValidDocType(true);
-            
-            // Now, fetch the correct documents
-            let fetchedDocs: AnyDocument[] = [];
-            if (isFinancial) {
-                 const finDocs = await getFinancialDocuments(documentType);
-                 fetchedDocs = finDocs.map(d => ({ ...d, docCategory: 'financial' }));
-            } else {
-                 const genDocs = await getGeneratedDocuments(documentType);
-                 fetchedDocs = genDocs.map(d => ({ ...d, docCategory: 'standard' }));
-            }
-            setDocuments(fetchedDocs);
+        if (!isStandard && !isFinancial) {
+            setIsValidDocType(false);
             setIsLoading(false);
+            return;
         }
+        setIsValidDocType(true);
+        
+        // Fetch the correct documents based on type
+        let fetchedDocs: AnyDocument[] = [];
+        if (isFinancial) {
+             const finDocs = await getFinancialDocuments(documentType);
+             fetchedDocs = finDocs.map(d => ({ ...d, docCategory: 'financial' }));
+        } else {
+             const genDocs = await getGeneratedDocuments(documentType);
+             fetchedDocs = genDocs.map(d => ({ ...d, docCategory: 'standard' }));
+        }
+        setDocuments(fetchedDocs);
+        setIsLoading(false);
     };
     
     useEffect(() => {
@@ -96,11 +94,11 @@ export default function GeneratedDocumentsPage() {
         setIsCreateDialogOpen(true);
     };
 
-    const handleGenerationSuccess = (urls: { pdfUrl: string, docxUrl: string }) => {
+    const handleGenerationSuccess = (data: { pdfUrl: string; docxUrl: string; documentId: string; isFinancialDocument: boolean; }) => {
         setIsCreateDialogOpen(false);
         setDocumentToEdit(null);
         refreshDocuments();
-        setPreviewUrls(urls);
+        setPreviewData(data);
     };
 
     const closeCreationDialogs = () => {
@@ -190,7 +188,7 @@ export default function GeneratedDocumentsPage() {
                                 <CardFooter className="flex justify-end gap-2">
                                     {(doc.docCategory === 'standard' || isApproved) && (
                                         <>
-                                            <Button variant="outline" size="sm" onClick={() => setPreviewUrls({ pdfUrl: doc.pdfUrl, docxUrl: doc.docxUrl })}>
+                                            <Button variant="outline" size="sm" onClick={() => setPreviewData({ pdfUrl: doc.pdfUrl, docxUrl: doc.docxUrl, documentId: doc.id, isFinancialDocument: isFinancial })}>
                                                 <Eye className="mr-2 h-4 w-4" /> View
                                             </Button>
                                             <Button variant="secondary" size="sm" onClick={() => handleEdit(doc)}>
@@ -232,19 +230,21 @@ export default function GeneratedDocumentsPage() {
                     })}
                 </div>
             )}
-             {previewUrls && (
+             {previewData && (
                 <ProposalPreviewDialog
-                    isOpen={!!previewUrls}
-                    onClose={() => setPreviewUrls(null)}
-                    pdfUrl={previewUrls.pdfUrl}
-                    docxUrl={previewUrls.docxUrl}
+                    isOpen={!!previewData}
+                    onClose={() => setPreviewData(null)}
+                    pdfUrl={previewData.pdfUrl}
+                    docxUrl={previewData.docxUrl}
+                    documentId={previewData.documentId}
+                    isFinancialDocument={previewData.isFinancialDocument}
                 />
             )}
             {isCreateDialogOpen && (
                 <DocumentCreationDialog
                   isOpen={isCreateDialogOpen}
                   onClose={closeCreationDialogs}
-                  documentType={documentToEdit?.documentType || documentType}
+                  documentType={documentToEdit?.documentType || documentType!}
                   templateId={documentToEdit?.templateId || null}
                   documentToEdit={documentToEdit}
                   onSuccess={handleGenerationSuccess}

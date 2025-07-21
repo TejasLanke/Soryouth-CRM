@@ -23,7 +23,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import type { DocumentType, Template, GeneratedDocument } from '@/types';
+import type { DocumentType, Template, GeneratedDocument, AnyDocument } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { getTemplateById } from '@/app/(app)/manage-templates/actions';
@@ -34,8 +34,8 @@ interface DocumentCreationDialogProps {
   onClose: () => void;
   documentType: DocumentType;
   templateId: string | null;
-  onSuccess: (urls: { pdfUrl: string; docxUrl: string }) => void;
-  documentToEdit?: GeneratedDocument | null;
+  onSuccess: (data: { pdfUrl: string; docxUrl: string; documentId: string; isFinancialDocument: boolean }) => void;
+  documentToEdit?: AnyDocument | null;
 }
 
 // Helper to clean placeholder keys for form and label
@@ -137,7 +137,7 @@ export function DocumentCreationDialog({ isOpen, onClose, documentType, template
           title: 'Document Generation Successful',
           description: `${documentType} for "${(values as any).client_name || 'document'}" has been generated.`,
         });
-        onSuccess({ pdfUrl: result.pdfUrl, docxUrl: result.docxUrl });
+        onSuccess({ pdfUrl: result.pdfUrl, docxUrl: result.docxUrl, documentId: result.documentId, isFinancialDocument: result.isFinancialDocument });
         onClose();
 
       } catch (error) {
