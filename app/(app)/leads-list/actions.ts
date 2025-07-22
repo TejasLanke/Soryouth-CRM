@@ -8,6 +8,7 @@ import { format, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { verifySession } from '@/lib/auth';
 import * as ExcelJS from 'exceljs';
 import { z } from 'zod';
+import type { Prisma } from '@prisma/client';
 
 // Helper function to map Prisma lead to frontend Lead type
 function mapPrismaLeadToLeadType(prismaLead: any): Lead {
@@ -90,8 +91,16 @@ function mapPrismaFollowUpToFollowUpType(prismaFollowUp: any): FollowUp {
 
 
 export async function getLeads(): Promise<Lead[]> {
+  const session = await verifySession();
+  if (!session?.userId) return [];
+
   try {
+    const whereClause: Prisma.LeadWhereInput = {};
+    if (session.viewPermission === 'ASSIGNED') {
+      whereClause.assignedToId = session.userId;
+    } 
     const leadsFromDb = await prisma.lead.findMany({
+      where: whereClause,
       orderBy: {
         createdAt: 'desc',
       },

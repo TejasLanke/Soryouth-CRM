@@ -47,6 +47,8 @@ export default function ClientsListPage() {
   const { toast } = useToast();
   const [activeFilter, setActiveFilter] = useState<ClientStatusType | 'all'>('all');
   const [quickFilter, setQuickFilter] = useState<string>('Show all');
+  const [userFilter, setUserFilter] = useState<string>('all');
+  const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<ClientSortConfig | null>(null);
@@ -222,6 +224,13 @@ export default function ClientsListPage() {
         break;
     }
     
+    if (userFilter !== 'all') {
+        clientsToDisplay = clientsToDisplay.filter(client => client.assignedTo === userFilter);
+    }
+    if (sourceFilter !== 'all') {
+        clientsToDisplay = clientsToDisplay.filter(client => client.source === sourceFilter);
+    }
+
     if (searchTerm) {
       const lowercasedTerm = searchTerm.toLowerCase();
       clientsToDisplay = clientsToDisplay.filter(client => 
@@ -243,7 +252,7 @@ export default function ClientsListPage() {
       });
     }
     return clientsToDisplay;
-  }, [clients, activeFilter, sortConfig, searchTerm, quickFilter]);
+  }, [clients, activeFilter, sortConfig, searchTerm, quickFilter, userFilter, sourceFilter]);
 
   const paginatedClients = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
@@ -300,11 +309,40 @@ export default function ClientsListPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Quick Filters</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
                     {['Assigned today', 'Followed today', 'Not followed today', 'Unattended', 'Show all'].map(item => (
-                      <DropdownMenuItem key={item} onSelect={() => setQuickFilter(item)}>
+                      <DropdownMenuItem key={item} onSelect={() => {setQuickFilter(item); setUserFilter('all'); setSourceFilter('all');}}>
                         {item}
                       </DropdownMenuItem>
                     ))}
+                    <DropdownMenuSeparator />
+                     <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>Assigned To</DropdownMenuSubTrigger>
+                        <DropdownMenuPortal>
+                        <DropdownMenuSubContent>
+                            <DropdownMenuRadioGroup value={userFilter} onValueChange={(value) => {setUserFilter(value); setQuickFilter('Show all'); setSourceFilter('all');}}>
+                                <DropdownMenuRadioItem value="all">All Users</DropdownMenuRadioItem>
+                                {users.map(user => (
+                                    <DropdownMenuRadioItem key={user.id} value={user.name}>{user.name}</DropdownMenuRadioItem>
+                                ))}
+                            </DropdownMenuRadioGroup>
+                        </DropdownMenuSubContent>
+                        </DropdownMenuPortal>
+                    </DropdownMenuSub>
+                    <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>Source</DropdownMenuSubTrigger>
+                        <DropdownMenuPortal>
+                        <DropdownMenuSubContent>
+                             <DropdownMenuRadioGroup value={sourceFilter} onValueChange={(value) => {setSourceFilter(value); setQuickFilter('Show all'); setUserFilter('all');}}>
+                                <DropdownMenuRadioItem value="all">All Sources</DropdownMenuRadioItem>
+                                {sources.map(source => (
+                                    <DropdownMenuRadioItem key={source.id} value={source.name}>{source.name}</DropdownMenuRadioItem>
+                                ))}
+                            </DropdownMenuRadioGroup>
+                        </DropdownMenuSubContent>
+                        </DropdownMenuPortal>
+                    </DropdownMenuSub>
                   </DropdownMenuContent>
                 </DropdownMenu>
                 <Button variant="outline" size="sm" onClick={() => setIsSearchOpen(true)}>

@@ -5,6 +5,8 @@ import prisma from '@/lib/prisma';
 import type { DroppedLead, FollowUp, LeadStatusType, SiteSurvey, Proposal } from '@/types';
 import { revalidatePath } from 'next/cache';
 import { format, parseISO } from 'date-fns';
+import { verifySession } from '@/lib/auth';
+import type { Prisma } from '@prisma/client';
 
 function mapPrismaDroppedLeadToDroppedLeadType(prismaLead: any): DroppedLead {
   return {
@@ -46,6 +48,7 @@ function mapPrismaFollowUpToFollowUpType(prismaFollowUp: any): FollowUp {
     leadStageAtTimeOfFollowUp: prismaFollowUp.leadStageAtTimeOfFollowUp ?? undefined,
     comment: prismaFollowUp.comment ?? undefined,
     createdBy: prismaFollowUp.createdBy?.name ?? undefined,
+    createdById: prismaFollowUp.createdById ?? undefined,
     createdAt: prismaFollowUp.createdAt.toISOString(),
     followupOrTask: prismaFollowUp.followupOrTask,
     taskForUser: prismaFollowUp.taskForUser?.name ?? undefined,
@@ -113,8 +116,17 @@ function mapPrismaProposalToProposalType(prismaProposal: any): Proposal {
 }
 
 export async function getDroppedLeads(): Promise<DroppedLead[]> {
+     const session = await verifySession();
+    if (!session?.userId) return [];
+
     try {
+        const whereClause: Prisma.DroppedLeadWhereInput = {};
+        if (session.viewPermission === 'ASSIGNED') {
+          whereClause.assignedToId = session.userId;
+        }
+
         const droppedLeads = await prisma.droppedLead.findMany({
+            where: whereClause,
             orderBy: { droppedAt: 'desc' },
             include: { 
               followUps: { select: { id: true }},

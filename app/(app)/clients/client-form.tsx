@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Client, ClientStatusType, ClientPriorityType, User, CreateClientData, CustomSetting, LeadSourceOptionType } from '@/types';
+import type { Client, ClientStatusType, ClientPriorityType, User, CreateClientData, CustomSetting, ElectricityBill, LeadSourceOptionType } from '@/types';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -58,7 +58,7 @@ interface ClientFormProps {
   sources: CustomSetting[];
 }
 
-export function ClientForm({ isOpen, onClose, onSubmit, client, users, statuses, sources }: ClientFormProps) {
+export function ClientForm({ isOpen, onClose, onSubmit, client, users, statuses, sources = [] }: ClientFormProps) {
   const statusNames = useMemo(() => statuses.map(s => s.name), [statuses]);
   const sourceNames = useMemo(() => sources.map(s => s.name), [sources]);
   const clientSchema = useMemo(() => getClientSchema(statusNames, sourceNames), [statusNames, sourceNames]);
@@ -343,3 +343,4 @@ export function ClientForm({ isOpen, onClose, onSubmit, client, users, statuses,
     </Dialog>
   );
 }
+

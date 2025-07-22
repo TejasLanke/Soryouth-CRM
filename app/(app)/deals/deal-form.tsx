@@ -348,7 +348,9 @@ export function DealForm({ isOpen, onClose, onSubmit, users, clients, deal, pipe
         onSubmit={handleClientFormSubmit}
         users={users}
         statuses={clientStatuses}
+        sources={sources}
     />
     </>
   );
 }
+

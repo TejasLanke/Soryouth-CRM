@@ -102,18 +102,18 @@ export default function DealsPage() {
 
         // Call the server action
         startTransition(async () => {
-          const updatedDeal = await updateDealStage(draggableId, finishStage);
-          if (!updatedDeal) {
+          const updatedDealResult = await updateDealStage(draggableId, finishStage);
+          if (updatedDealResult.success && updatedDealResult.deal) {
+             toast({ title: "Deal Stage Updated", description: `${updatedDealResult.deal.clientName} moved to ${finishStage}.` });
+             await refreshData(); // Re-fetch to ensure consistency
+          } else {
             // Revert UI on failure
-            toast({ title: "Error", description: "Could not update deal stage.", variant: "destructive" });
+            toast({ title: "Error", description: updatedDealResult.error || "Could not update deal stage.", variant: "destructive" });
             setDeals(prevDeals =>
               prevDeals.map(deal =>
                 deal.id === draggableId ? { ...deal, stage: startStage } : deal
               )
             );
-          } else {
-             toast({ title: "Deal Stage Updated", description: `${updatedDeal.clientName} moved to ${finishStage}.` });
-             await refreshData(); // Re-fetch to ensure consistency
           }
         });
       }

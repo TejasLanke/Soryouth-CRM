@@ -133,6 +133,8 @@ export default function LeadsListPage() {
   const { toast } = useToast();
   const [activeFilter, setActiveFilter] = useState<LeadStatusType | 'all'>('all');
   const [quickFilter, setQuickFilter] = useState<string>('Show all');
+  const [userFilter, setUserFilter] = useState<string>('all');
+  const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<LeadSortConfig | null>(null);
@@ -294,6 +296,13 @@ export default function LeadsListPage() {
         break;
     }
 
+    if (userFilter !== 'all') {
+        leadsToDisplay = leadsToDisplay.filter(lead => lead.assignedTo === userFilter);
+    }
+    if (sourceFilter !== 'all') {
+        leadsToDisplay = leadsToDisplay.filter(lead => lead.source === sourceFilter);
+    }
+
     if (searchTerm) {
       const lowercasedTerm = searchTerm.toLowerCase();
       leadsToDisplay = leadsToDisplay.filter(lead => 
@@ -335,7 +344,7 @@ export default function LeadsListPage() {
       });
     }
     return leadsToDisplay;
-  }, [leads, activeFilter, sortConfig, quickFilter, searchTerm]);
+  }, [leads, activeFilter, sortConfig, quickFilter, searchTerm, userFilter, sourceFilter]);
 
   const paginatedLeads = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
@@ -448,11 +457,40 @@ export default function LeadsListPage() {
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                        {['Assigned today', 'Followed today', 'Not followed today', 'Unattended', 'No stage', 'Duplicate', 'Show all'].map(item => (
-                        <DropdownMenuItem key={item} onSelect={() => setQuickFilter(item)} disabled={item === 'Duplicate'}>
+                        <DropdownMenuLabel>Quick Filters</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {['Assigned today', 'Followed today', 'Not followed today', 'Unattended', 'No stage', 'Show all'].map(item => (
+                        <DropdownMenuItem key={item} onSelect={() => {setQuickFilter(item); setUserFilter('all'); setSourceFilter('all');}}>
                             {item}
                         </DropdownMenuItem>
                         ))}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuSub>
+                            <DropdownMenuSubTrigger>Assigned To</DropdownMenuSubTrigger>
+                            <DropdownMenuPortal>
+                            <DropdownMenuSubContent>
+                                <DropdownMenuRadioGroup value={userFilter} onValueChange={(value) => {setUserFilter(value); setQuickFilter('Show all'); setSourceFilter('all');}}>
+                                    <DropdownMenuRadioItem value="all">All Users</DropdownMenuRadioItem>
+                                    {users.map(user => (
+                                        <DropdownMenuRadioItem key={user.id} value={user.name}>{user.name}</DropdownMenuRadioItem>
+                                    ))}
+                                </DropdownMenuRadioGroup>
+                            </DropdownMenuSubContent>
+                            </DropdownMenuPortal>
+                        </DropdownMenuSub>
+                        <DropdownMenuSub>
+                            <DropdownMenuSubTrigger>Source</DropdownMenuSubTrigger>
+                            <DropdownMenuPortal>
+                            <DropdownMenuSubContent>
+                                <DropdownMenuRadioGroup value={sourceFilter} onValueChange={(value) => {setSourceFilter(value); setQuickFilter('Show all'); setUserFilter('all');}}>
+                                    <DropdownMenuRadioItem value="all">All Sources</DropdownMenuRadioItem>
+                                    {sources.map(source => (
+                                        <DropdownMenuRadioItem key={source.id} value={source.name}>{source.name}</DropdownMenuRadioItem>
+                                    ))}
+                                </DropdownMenuRadioGroup>
+                            </DropdownMenuSubContent>
+                            </DropdownMenuPortal>
+                        </DropdownMenuSub>
                     </DropdownMenuContent>
                     </DropdownMenu>
                     <Button variant="outline" size="sm" onClick={() => setIsSearchOpen(true)}>

@@ -190,8 +190,17 @@ export async function getDealsForClient(clientId: string): Promise<Deal[]> {
 }
 
 export async function getAllDeals(): Promise<Deal[]> {
+     const session = await verifySession();
+     if (!session?.userId) return [];
+     
      try {
+        const whereClause: Prisma.DealWhereInput = {};
+        if (session.viewPermission === 'ASSIGNED') {
+          whereClause.assignedToId = session.userId;
+        }
+
         const deals = await prisma.deal.findMany({
+            where: whereClause,
             orderBy: { createdAt: 'desc' },
             include: { assignedTo: true, client: true }
         });

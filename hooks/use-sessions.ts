@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { getSession } from '@/lib/session';
+import type { ViewPermission } from '@/types';
 
 type Session = {
   isAuth: boolean;
@@ -10,6 +11,7 @@ type Session = {
   name: string;
   email: string;
   role: string;
+  viewPermission: ViewPermission;
 } | null;
 
 

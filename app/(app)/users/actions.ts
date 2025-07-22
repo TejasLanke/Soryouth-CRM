@@ -1,11 +1,12 @@
 
+
 'use server';
 
 import { z } from 'zod';
 import prisma from '@/lib/prisma';
 import { hashPassword, verifySession } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
-import type { User, UserRole, RolePermission } from '@/types';
+import type { User, UserRole, RolePermission, ViewPermission } from '@/types';
 import { getUserRoles } from '@/app/(app)/settings/actions';
 import { NAV_ITEMS, TOOLS_NAV_ITEMS } from '@/lib/constants';
 
@@ -17,6 +18,7 @@ function mapPrismaUserToUserType(prismaUser: any): User {
       phone: prismaUser.phone,
       role: prismaUser.role,
       isActive: prismaUser.isActive,
+      viewPermission: prismaUser.viewPermission,
       createdAt: prismaUser.createdAt.toISOString(),
     };
   }
@@ -79,6 +81,7 @@ export async function addUser(prevState: any, formData: FormData) {
         password: hashedPassword,
         role: role,
         isActive: true, // New users are active by default
+        viewPermission: 'ASSIGNED', // Default to only seeing assigned items
       },
     });
 
@@ -141,6 +144,26 @@ export async function toggleUserStatus(userId: string, currentStatus: boolean): 
         return { success: true };
     } catch (error) {
         console.error(`Failed to toggle status for user ${userId}:`, error);
+        return { success: false, error: 'An unexpected error occurred.' };
+    }
+}
+
+export async function toggleUserViewPermission(userId: string, currentPermission: ViewPermission): Promise<{ success: boolean; error?: string }> {
+    const session = await verifySession();
+    if (!session?.userId || session.role !== 'Admin') {
+        return { success: false, error: 'Only admins can change view permissions.' };
+    }
+
+    try {
+        const newPermission: ViewPermission = currentPermission === 'ALL' ? 'ASSIGNED' : 'ALL';
+        await prisma.user.update({
+            where: { id: userId },
+            data: { viewPermission: newPermission },
+        });
+        revalidatePath('/users');
+        return { success: true };
+    } catch (error) {
+        console.error(`Failed to toggle view permission for user ${userId}:`, error);
         return { success: false, error: 'An unexpected error occurred.' };
     }
 }

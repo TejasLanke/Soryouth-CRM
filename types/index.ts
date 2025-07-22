@@ -17,6 +17,7 @@ export type ModuleType = typeof MODULE_TYPES[number];
 export type DCRStatus = typeof DCR_STATUSES[number];
 export type ModuleWattage = typeof MODULE_WATTAGE_OPTIONS[number];
 export type ClientPriorityType = typeof CLIENT_PRIORITY_OPTIONS[number];
+export type ViewPermission = 'ALL' | 'ASSIGNED';
 
 
 export type AnyStatusType = LeadStatusType | ClientStatusType;
@@ -29,6 +30,7 @@ export interface User {
   role: UserRole;
   isActive: boolean;
   createdAt: string;
+  viewPermission: ViewPermission;
 }
 
 export interface RolePermission {

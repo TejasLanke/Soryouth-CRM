@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useEffect, useState, useTransition } from 'react';
@@ -8,9 +9,9 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Users, PlusCircle, Loader2, MoreVertical, Trash2, Edit, UserX, UserCheck, Settings, ShieldCheck } from 'lucide-react';
+import { Users, PlusCircle, Loader2, MoreVertical, Trash2, Edit, UserX, UserCheck, Settings, ShieldCheck, Eye, ListFilter } from 'lucide-react';
 import type { User, CustomSetting } from '@/types';
-import { getUsers, deleteUser, updateUser, toggleUserStatus } from './actions';
+import { getUsers, deleteUser, updateUser, toggleUserStatus, toggleUserViewPermission } from './actions';
 import { getUserRoles } from '@/app/(app)/settings/actions';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -102,6 +103,18 @@ export default function ManageUsersPage() {
     });
   };
 
+  const handleToggleViewPermission = (user: User) => {
+    startTransition(async () => {
+        const result = await toggleUserViewPermission(user.id, user.viewPermission);
+        if(result.success) {
+            toast({ title: 'Permission Updated', description: `${user.name}'s view permission has been updated.`});
+            fetchData();
+        } else {
+            toast({ title: 'Error', description: result.error || 'Failed to update permission.', variant: 'destructive'});
+        }
+    });
+  }
+
   return (
     <>
       <PageHeader
@@ -139,6 +152,7 @@ export default function ManageUsersPage() {
                 <TableHead>Phone</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>View Permission</TableHead>
                 <TableHead>Date Joined</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -159,6 +173,11 @@ export default function ManageUsersPage() {
                       {user.isActive ? 'Active' : 'Inactive'}
                     </Badge>
                   </TableCell>
+                  <TableCell>
+                    <Badge variant={user.viewPermission === 'ALL' ? 'default' : 'secondary'}>
+                       {user.viewPermission === 'ALL' ? 'All Data' : 'Assigned Only'}
+                    </Badge>
+                  </TableCell>
                   <TableCell>{format(new Date(user.createdAt), 'dd MMM, yyyy')}</TableCell>
                    <TableCell className="text-right">
                      <DropdownMenu>
@@ -176,6 +195,10 @@ export default function ManageUsersPage() {
                             <DropdownMenuItem onClick={() => handleToggleStatus(user)}>
                                 {user.isActive ? <UserX className="mr-2 h-4 w-4" /> : <UserCheck className="mr-2 h-4 w-4" />}
                                 <span>{user.isActive ? 'Make Inactive' : 'Make Active'}</span>
+                            </DropdownMenuItem>
+                             <DropdownMenuItem onClick={() => handleToggleViewPermission(user)}>
+                                {user.viewPermission === 'ALL' ? <ListFilter className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
+                                <span>{user.viewPermission === 'ALL' ? 'Set to Assigned View' : 'Set to All View'}</span>
                             </DropdownMenuItem>
                            <AlertDialog>
                                 <AlertDialogTrigger asChild>

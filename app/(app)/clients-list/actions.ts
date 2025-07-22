@@ -57,13 +57,20 @@ function mapPrismaFollowUpToFollowUpType(prismaFollowUp: any): FollowUp {
 }
 
 export async function getActiveClients(): Promise<Client[]> {
+  const session = await verifySession();
+  if (!session?.userId) return [];
+  
   try {
+    const whereClause: Prisma.ClientWhereInput = {
+      status: { not: 'Inactive' },
+    };
+
+    if (session.viewPermission === 'ASSIGNED') {
+      whereClause.assignedToId = session.userId;
+    }
+
     const clientsFromDb = await prisma.client.findMany({
-      where: {
-        status: {
-          not: 'Inactive',
-        },
-      },
+      where: whereClause,
       orderBy: { createdAt: 'desc' },
       include: {
         followUps: {
@@ -82,11 +89,18 @@ export async function getActiveClients(): Promise<Client[]> {
 }
 
 export async function getInactiveClients(): Promise<Client[]> {
+  const session = await verifySession();
+  if (!session?.userId) return [];
+
   try {
+    const whereClause: Prisma.ClientWhereInput = {
+      status: 'Inactive',
+    };
+    if (session.viewPermission === 'ASSIGNED') {
+      whereClause.assignedToId = session.userId;
+    }
     const clientsFromDb = await prisma.client.findMany({
-      where: {
-        status: 'Inactive',
-      },
+      where: whereClause,
       orderBy: { createdAt: 'desc' },
       include: {
         followUps: {

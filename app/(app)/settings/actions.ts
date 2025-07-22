@@ -21,7 +21,7 @@ export async function getSettingsByType(type: SettingType): Promise<CustomSettin
     try {
         const settings = await prisma.customSetting.findMany({
             where: { type },
-            orderBy: { name: 'asc' },
+            orderBy: { createdAt: 'asc' },
         });
         return settings.map(mapPrismaCustomSetting);
     } catch (error) {
