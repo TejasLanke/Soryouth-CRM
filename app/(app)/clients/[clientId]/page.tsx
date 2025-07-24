@@ -34,6 +34,7 @@ import { TemplateSelectionDialog } from '@/app/(app)/proposals/template-selectio
 import { DocumentCreationDialog } from '@/app/(app)/documents/document-creation-dialog';
 import { DocumentTemplateSelectionDialog } from '@/app/(app)/documents/document-template-selection-dialog';
 import { TaskCompletionToast } from '@/components/task-completion-toast';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 
 const ActivityIcon = ({ type, className }: { type: string, className?: string }) => {
@@ -798,7 +799,56 @@ export default function ClientDetailsPage() {
                 )}
               </CardContent>
             </Card>
-            {surveys.length > 0 && <SurveyDetailsCard survey={surveys[0]} />}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                        <ClipboardEdit className="h-5 w-5 text-primary" />
+                        Site Survey History
+                    </CardTitle>
+                    <CardDescription>All surveys conducted for this client.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {surveys.length === 0 ? (
+                        <p className="text-sm text-center text-muted-foreground py-4">No surveys found.</p>
+                    ) : (
+                        <Accordion type="single" collapsible className="w-full">
+                            {surveys.map(survey => (
+                                <AccordionItem value={survey.id} key={survey.id}>
+                                    <AccordionTrigger>
+                                        <div className="flex justify-between w-full pr-4">
+                                            <span>Survey No: {survey.surveyNumber.slice(-8)}</span>
+                                            <span className="text-muted-foreground text-sm">{format(parseISO(survey.date), 'dd MMM, yyyy')}</span>
+                                        </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent className="p-1">
+                                       <div className="text-xs space-y-3 p-3 border rounded-md">
+                                            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                                                <div><strong>Surveyor:</strong> {survey.surveyorName}</div>
+                                                <div><strong>Category:</strong> {survey.consumerCategory}</div>
+                                                <div><strong>Roof Type:</strong> {survey.roofType}</div>
+                                                <div><strong>Building Height:</strong> {survey.buildingHeight}</div>
+                                                <div><strong>Shadow-Free Area:</strong> {survey.shadowFreeArea}</div>
+                                                <div><strong>DISCOM:</strong> {survey.discom}</div>
+                                                <div><strong>Sanctioned Load:</strong> {survey.sanctionedLoad || 'N/A'}</div>
+                                                <div><strong>Meter Phase:</strong> {survey.meterPhase || 'N/A'}</div>
+                                                <div><strong>No. of Meters:</strong> {survey.numberOfMeters}</div>
+                                                <div><strong>Meter Rating:</strong> {survey.meterRating || 'N/A'}</div>
+                                                <div><strong>Avg. Bill (₹):</strong> {survey.electricityAmount?.toLocaleString('en-IN') || 'N/A'}</div>
+                                            </div>
+                                            {survey.remark && (
+                                                <div className="pt-1">
+                                                    <strong className="font-semibold">Remark:</strong>
+                                                    <p className="p-2 bg-muted rounded-md mt-1 text-xs">{survey.remark}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            ))}
+                        </Accordion>
+                    )}
+                </CardContent>
+            </Card>
           </div>
 
           <div className="lg:col-span-3 space-y-6">

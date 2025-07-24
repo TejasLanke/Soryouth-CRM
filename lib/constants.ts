@@ -59,7 +59,6 @@ export const TOOLS_NAV_ITEMS: NavItem[] = [
   { href: '/view-expenses', label: 'View Expenses', icon: ClipboardCheck },
   { href: '/attendance', label: 'Attendance', icon: CheckSquare },
   { href: '/communications', label: 'Communications', icon: MessageSquareText },
-  { href: '/calendar', label: 'Calendar', icon: CalendarDays },
   { href: '/survey-reports', label: 'Survey Reports', icon: MapPinnedIcon },
   { href: '/tickets', label: 'Tickets', icon: Ticket },
   { href: '/proposals/batch', label: 'Batch Proposals', icon: Rows },

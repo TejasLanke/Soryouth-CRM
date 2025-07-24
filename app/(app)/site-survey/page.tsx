@@ -179,7 +179,7 @@ export default function SiteSurveyPage() {
     form.setValue('consumerName', customer.name);
     form.setValue('location', customer.address || '');
     form.setValue('consumerCategory', customer.clientType || 'Other');
-    if ('source' in customer) { // It's a Lead
+    if ('dropReason' in customer) { // It's a Lead
         form.setValue('leadId', customer.id);
         form.setValue('clientId', undefined);
     } else { // It's a Client

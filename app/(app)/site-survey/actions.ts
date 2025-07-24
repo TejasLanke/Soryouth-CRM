@@ -81,22 +81,7 @@ export async function createSiteSurvey(data: CreateSiteSurveyData): Promise<Site
       },
     });
 
-    // After creating the survey, update the corresponding lead or client with the bill URL
-    if (newSurvey.electricityBillFiles && newSurvey.electricityBillFiles.length > 0) {
-      if (newSurvey.leadId) {
-        const lead = await prisma.lead.findUnique({ where: { id: newSurvey.leadId } });
-        await prisma.lead.update({
-          where: { id: newSurvey.leadId },
-          data: { electricityBillUrls: [...(lead?.electricityBillUrls || []), ...newSurvey.electricityBillFiles] },
-        });
-      } else if (newSurvey.clientId) {
-        const client = await prisma.client.findUnique({ where: { id: newSurvey.clientId } });
-        await prisma.client.update({
-          where: { id: newSurvey.clientId },
-          data: { electricityBillUrls: [...(client?.electricityBillUrls || []), ...newSurvey.electricityBillFiles] },
-        });
-      }
-    }
+  
 
 
     revalidatePath('/site-survey');
