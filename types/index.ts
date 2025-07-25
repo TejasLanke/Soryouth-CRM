@@ -1,5 +1,5 @@
 
-import type { LEAD_PRIORITY_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES, EXPENSE_CATEGORIES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS, SURVEY_STATUS_OPTIONS, SURVEY_TYPE_OPTIONS, METER_PHASES, CONSUMER_LOAD_TYPES, ROOF_TYPES, DISCOM_OPTIONS, CLIENT_PRIORITY_OPTIONS, EXPENSE_STATUSES, DEAL_PIPELINES, ALL_DEAL_STAGES, TASK_PRIORITIES } from '@/lib/constants';
+import type { LEAD_PRIORITY_OPTIONS, USER_OPTIONS, DROP_REASON_OPTIONS, CLIENT_TYPES, EXPENSE_CATEGORIES, FOLLOW_UP_TYPES, FOLLOW_UP_STATUSES, MODULE_TYPES, DCR_STATUSES, MODULE_WATTAGE_OPTIONS, SURVEY_TYPE_OPTIONS, METER_PHASES, CONSUMER_LOAD_TYPES, ROOF_TYPES, DISCOM_OPTIONS, CLIENT_PRIORITY_OPTIONS, EXPENSE_STATUSES, DEAL_PIPELINES, ALL_DEAL_STAGES, TASK_PRIORITIES } from '@/lib/constants';
 
 // Deriving types from the const arrays ensures type safety and single source of truth
 export type LeadStatusType = string;
@@ -67,7 +67,7 @@ export interface Lead {
   kilowatt?: number | null;
   address?: string | null;
   priority?: LeadPriorityType | null;
-  dropReason?: DropReasonType | null;
+  dropReason?: DropReasonType | "Not Dropped" | null;
   clientType?: ClientType | null;
   electricityBillUrls: string[];
   followupCount?: number;
@@ -306,7 +306,7 @@ export interface Expense {
 
 export type CreateExpenseData = Omit<Expense, 'id' | 'userName' | 'submittedAt' | 'reviewedById' | 'reviewedBy' | 'reviewedAt' | 'status'>;
 
-export type SurveyStatusType = typeof SURVEY_STATUS_OPTIONS[number];
+export type SurveyStatusType = 'Scheduled' | 'In Progress' | 'Completed' | 'Cancelled' | 'On Hold';
 export type SurveyTypeOption = typeof SURVEY_TYPE_OPTIONS[number];
 export type ConsumerCategoryType = typeof CLIENT_TYPES[number];
 export type MeterPhaseType = typeof METER_PHASES[number];
@@ -334,7 +334,6 @@ export interface SiteSurvey {
   sanctionedLoad?: string;
   remark?: string;
   electricityBillFiles: string[];
-  status: string;
   createdAt: string;
   updatedAt: string;
   leadId?: string | null;
@@ -344,17 +343,16 @@ export interface SiteSurvey {
   surveyorId: string;
 }
 
-export type CreateSiteSurveyData = Omit<SiteSurvey, 'id' | 'surveyNumber' | 'createdAt' | 'updatedAt' | 'surveyorName' | 'status' | 'consumerName' | 'location' | 'electricityBills'> & {
+export type CreateSiteSurveyData = Omit<SiteSurvey, 'id' | 'surveyNumber' | 'createdAt' | 'updatedAt' | 'surveyorName' | 'consumerName' | 'location' | 'electricityBills'> & {
   leadId?: string | null;
   clientId?: string | null;
   surveyorId: string;
   consumerName: string;
   location: string;
-  status?: string;
 };
 
 
-export interface SiteSurveyFormValues extends Omit<SiteSurvey, 'id' | 'surveyNumber' | 'createdAt' | 'updatedAt' | 'surveyorName' | 'status' | 'electricityBillFiles' | 'surveyorId'> {
+export interface SiteSurveyFormValues extends Omit<SiteSurvey, 'id' | 'surveyNumber' | 'createdAt' | 'updatedAt' | 'surveyorName' | 'electricityBillFiles' | 'surveyorId'> {
   electricityBillFiles?: FileList | null;
   surveyorName: UserOptionType;
   leadId?: string;

@@ -190,7 +190,7 @@ export async function createLead(data: CreateLeadData): Promise<Lead | null> {
         kilowatt: data.kilowatt === undefined ? null : Number(data.kilowatt),
         address: data.address || null,
         priority: data.priority || null,
-        dropReason: data.dropReason || null,
+        dropReason: data.dropReason || "Not Dropped" || null,
         clientType: data.clientType || null,
         electricityBillUrls: data.electricityBillUrls || [],
         createdById: session.userId,
@@ -371,7 +371,7 @@ export async function convertToClient(leadId: string): Promise<{ success: boolea
   try {
     const lead = await prisma.lead.findUnique({
       where: { id: leadId },
-      include: { followUps: true },
+      include: { followUps: true , siteSurveys: true},
     });
 
     if (!lead) {
@@ -413,7 +413,18 @@ export async function convertToClient(leadId: string): Promise<{ success: boolea
         });
       }
 
-      // 3. Re-associate all proposals with the new client
+      // Re-associate site surveys
+      if (lead.siteSurveys.length > 0) {
+        await tx.siteSurvey.updateMany({
+          where: { leadId: lead.id },
+          data: {
+            clientId: createdClient.id,
+            leadId: null,
+          },
+        });
+      }
+
+      // 4. Re-associate all proposals with the new client
       await tx.proposal.updateMany({
         where: { leadId: lead.id },
         data: {
@@ -422,7 +433,7 @@ export async function convertToClient(leadId: string): Promise<{ success: boolea
         },
       });
 
-      // 4. Delete the original lead
+      // 5. Delete the original lead
       await tx.lead.delete({
         where: { id: lead.id },
       });

@@ -27,7 +27,6 @@ function mapPrismaSurvey(survey: any): SiteSurvey {
     sanctionedLoad: survey.sanctionedLoad ?? undefined,
     remark: survey.remark ?? undefined,
     electricityBillFiles: survey.electricityBillFiles ?? [],
-    status: survey.status,
     createdAt: survey.createdAt.toISOString(),
     updatedAt: survey.updatedAt.toISOString(),
     leadId: survey.leadId ?? undefined,
@@ -71,7 +70,6 @@ export async function createSiteSurvey(data: CreateSiteSurveyData): Promise<Site
         sanctionedLoad: data.sanctionedLoad,
         remark: data.remark,
         electricityBillFiles: data.electricityBillFiles,
-        status: 'Scheduled', // Default status for a new survey
         leadId: data.leadId,
         clientId: data.clientId,
         surveyorId: surveyor.id,

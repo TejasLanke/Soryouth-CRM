@@ -76,15 +76,15 @@ model Lead {
   kilowatt          Float?
   address           String?
   priority          String? // Corresponds to LeadPriorityType
-  dropReason        String? // Corresponds to DropReasonType
+  dropReason        String? @default("Not Dropped")// Corresponds to DropReasonType
   clientType        String? // Corresponds to ClientType
   totalDealValue    Float?
   electricityBillUrls String[] @default([]) 
   followUpCount     Int @default(0)
 
-  followUps FollowUp[]
+  followUps      FollowUp[]
   proposals      Proposal[]
-  siteSurveys        SiteSurvey[]
+  siteSurveys    SiteSurvey[]
 
   // --- Relations to User ---
   createdById String?
@@ -320,7 +320,6 @@ model SiteSurvey {
   sanctionedLoad      String?
   remark              String?
   electricityBillFiles String[] @default([])
-  status              String   @default("Pending")
 
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt

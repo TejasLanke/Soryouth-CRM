@@ -5,9 +5,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { SURVEY_STATUS_OPTIONS } from '@/lib/constants';
-import type { SiteSurvey, SurveyStatusType, SurveySortConfig, SurveyStatusFilterItem } from '@/types';
-import { Filter, Search, PlusCircle, Settings2, ListChecks, Rows, ListFilter } from 'lucide-react';
+import type { SiteSurvey, SurveySortConfig } from '@/types';
+import { Search, PlusCircle, Settings2, ListChecks, Rows, ListFilter } from 'lucide-react';
 import { SurveysTable } from './surveys-table';
 import { useToast } from "@/hooks/use-toast";
 import { getSiteSurveys } from '@/app/(app)/site-survey/actions';
@@ -18,14 +17,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 // Define all possible columns for the survey list
-const allColumns: Record<keyof Omit<SiteSurvey, 'id' | 'createdAt' | 'updatedAt' | 'leadId' | 'clientId' | 'droppedLeadId' | 'surveyorId' | 'electricityBillFiles'>, string> = {
+const allColumns: Record<keyof Omit<SiteSurvey, 'id' | 'createdAt' | 'updatedAt' | 'leadId' | 'clientId' | 'droppedLeadId' | 'surveyorId' | 'electricityBillFiles' | 'status'>, string> = {
     surveyNumber: 'Survey No.',
     consumerName: 'Client Name',
     location: 'Location',
     date: 'Survey Date',
     surveyorName: 'Surveyor',
     consumerCategory: 'Category',
-    status: 'Status',
     numberOfMeters: 'No. of Meters',
     meterRating: 'Meter Rating',
     meterPhase: 'Meter Phase',
@@ -45,7 +43,6 @@ export default function SurveyListPage() {
   const [surveys, setSurveys] = useState<SiteSurvey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
-  const [activeFilter, setActiveFilter] = useState<SurveyStatusType | 'all'>('all');
   const [sortConfig, setSortConfig] = useState<SurveySortConfig | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -84,36 +81,10 @@ export default function SurveyListPage() {
     fetchData();
   }, []);
 
-  const statusFilters = useMemo((): SurveyStatusFilterItem[] => {
-    const counts: { [key: string]: number } = {};
-    SURVEY_STATUS_OPTIONS.forEach(status => counts[status] = 0);
-    counts['all'] = surveys.length;
-
-    surveys.forEach(survey => {
-      if (counts[survey.status] !== undefined) {
-        counts[survey.status]++;
-      } else {
-        counts[survey.status] = 1;
-      }
-    });
-
-    const filters: SurveyStatusFilterItem[] = [{ label: 'Show all', value: 'all', count: counts.all }];
-    SURVEY_STATUS_OPTIONS.forEach(status => {
-      if(counts[status] > 0) {
-        filters.push({ label: status, value: status, count: counts[status] });
-      }
-    });
-
-    return filters;
-  }, [surveys]);
-
 
   const allFilteredSurveys = useMemo(() => {
     let currentSurveys = [...surveys];
-    
-    if (activeFilter !== 'all') {
-      currentSurveys = currentSurveys.filter(survey => survey.status === activeFilter);
-    }
+  
 
     if (searchTerm) {
       const lowercasedTerm = searchTerm.toLowerCase();
@@ -154,7 +125,7 @@ export default function SurveyListPage() {
       });
     }
     return currentSurveys;
-  }, [surveys, activeFilter, sortConfig, searchTerm]);
+  }, [surveys, sortConfig, searchTerm]);
 
   const paginatedSurveys = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
@@ -243,24 +214,6 @@ export default function SurveyListPage() {
           </div>
         }
       />
-      <div className="mb-4">
-        <div className="flex flex-wrap gap-2 items-center">
-          {statusFilters.map(filter => (
-            <Button
-              key={filter.value}
-              variant={activeFilter === filter.value ? 'secondary' : 'ghost'}
-              size="sm"
-              onClick={() => setActiveFilter(filter.value as SurveyStatusType | 'all')}
-              className={`py-1 px-3 h-auto text-xs rounded-full ${activeFilter === filter.value ? 'border-b-2 border-primary font-semibold' : 'text-muted-foreground'}`}
-            >
-              {filter.label}
-              <Badge variant={activeFilter === filter.value ? 'default' : 'secondary'} className="ml-2 rounded-sm px-1.5 py-0.5 text-[10px] h-4 leading-none">
-                {filter.count}
-              </Badge>
-            </Button>
-          ))}
-        </div>
-      </div>
       
       <SurveysTable 
         surveys={paginatedSurveys} 

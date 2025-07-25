@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { SiteSurvey, SurveySortConfig, SurveyStatusType, ConsumerCategoryType, UserOptionType } from '@/types';
+import type { SiteSurvey, SurveySortConfig, ConsumerCategoryType, UserOptionType } from '@/types';
 import React from 'react';
 import {
   Table,
@@ -66,7 +66,6 @@ const allColumnsConfig: { key: keyof SiteSurvey; label: string }[] = [
     { key: 'date', label: 'Survey Date' },
     { key: 'surveyorName', label: 'Surveyor' },
     { key: 'consumerCategory', label: 'Category' },
-    { key: 'status', label: 'Status' },
     { key: 'numberOfMeters', label: 'No. of Meters' },
     { key: 'meterRating', label: 'Meter Rating' },
     { key: 'meterPhase', label: 'Meter Phase' },
@@ -81,17 +80,6 @@ const allColumnsConfig: { key: keyof SiteSurvey; label: string }[] = [
 ];
 
 export function SurveysTable({ surveys, onEditSurvey, onDeleteSurvey, sortConfig, requestSort, columnVisibility = {} }: SurveysTableProps) {
-  
-  const getStatusBadgeVariant = (status: SurveyStatusType) => {
-    switch (status) {
-      case 'Completed': return 'default';
-      case 'Scheduled': return 'secondary';
-      case 'In Progress': return 'outline';
-      case 'Cancelled': return 'destructive';
-      case 'On Hold': return 'secondary';
-      default: return 'outline';
-    }
-  };
 
   const getSortIndicator = (key: keyof SiteSurvey) => {
     if (!requestSort || !sortConfig || sortConfig.key !== key) {
@@ -121,8 +109,6 @@ export function SurveysTable({ surveys, onEditSurvey, onDeleteSurvey, sortConfig
                 <span className="text-xs">{value || '-'}</span>
             </div>
         );
-      case 'status':
-        return <Badge variant={getStatusBadgeVariant(value as SurveyStatusType)} className="capitalize text-xs">{value}</Badge>;
       case 'electricityAmount':
         return value ? <span className="flex items-center"><IndianRupee className="h-3 w-3 mr-0.5" />{Number(value).toLocaleString('en-IN')}</span> : '-';
       case 'surveyNumber':

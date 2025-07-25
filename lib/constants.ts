@@ -137,7 +137,6 @@ export const MOCK_COMMUNICATIONS: Communication[] = [];
 export const EXPENSE_CATEGORIES = ['Travel', 'Food', 'Supplies', 'Utilities', 'Software', 'Training', 'Marketing', 'Other'] as const;
 export const EXPENSE_STATUSES = ['Pending', 'Approved', 'Rejected'] as const;
 export const MOCK_EXPENSES: Expense[] = [];
-export const SURVEY_STATUS_OPTIONS = ['Scheduled', 'In Progress', 'Completed', 'Cancelled', 'On Hold'] as const;
 export const SURVEY_TYPE_OPTIONS = ['Commercial', 'Residential', 'Industrial', 'Agricultural', 'Other'] as const;
 export const CONSUMER_CATEGORIES_OPTIONS = CLIENT_TYPES;
 export const METER_PHASES = ['Single Phase', 'Three Phase', 'Not Applicable'] as const;

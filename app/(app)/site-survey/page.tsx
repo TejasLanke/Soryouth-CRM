@@ -97,7 +97,7 @@ const CustomerCombobox = ({ onSelect, customers }: { onSelect: (customer: Client
                                 <Check className={cn("mr-2 h-4 w-4", selectedCustomer?.id === customer.id ? "opacity-100" : "opacity-0")} />
                                 <div>
                                     <p>{customer.name}</p>
-                                    <p className="text-xs text-muted-foreground">{'source' in customer ? `Lead: ${customer.status}` : `Client: ${customer.status}`}</p>
+                                    <p className="text-xs text-muted-foreground">{'dropReason' in customer ? `Lead: ${customer.status} - ${customer.phone}` : `Client: ${customer.status} - ${customer.phone}`}</p>
                                 </div>
                             </CommandItem>
                         ))}
