@@ -163,6 +163,7 @@ export const PLACEHOLDER_DEFINITIONS_PROPOSAL: PlaceholderGroup = {
     { placeholder: '{{module_wattage}}', description: 'The wattage of a single module (e.g., 545 W).' },
     { placeholder: '{{inverter_rating}}', description: 'The rating of the inverter in kW.' },
     { placeholder: '{{inverter_qty}}', description: 'The quantity of inverters.' },
+    { placeholder: '{{dcr_status}}', description: 'Indicates if the components are DCR or Non-DCR.' },
   ],
   'Financials': [
     { placeholder: '{{rate_per_watt}}', description: 'The cost per watt in rupees.' },

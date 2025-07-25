@@ -329,7 +329,10 @@ export async function convertClientToLead(clientId: string): Promise<{ success: 
   try {
     const client = await prisma.client.findUnique({
       where: { id: clientId },
-      include: { followUps: { orderBy: { createdAt: 'desc' }} },
+      include: { 
+        followUps: { orderBy: { createdAt: 'desc' }}, 
+        siteSurveys: true // Include site surveys
+      },
     });
 
     if (!client) {
@@ -371,6 +374,17 @@ export async function convertClientToLead(clientId: string): Promise<{ success: 
 
       if (client.followUps.length > 0) {
         await tx.followUp.updateMany({
+          where: { clientId: client.id },
+          data: {
+            leadId: createdLead.id,
+            clientId: null,
+          },
+        });
+      }
+
+      // Re-associate site surveys
+      if (client.siteSurveys.length > 0) {
+        await tx.siteSurvey.updateMany({
           where: { clientId: client.id },
           data: {
             leadId: createdLead.id,
