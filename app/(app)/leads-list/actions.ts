@@ -165,41 +165,83 @@ export async function getLeadById(id: string): Promise<Lead | null> {
 export async function createLead(data: CreateLeadData): Promise<Lead | null> {
   const session = await verifySession();
   if (!session?.userId) {
-      console.error("Authentication error: No user session found.");
-      return null;
+    console.error("Authentication error: No user session found.");
+    return null;
   }
-  
+
   try {
-    let assignedToId: string | null = null;
-    if (data.assignedTo) {
-      const user = await prisma.user.findFirst({ where: { name: data.assignedTo }});
-      if (user) assignedToId = user.id;
-    }
+    const newLead = await prisma.$transaction(async (tx) => {
+      let assignedToId: string | null = null;
+      if (data.assignedTo) {
+        const user = await tx.user.findFirst({ where: { name: data.assignedTo }});
+        if (user) assignedToId = user.id;
+      }
     
-    const newLead = await prisma.lead.create({
-      data: {
-        name: data.name,
-        status: data.status,
-        email: data.email || null,
-        phone: data.phone || null,
-        source: data.source || null,
-        lastCommentText: data.lastCommentText || null,
-        lastCommentDate: data.lastCommentDate ? parseISO(data.lastCommentDate.split('-').reverse().join('-')) : null,
-        nextFollowUpDate: data.nextFollowUpDate ? parseISO(data.nextFollowUpDate) : null,
-        nextFollowUpTime: data.nextFollowUpTime || null,
-        kilowatt: data.kilowatt === undefined ? null : Number(data.kilowatt),
-        address: data.address || null,
-        priority: data.priority || null,
-        dropReason: data.dropReason || "Not Dropped" || null,
-        clientType: data.clientType || null,
-        electricityBillUrls: data.electricityBillUrls || [],
-        createdById: session.userId,
-        assignedToId: assignedToId,
-      },
+      // 1. Create the lead record
+      const createdLead = await tx.lead.create({
+        data: {
+          name: data.name,
+          status: data.status,
+          email: data.email || null,
+          phone: data.phone || null,
+          source: data.source || null,
+          kilowatt: data.kilowatt === undefined ? null : Number(data.kilowatt),
+          address: data.address || null,
+          priority: data.priority || null,
+          dropReason: data.dropReason || "Not Dropped" || null,
+          clientType: data.clientType || null,
+          electricityBillUrls: data.electricityBillUrls || [],
+          createdById: session.userId,
+          assignedToId: assignedToId,
+          // Set fields that will be updated by follow-ups/tasks
+          lastCommentText: data.lastCommentText || null,
+          lastCommentDate: data.lastCommentDate ? parseISO(data.lastCommentDate.split('-').reverse().join('-')) : null,
+          nextFollowUpDate: data.nextFollowUpDate ? parseISO(data.nextFollowUpDate) : null,
+          nextFollowUpTime: data.nextFollowUpTime || null,
+        },
+      });
+
+      // 2. Create a follow-up activity if a comment was added
+      if (data.lastCommentText) {
+        await tx.followUp.create({
+          data: {
+            leadId: createdLead.id,
+            type: 'Call', // Default type for initial comment
+            date: new Date(),
+            status: 'Answered',
+            comment: data.lastCommentText,
+            followupOrTask: 'Followup',
+            createdById: session.userId,
+          },
+        });
+      };
+
+      // 3. Create a task if a next follow-up date/time was set
+      if (data.nextFollowUpDate && data.nextFollowUpTime && assignedToId) {
+        await tx.followUp.create({
+          data: {
+            leadId: createdLead.id,
+            type: 'Call', // Default task type
+            date: new Date(),
+            status: 'Answered', // Not applicable for tasks, but required
+            comment: `Initial follow-up task for ${data.name}`,
+            followupOrTask: 'Task',
+            taskDate: parseISO(data.nextFollowUpDate),
+            taskTime: data.nextFollowUpTime,
+            taskStatus: 'Open',
+            createdById: session.userId,
+            taskForUserId: assignedToId,
+          },
+        });
+      }
+      
+      return createdLead;
     });
+
     revalidatePath('/leads-list');
     const newLeadWithRelations = await getLeadById(newLead.id);
     return newLeadWithRelations;
+
   } catch (error) {
     console.error("Failed to create lead:", error);
     return null;

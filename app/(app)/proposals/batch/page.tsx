@@ -141,6 +141,8 @@ const CustomerCombobox = ({ control, index, customers, onSelect }: { control: an
     );
 };
 
+const BATCH_PROPOSAL_CACHE_KEY = 'batchProposalFormData';
+
 export default function BatchProposalsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -160,8 +162,9 @@ export default function BatchProposalsPage() {
     defaultValues: { proposals: [] },
   });
 
-  const { fields, append, remove } = useFieldArray({ control: form.control, name: 'proposals' });
+  const { fields, append, remove, replace } = useFieldArray({ control: form.control, name: 'proposals' });
   const watchedProposals = useWatch({ control: form.control, name: 'proposals' });
+  const watchedClientTypes = useWatch({ control: form.control, name: 'proposals' });
   const overallProgress = progress.length > 0 ? (progress.filter(p => p.status === 'success' || p.status === 'error').length / progress.length) * 100 : 0;
 
   useEffect(() => {
@@ -177,22 +180,68 @@ export default function BatchProposalsPage() {
         const [fetchedClients, fetchedLeads] = await Promise.all([getActiveClients(), getLeads()]);
         setClients(fetchedClients);
         setLeads(fetchedLeads);
-        if (fields.length === 0) append(getDefaultProposalRow() as any);
+        
+        const cachedData = localStorage.getItem(BATCH_PROPOSAL_CACHE_KEY);
+        if (cachedData) {
+            const parsedData = JSON.parse(cachedData);
+            if (parsedData.proposals && parsedData.proposals.length > 0) {
+                 replace(parsedData.proposals);
+            }
+        } else if (fields.length === 0) {
+             append(getDefaultProposalRow() as any);
+        }
         setIsDataLoading(false);
     }
     fetchData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  
+  useEffect(() => {
+    if (watchedProposals && !isDataLoading) {
+        localStorage.setItem(BATCH_PROPOSAL_CACHE_KEY, JSON.stringify({ proposals: watchedProposals }));
+    }
+  }, [watchedProposals, isDataLoading]);
+  
+  // Effect to update unitRate when clientType changes manually
+  useEffect(() => {
+    watchedClientTypes.forEach((proposal, index) => {
+        const clientType = proposal.clientType;
+        let newUnitRate;
+        switch (clientType) {
+            case 'Individual/Bungalow': newUnitRate = 14; break;
+            case 'Housing Society': newUnitRate = 19; break;
+            case 'Commercial': case 'Industrial': newUnitRate = 12; break;
+            default: newUnitRate = 10; break;
+        }
+        if (form.getValues(`proposals.${index}.unitRate`) !== newUnitRate) {
+            form.setValue(`proposals.${index}.unitRate`, newUnitRate);
+        }
+    });
+  }, [watchedClientTypes, form]);
+
 
   const handleCustomerSelect = (customer: Client | Lead, index: number) => {
     const isClient = 'status' in customer && !('source' in customer);
+    const capacity = customer.kilowatt || 0;
+    const clientType = customer.clientType || 'Other';
+    
+    let unitRate;
+    switch (clientType) {
+        case 'Individual/Bungalow': unitRate = 14; break;
+        case 'Housing Society': unitRate = 19; break;
+        case 'Commercial': case 'Industrial': unitRate = 12; break;
+        default: unitRate = 10; break;
+    }
+
     form.setValue(`proposals.${index}.customerId`, customer.id);
     form.setValue(`proposals.${index}.customerType`, isClient ? 'client' : 'lead');
     form.setValue(`proposals.${index}.name`, customer.name);
     form.setValue(`proposals.${index}.contactPerson`, customer.name);
     form.setValue(`proposals.${index}.location`, customer.address || '');
-    form.setValue(`proposals.${index}.clientType`, customer.clientType || 'Other');
-    form.setValue(`proposals.${index}.capacity`, customer.kilowatt || 0);
+    form.setValue(`proposals.${index}.clientType`, clientType);
+    form.setValue(`proposals.${index}.capacity`, capacity);
+    form.setValue(`proposals.${index}.inverterRating`, capacity); // Set inverter rating default
+    form.setValue(`proposals.${index}.unitRate`, unitRate); // Set unit rate
   };
   
   const processAllProposals = (data: BatchProposalsFormValues) => {
@@ -243,6 +292,7 @@ export default function BatchProposalsPage() {
             const saveResult = await bulkCreateProposals(successfulProposals);
             if (saveResult.success) {
                 toast({ title: `Batch Complete: ${saveResult.count} proposals saved.`, description: failedCount > 0 ? `${failedCount} failed.` : 'All successful.'});
+                 localStorage.removeItem(BATCH_PROPOSAL_CACHE_KEY); // Clear cache on success
             } else {
                 toast({ title: "Database Save Failed", description: saveResult.message, variant: "destructive" });
             }

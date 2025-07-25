@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 import type { GeneralTask, CreateGeneralTaskData, GeneralTaskStatus } from '@/types';
 import { revalidatePath } from 'next/cache';
 import { verifySession } from '@/lib/auth';
+import type { Prisma } from '@prisma/client';
 
 // Helper to map Prisma GeneralTask to frontend type
 function mapPrismaGeneralTask(task: any): GeneralTask {
@@ -60,8 +61,19 @@ export async function createGeneralTask(data: CreateGeneralTaskData): Promise<Ge
 }
 
 export async function getGroupedGeneralTasks(): Promise<Record<string, { user: { id: string, name: string }, tasks: GeneralTask[] }>> {
+    const session = await verifySession();
+    if (!session?.userId) return {};
+
     try {
+        const whereClause: Prisma.GeneralTaskWhereInput = {};
+
+        // If the user is not an Admin, they can only see tasks they created.
+        if (session.role !== 'Admin') {
+            whereClause.createdById = session.userId;
+        }
+
         const tasks = await prisma.generalTask.findMany({
+            where: whereClause,
             include: { 
                 assignedTo: { select: { id: true, name: true } },
                 createdBy: { select: { id: true, name: true } },
