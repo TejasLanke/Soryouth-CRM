@@ -1,8 +1,9 @@
 
+
 'use client';
 
 import { useState, useEffect, useMemo, useTransition, ChangeEvent } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { PageHeader } from '@/components/page-header';
@@ -32,6 +33,7 @@ const getSiteSurveySchema = (userNames: string[]) => z.object({
   consumerName: z.string().min(2, { message: 'Consumer name must be at least 2 characters.' }),
   date: z.string().refine((val) => isValid(parseISO(val)), { message: "A valid date is required." }),
   consumerCategory: z.enum(CONSUMER_CATEGORIES_OPTIONS, { required_error: "Consumer category is required." }),
+  consumerCategoryOther: z.string().optional(),
   location: z.string().min(3, { message: 'Location must be at least 3 characters.' }),
   numberOfMeters: z.coerce.number().int().positive({ message: 'Number of meters must be a positive integer.' }),
   meterRating: z.string().optional(),
@@ -39,9 +41,11 @@ const getSiteSurveySchema = (userNames: string[]) => z.object({
   electricityAmount: z.coerce.number().optional(),
   consumerLoadType: z.enum(CONSUMER_LOAD_TYPES, { required_error: "Consumer load type is required." }),
   roofType: z.enum(ROOF_TYPES, { required_error: "Type of roof is required." }),
+  roofTypeOther: z.string().optional(),
   buildingHeight: z.string().min(1, { message: "Building height is required." }),
   shadowFreeArea: z.string().min(1, { message: "Shadow free area is required." }),
   discom: z.enum(DISCOM_OPTIONS, { required_error: "Discom is required." }),
+  discomOther: z.string().optional(),
   sanctionedLoad: z.string().optional(),
   remark: z.string().optional(),
   surveyorName: userNames.length > 0
@@ -49,14 +53,14 @@ const getSiteSurveySchema = (userNames: string[]) => z.object({
     : z.string({ required_error: "Surveyor name is required." }).refine(() => false, "Cannot submit: No surveyors are available in the system."),
   electricityBillFiles: z.instanceof(FileList).optional().nullable()
     .refine(files => {
-        if (!files) return true;
+        if (!files || files.length === 0) return true;
         for (const file of Array.from(files)) {
             if (file.size > 5 * 1024 * 1024) return false;
         }
         return true;
     }, `Max file size is 5MB.`)
     .refine(files => {
-        if (!files) return true;
+        if (!files || files.length === 0) return true;
         for (const file of Array.from(files)) {
             if (!['image/jpeg', 'image/png', 'application/pdf'].includes(file.type)) return false;
         }
@@ -64,6 +68,15 @@ const getSiteSurveySchema = (userNames: string[]) => z.object({
     }, '.jpg, .png, or .pdf files are accepted.'),
   leadId: z.string().optional(),
   clientId: z.string().optional(),
+}).refine(data => data.consumerCategory !== 'Other' || (data.consumerCategory === 'Other' && data.consumerCategoryOther), {
+  message: 'Please specify the consumer category',
+  path: ['consumerCategoryOther'],
+}).refine(data => data.roofType !== 'Other' || (data.roofType === 'Other' && data.roofTypeOther), {
+  message: 'Please specify the roof type',
+  path: ['roofTypeOther'],
+}).refine(data => data.discom !== 'Other' || (data.discom === 'Other' && data.discomOther), {
+  message: 'Please specify the DISCOM',
+  path: ['discomOther'],
 });
 
 
@@ -97,7 +110,7 @@ const CustomerCombobox = ({ onSelect, customers }: { onSelect: (customer: Client
                                 <Check className={cn("mr-2 h-4 w-4", selectedCustomer?.id === customer.id ? "opacity-100" : "opacity-0")} />
                                 <div>
                                     <p>{customer.name}</p>
-                                    <p className="text-xs text-muted-foreground">{'dropReason' in customer ? `Lead: ${customer.status} - ${customer.phone}` : `Client: ${customer.status} - ${customer.phone}`}</p>
+                                    <p className="text-xs text-muted-foreground">{'dropReason' in customer ? `Lead: ${customer.status}` : `Client: ${customer.status}`}</p>
                                 </div>
                             </CommandItem>
                         ))}
@@ -136,6 +149,7 @@ export default function SiteSurveyPage() {
       consumerName: '',
       date: format(new Date(), 'yyyy-MM-dd'),
       consumerCategory: undefined,
+      consumerCategoryOther: '',
       location: '',
       numberOfMeters: 1,
       meterRating: '',
@@ -143,9 +157,11 @@ export default function SiteSurveyPage() {
       electricityAmount: undefined,
       consumerLoadType: undefined,
       roofType: undefined,
+      roofTypeOther: '',
       buildingHeight: '',
       shadowFreeArea: '',
       discom: undefined,
+      discomOther: '',
       sanctionedLoad: '',
       remark: '',
       surveyorName: undefined,
@@ -154,6 +170,10 @@ export default function SiteSurveyPage() {
       clientId: undefined,
     },
   });
+
+  const watchedConsumerCategory = form.watch('consumerCategory');
+  const watchedRoofType = form.watch('roofType');
+  const watchedDiscom = form.watch('discom');
 
   useEffect(() => {
     async function fetchData() {
@@ -305,23 +325,37 @@ export default function SiteSurveyPage() {
                   )}
                 />
               </div>
-
-              <FormField
-                control={form.control}
-                name="consumerCategory"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Consumer Category *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        {CONSUMER_CATEGORIES_OPTIONS.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <div className="grid md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="consumerCategory"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Consumer Category *</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl><SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            {CONSUMER_CATEGORIES_OPTIONS.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  {watchedConsumerCategory === 'Other' && (
+                     <FormField
+                      control={form.control}
+                      name="consumerCategoryOther"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Please Specify Category *</FormLabel>
+                          <FormControl><Input placeholder="e.g., Residential Complex" {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </div>
 
               <FormField
                 control={form.control}
@@ -412,7 +446,7 @@ export default function SiteSurveyPage() {
               </div>
 
               <div className="grid md:grid-cols-3 gap-6">
-                <FormField
+                 <FormField
                   control={form.control}
                   name="roofType"
                   render={({ field }) => (
@@ -428,6 +462,19 @@ export default function SiteSurveyPage() {
                     </FormItem>
                   )}
                 />
+                {watchedRoofType === 'Other' && (
+                  <FormField
+                    control={form.control}
+                    name="roofTypeOther"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Please Specify Roof Type *</FormLabel>
+                        <FormControl><Input placeholder="e.g., Tiled Roof" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
                 <FormField
                   control={form.control}
                   name="buildingHeight"
@@ -469,6 +516,19 @@ export default function SiteSurveyPage() {
                     </FormItem>
                   )}
                 />
+                {watchedDiscom === 'Other' && (
+                  <FormField
+                    control={form.control}
+                    name="discomOther"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Please Specify DISCOM *</FormLabel>
+                        <FormControl><Input placeholder="e.g., BEST" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
                 <FormField
                   control={form.control}
                   name="sanctionedLoad"

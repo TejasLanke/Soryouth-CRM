@@ -349,6 +349,9 @@ export type CreateSiteSurveyData = Omit<SiteSurvey, 'id' | 'surveyNumber' | 'cre
   surveyorId: string;
   consumerName: string;
   location: string;
+  consumerCategoryOther?: string;
+  roofTypeOther?: string;
+  discomOther?: string;
 };
 
 
