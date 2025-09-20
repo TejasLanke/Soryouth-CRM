@@ -205,23 +205,30 @@ export default function ClientsListPage() {
   };
 
   const statusFilters = useMemo((): ClientStatusFilterItem[] => {
+    let activeClients = clients;
+    if (userFilter !== 'all') {
+      activeClients = clients.filter(client => client.assignedTo === userFilter);
+    }
+    if (sourceFilter !== 'all'){
+      activeClients = activeClients.filter(client => client.source === sourceFilter);
+    }
     const counts: Record<string, number> = {};
     statuses.forEach(status => counts[status.name] = 0);
     
-    clients.forEach(client => {
+    activeClients.forEach(client => {
       if (counts[client.status] !== undefined) {
         counts[client.status]++;
       }
     });
 
-    const filters: ClientStatusFilterItem[] = [{ label: 'Show all', count: clients.length, value: 'all' }];
+    const filters: ClientStatusFilterItem[] = [{ label: 'Show all', count: activeClients.length, value: 'all' }];
     statuses.forEach(status => {
        if (status.name !== 'Inactive') {
          filters.push({ label: status.name, count: counts[status.name] || 0, value: status.name as ClientStatusType });
        }
     });
     return filters;
-  }, [clients, statuses]);
+  }, [clients, statuses, userFilter, sourceFilter]);
 
   const allFilteredClients = useMemo(() => {
     let clientsToDisplay = [...clients];

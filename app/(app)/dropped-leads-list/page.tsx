@@ -118,23 +118,30 @@ export default function DroppedLeadsListPage() {
   };
 
   const dropReasonFilters = useMemo((): DropReasonFilterItem[] => {
+    let dLeads = droppedLeads;
+    if (sourceFilter !== 'all'){
+      dLeads = dLeads.filter(droppedLead => droppedLead.source === sourceFilter);
+    }
+    if (userFilter !== 'all'){
+      dLeads = dLeads.filter(droppedLead => droppedLead.assignedTo === userFilter);
+    }
     const counts: Record<string, number> = {};
     DROP_REASON_OPTIONS.forEach(reason => counts[reason] = 0);
     
-    droppedLeads.forEach(lead => {
+    dLeads.forEach(lead => {
       if (counts[lead.dropReason] !== undefined) {
         counts[lead.dropReason]++;
       }
     });
 
-    const filters: DropReasonFilterItem[] = [{ label: 'Show all', count: droppedLeads.length, value: 'all' }];
+    const filters: DropReasonFilterItem[] = [{ label: 'Show all', count: dLeads.length, value: 'all' }];
     DROP_REASON_OPTIONS.forEach(reason => {
       if (counts[reason] > 0 || droppedLeads.some(l => l.dropReason === reason)) {
         filters.push({ label: reason, count: counts[reason] || 0, value: reason });
       }
     });
     return filters;
-  }, [droppedLeads]);
+  }, [droppedLeads, userFilter, sourceFilter]);
 
   const allFilteredLeads = useMemo(() => {
     let leadsToDisplay = [...droppedLeads];
